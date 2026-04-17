@@ -29,3 +29,12 @@ export interface VoiceMeta {
   lieScore: number;
   parsed: { count: number; rank: Rank } | null;
 }
+
+// From game-engine spec §2 — produced by dealFresh(), consumed by SetupComplete/JokerPicked events.
+export interface RoundDeal {
+  playerHand: Card[];       // length === 5
+  aiHand: Card[];           // length === 5
+  remainingDeck: Card[];    // length === 10
+  targetRank: Rank;
+  activePlayer: 'player' | 'ai';
+}
