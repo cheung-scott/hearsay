@@ -43,18 +43,13 @@ export async function GET() {
       },
     });
 
-    // Aggregate the iterable into a Buffer. For ~1-2s of Flash v2.5 this is
-    // fine; optimize to true streaming later in voice/tts.ts.
-    const chunks: Uint8Array[] = [];
-    for await (const chunk of audio) {
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
-
-    return new Response(new Uint8Array(buffer), {
+    // SDK returns a Web ReadableStream<Uint8Array>. Pass it straight to
+    // Response — browser starts playing as bytes arrive (no Buffer.concat
+    // wait). Response accepts ReadableStream as its body. No Content-Length
+    // because we don't know the total size up front.
+    return new Response(audio, {
       headers: {
         "Content-Type": "audio/mpeg",
-        "Content-Length": buffer.length.toString(),
         "Cache-Control": "no-store",
       },
     });
