@@ -1,5 +1,14 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# ============================================================================
+# ⚠️  DO NOT ADD `.kiro/` TO THIS FILE
+# ----------------------------------------------------------------------------
+# `.kiro/` contains specs, steering, hooks, and the game-debug MCP server.
+# ElevenHacks Hack #5 (Kiro partner week) REQUIRES `.kiro/` be committed to
+# the public repo so judges can evaluate the Implementation pillar.
+# Gitignoring it would auto-fail the submission.
+# ============================================================================
+
 # dependencies
 /node_modules
 /.pnp
@@ -39,3 +48,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel
