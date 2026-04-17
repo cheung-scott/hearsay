@@ -69,7 +69,7 @@
   **Files:** `src/lib/game/claims.test.ts`
   - [ ] 11.1 Test WORD_TO_NUM has exactly 4 entries with correct mappings.
   - [ ] 11.2 Test CLAIM_REGEX is a RegExp with the expected pattern.
-  - [ ] 11.3 Parameterized test: all 48 positive variants (16 count×rank combos × 3 casings) parse correctly (Invariant 14).
+  - [ ] 11.3 Parameterized test: all 32 meaningful variants — 24 word (2 words × 4 ranks × 3 casings) + 8 digit (2 digits × 4 ranks × 1 casing) — parse correctly (Invariant 14).
   - [ ] 11.4 Test numeric digit forms: "1 queen" → {1, Queen}, "2 queens" → {2, Queen} (Invariant 15).
   - [ ] 11.5 Test leading/trailing noise: "uh, one queen.", "One queen, please.", "Just two kings" (Invariant 16).
   - [ ] 11.6 Test first-match-wins: "two queens or one king" → {2, Queen} (Invariant 17).

@@ -74,7 +74,7 @@ This document specifies the requirements for the deck-and-claims module of Hears
 #### Acceptance Criteria
 
 1. WHEN a transcript contains a valid claim phrase (count word/digit followed by a rank, with optional plural "s"), THE parseClaim function SHALL return `{ count: 1|2, rank: Rank }` with the correct values.
-2. THE parseClaim function SHALL match all 16 count × rank combinations (`one|two|1|2` × `queen|king|ace|jack`) across lowercase, UPPERCASE, and Title Case — 48 positive variants total (matches design.md §6 invariant 14 + Task 11.3).
+2. THE parseClaim function SHALL match 32 meaningful positive variants — `2 word-counts (one, two) × 4 ranks × 3 casings = 24` + `2 digit-counts (1, 2) × 4 ranks × 1 casing = 8` (digits don't casing-permute). Matches design.md §6 invariant 14 + tasks.md Task 11.3.
 3. WHEN a transcript contains leading or trailing noise (filler words, punctuation), THE parseClaim function SHALL still extract the valid claim phrase.
 4. WHEN a transcript contains multiple valid claim phrases, THE parseClaim function SHALL return the first match only.
 5. WHEN a transcript is an empty string, THE parseClaim function SHALL return null.
@@ -105,7 +105,7 @@ This document specifies the requirements for the deck-and-claims module of Hears
 11. THE test suite SHALL verify dealFresh targetRank is a valid member of ALL_RANKS (Invariant 11).
 12. THE test suite SHALL verify dealFresh activePlayer is 'player' or 'ai' (Invariant 12).
 13. THE test suite SHALL verify dealFresh determinism with a seeded RNG (Invariant 13).
-14. THE test suite SHALL verify parseClaim positive matches across all 48 count × rank × casing variants (Invariant 14).
+14. THE test suite SHALL verify parseClaim positive matches across all 32 meaningful count × rank × casing variants (Invariant 14 — 24 word + 8 digit, digits don't casing-permute).
 15. THE test suite SHALL verify parseClaim handles numeric digit forms (Invariant 15).
 16. THE test suite SHALL verify parseClaim handles leading/trailing noise (Invariant 16).
 17. THE test suite SHALL verify parseClaim first-match-wins behavior (Invariant 17).
@@ -139,7 +139,7 @@ Maps each of the 25 locked invariants from design.md §6 to the requirement(s) t
 | 11 | dealFresh targetRank valid | 4.3, 6.11 |
 | 12 | dealFresh activePlayer valid | 4.4, 6.12 |
 | 13 | dealFresh determinism with seeded rng | 4.5, 6.13 |
-| 14 | parseClaim positive matches (48 variants) | 5.1, 5.2, 6.14 |
+| 14 | parseClaim positive matches (32 variants) | 5.1, 5.2, 6.14 |
 | 15 | parseClaim numeric digit forms | 5.2, 6.15 |
 | 16 | parseClaim leading/trailing noise | 5.3, 6.16 |
 | 17 | parseClaim first-match-wins | 5.4, 6.17 |

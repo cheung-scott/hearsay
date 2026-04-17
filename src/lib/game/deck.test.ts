@@ -178,6 +178,16 @@ describe('dealFresh', () => {
       deal1.activePlayer !== deal2.activePlayer;
     expect(differs).toBe(true);
   });
+
+  it('consumes exactly 21 rng() calls in order: 19 shuffle swaps + 1 targetRank + 1 activePlayer (Req 4.6)', () => {
+    let calls = 0;
+    const countingRng = () => {
+      calls++;
+      return 0.5;
+    };
+    dealFresh(countingRng);
+    expect(calls).toBe(21);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -243,7 +243,7 @@ Tests live in `src/lib/game/deck.test.ts` and `src/lib/game/claims.test.ts`.
 
 ### `parseClaim`
 
-14. **Positive matches:** parameterised test over the 16 `count × rank × singular/plural` combinations × `lowercase/Title Case/UPPERCASE` = 48 variants → all parse to expected `{ count, rank }`.
+14. **Positive matches:** parameterised test over 32 meaningful variants — `2 word-counts (one, two) × 4 ranks × 3 casings = 24` + `2 digit-counts (1, 2) × 4 ranks × 1 casing = 8` (digits don't casing-permute) → all parse to expected `{ count, rank }`. Earlier spec draft said "48" but that double-counted digits across nonexistent casing states.
 15. **Numeric digits:** `"1 queen"` and `"2 queens"` parse same as word forms.
 16. **Leading/trailing noise:** `"uh, one queen."` / `"One queen, please."` / `"Just two kings"` all parse correctly.
 17. **First-match-wins:** `"two queens or one king"` → `{2, Queen}`.
