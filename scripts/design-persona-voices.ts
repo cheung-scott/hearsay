@@ -160,9 +160,12 @@ const client = new ElevenLabsClient({ apiKey });
 async function getUserCredits(): Promise<number | null> {
   try {
     const sub = await client.user.subscription.get();
-    // character_count / character_limit available; credits field varies by plan
-    const remaining = (sub as Record<string, unknown>)['characterCount']
-      ?? (sub as Record<string, unknown>)['character_count']
+    // character_count / character_limit available; credits field varies by plan.
+    // Cast via unknown because Subscription has a defined shape but we probe
+    // defensively for tier-dependent fields.
+    const subRecord = sub as unknown as Record<string, unknown>;
+    const remaining = subRecord['characterCount']
+      ?? subRecord['character_count']
       ?? null;
     return typeof remaining === 'number' ? remaining : null;
   } catch {
