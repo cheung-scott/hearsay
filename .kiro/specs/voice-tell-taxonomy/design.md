@@ -105,7 +105,12 @@ function computeLieScore(m: LieScoreInput): number {
   const fil = Math.min(m.fillerCount / 3, 1);
   const pau = Math.min(m.pauseCount / 3, 1);
   const rat = (m.speechRateWpm < 120 || m.speechRateWpm > 220) ? 1 : 0;
-  return 0.40 * lat + 0.30 * fil + 0.20 * pau + 0.10 * rat;  // max 1.0
+  // Integer-weight form PREFERRED — mathematically equivalent to the literal
+  // 0.40/0.30/0.20/0.10 sum but avoids IEEE-754 drift where 0.4+0.3+0.2+0.1
+  // === 0.9999999999999999 (would break saturation → 1.0 invariant). The
+  // CONTRACT is the 40/30/20/10 weight allocation — any mathematically
+  // equivalent expression is a valid implementation.
+  return (4 * lat + 3 * fil + 2 * pau + 1 * rat) / 10;  // max 1.0
 }
 ```
 
@@ -188,3 +193,4 @@ This spec depends on (but does NOT implement):
 | `Persona`, `TruthState`, `Rank` types | `game-engine` spec / `src/lib/game/types.ts` | Shared across specs |
 | ElevenLabs JS SDK | npm package `@elevenlabs/elevenlabs-js` | TTS client applies VOICE_PRESETS via `voiceSettings` override on Flash v2.5 |
 | MediaRecorder + Web Audio VAD fallback | `src/lib/voice/stt.ts` (out of spec) | Produces `LieScoreInput` when Scribe word timestamps miss |
+
