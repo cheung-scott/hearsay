@@ -28,12 +28,29 @@ export const VOICE_PRESETS: Record<Persona, Record<TruthState, VoiceSettings>> =
   },
 };
 
-// Voice IDs per persona — Day-2 tuning block fills these from the ElevenLabs
-// preset library or Voice Generation API (stretch). Reader's ID is the smoke-
-// test placeholder from /api/ping-voice and will be confirmed or replaced.
+// VOICE CASTING — first-pass casting from ElevenLabs preset library.
+// Subject to A/B replacement during Day-2 tuning block.
+// To replace: swap the voice ID and annotate with // TUNED: YYYY-MM-DD <reason>.
+//
+//   Novice      → Rachel (21m00Tcm4TlvDq8ikWAM)
+//                 Calm young-sounding female. Hesitant delivery maps well to the
+//                 starter persona's obvious tells and nervous energy.
+//
+//   Reader      → George (JBFqnCBsd6RMkjVDRZzb)
+//                 Warm British baritone, measured and confident. Carried over from
+//                 /api/ping-voice smoke test; confirmed working on Flash v2.5.
+//
+//   Misdirector → Arnold (VR6AewLTigWG4xSOukaG)
+//                 Crisp authoritative male, can go theatrical. The inversion persona
+//                 needs a voice that sounds convincingly calm when lying — Arnold's
+//                 controlled range fits.
+//
+//   Silent      → Adam (pNInz6obpgDQGcFmaJgB)
+//                 Deep stoic male, minimal affect. Suits the expert-challenge persona
+//                 whose tells are near-imperceptible.
 export const PERSONA_VOICE_IDS: Record<Persona, string> = {
-  Novice: 'TBD_DAY2_TUNING',
-  Reader: 'JBFqnCBsd6RMkjVDRZzb',
-  Misdirector: 'TBD_DAY2_TUNING',
-  Silent: 'TBD_DAY2_TUNING',
+  Novice:      '21m00Tcm4TlvDq8ikWAM',  // Rachel — calm young-sounding female, hesitant-reads well
+  Reader:      'JBFqnCBsd6RMkjVDRZzb',  // George — warm British baritone, confident, kept from ping-voice
+  Misdirector: 'VR6AewLTigWG4xSOukaG',  // Arnold — crisp authoritative male, can go theatrical
+  Silent:      'pNInz6obpgDQGcFmaJgB',  // Adam — deep stoic male, minimal affect
 };
