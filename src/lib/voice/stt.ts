@@ -72,6 +72,9 @@ export function extractVoiceMeta(
 
   const chunk = response as SpeechToTextChunkResponseModel;
 
+  // Coerce text defensively — chunk.text can be null/undefined on empty audio.
+  const text = typeof chunk.text === 'string' ? chunk.text : '';
+
   // latencyMs — time to first word-type entry.
   const firstWord = chunk.words.find(
     (w) => w.type === 'word' && w.start != null,
@@ -79,7 +82,7 @@ export function extractVoiceMeta(
   const latencyMs = firstWord?.start != null ? firstWord.start * 1000 : 0;
 
   // fillerCount — use .match() to avoid mutating the global regex's lastIndex.
-  const fillerCount = (chunk.text.match(FILLER_REGEX) ?? []).length;
+  const fillerCount = (text.match(FILLER_REGEX) ?? []).length;
 
   // pauseCount — gaps strictly > 400ms between consecutive word-type entries.
   const wordEntries = chunk.words.filter((w) => w.type === 'word');
@@ -110,7 +113,7 @@ export function extractVoiceMeta(
   });
 
   return {
-    transcript: chunk.text,
+    transcript: text,
     latencyMs,
     fillerCount,
     pauseCount,

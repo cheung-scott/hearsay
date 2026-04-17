@@ -287,3 +287,22 @@ describe('extractVoiceMeta — pauses skip non-word entries', () => {
     expect(result.pauseCount).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 10. null / undefined chunk.text — defensive coercion (Fix 1)
+// ---------------------------------------------------------------------------
+describe('extractVoiceMeta — null/undefined chunk.text', () => {
+  it('handles null chunk.text → empty transcript, fillerCount 0, no throw', () => {
+    const response = { words: [], text: null } as unknown;
+    const result = extractVoiceMeta(response);
+    expect(result.transcript).toBe('');
+    expect(result.fillerCount).toBe(0);
+  });
+
+  it('handles undefined chunk.text → empty transcript, fillerCount 0, no throw', () => {
+    const response = { words: [] } as unknown;
+    const result = extractVoiceMeta(response);
+    expect(result.transcript).toBe('');
+    expect(result.fillerCount).toBe(0);
+  });
+});

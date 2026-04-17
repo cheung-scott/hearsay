@@ -65,7 +65,7 @@ if (!apiKey) {
   console.error('ERROR: ELEVENLABS_API_KEY is not set. Add it to .env.local');
   process.exit(1);
 }
-console.log(`[init] API key loaded (${apiKey.length} chars, prefix: ${apiKey.slice(0, 4)}***)`);
+console.log(`[init] API key loaded (${apiKey.length} chars).`);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -105,11 +105,12 @@ const STINGER_PROMPT    = 'heavy cell-door clang, metallic reverberant, single d
 
 // Voice settings for elimination-beat clips (emotional range, non-gameplay)
 // Per steering doc: stability 0.4, similarityBoost 0.85, style 0.65, useSpeakerBoost true
-// speed is NOT passed — v3 doesn't expose speed via voiceSettings in the SDK
+// speed: 0.95 — within spec §1.5 required range 0.92-0.98; SDK VoiceSettings.speed?: number confirmed.
 const ELIM_VOICE_SETTINGS = {
   stability:       0.4,
   similarityBoost: 0.85,
   style:           0.65,
+  speed:           0.95,  // spec §1.5 requires 0.92-0.98
   useSpeakerBoost: true,
 } as const;
 

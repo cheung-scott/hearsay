@@ -70,7 +70,7 @@ if (!apiKey) {
   console.error('ERROR: ELEVENLABS_API_KEY is not set. Add it to .env.local');
   process.exit(1);
 }
-console.log(`[init] API key loaded (${apiKey.length} chars, prefix: ${apiKey.slice(0, 4)}***)`);
+console.log(`[init] API key loaded (${apiKey.length} chars).`);
 
 // ---------------------------------------------------------------------------
 // Types — inlined to avoid importing Next.js app code into this Node script
@@ -133,6 +133,7 @@ const PERSONAS: Persona[]    = ['Novice', 'Reader', 'Misdirector', 'Silent'];
 const TRUTH_STATES: TruthState[] = ['honest', 'lying'];
 
 const OUTPUT_DIR = path.resolve(process.cwd(), 'public/sfx/presets');
+const LISTENING_MD_PATH = path.join(OUTPUT_DIR, 'LISTENING.md');
 
 // Flash v2.5 credit rate: ~0.5 credits per character
 const FLASH_CREDITS_PER_CHAR = 0.5;
@@ -163,6 +164,112 @@ async function streamToUint8Array(stream: ReadableStream<Uint8Array>): Promise<U
     offset += chunk.length;
   }
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// LISTENING.md generator
+// Always regenerates — it's cheap text, no API cost.
+// ---------------------------------------------------------------------------
+function writeListeningMarkdown(): void {
+  // For each persona, pair honest + lying per claim
+  function personaTable(persona: Persona): string {
+    const claims = CLAIM_STRINGS.map(c => c.slug);
+    const isMisdirector = persona === 'Misdirector';
+    const honestHeader = isMisdirector ? 'Honest (should sound NERVOUS)' : 'Honest';
+    const lyingHeader  = isMisdirector ? 'Lying (should sound CALM)'     : 'Lying';
+    const auditHeader  = isMisdirector ? 'Inversion correct? (Y/N)'      : 'Tell audible? (Y/N/Subtle)';
+
+    const rows = claims.map(slug => {
+      const claimLabel = CLAIM_STRINGS.find(c => c.slug === slug)!.text.replace(/\.$/, '');
+      const honestFile = `${persona.toLowerCase()}-honest-${slug}.mp3`;
+      const lyingFile  = `${persona.toLowerCase()}-lying-${slug}.mp3`;
+      return `| ${claimLabel} | [honest](./${honestFile}) | [lying](./${lyingFile}) | | |`;
+    });
+
+    return [
+      `| Claim | ${honestHeader} | ${lyingHeader} | ${auditHeader} | Notes |`,
+      `|---|---|---|---|---|`,
+      ...rows,
+    ].join('\n');
+  }
+
+  const md = `# Day-2 Tuning Block — A/B Listening Reference
+
+Use this file during the voice-preset tuning block to evaluate whether each persona's
+honest/lying voice tells are audibly distinguishable at the right distinctiveness level.
+
+**How to use:**
+1. Open this folder in your file browser (or a media player that can browse directories)
+2. For each persona section below, listen to the honest and lying clips side-by-side using headphones
+3. Fill in the "Tell audible?" column: **Y** (clearly audible), **Subtle** (present but requires attention), **N** (indistinguishable)
+4. See the tuning protocol at the bottom of this file if any persona needs adjustment
+
+---
+
+## Novice
+
+**Target:** Lying should be OBVIOUS — demo-safe, immediately readable even on first listen.
+No subtlety required. If a first-time player can't hear the tell, the preset is wrong.
+Invariant: \`stability <= 0.25\` AND \`style >= 0.55\` on lying preset.
+
+${personaTable('Novice')}
+
+---
+
+## Reader
+
+**Target:** Tell should be SUBTLE but RELIABLE — present on every claim, but requires
+attention to catch. A good player can read it; a casual player might miss it.
+
+${personaTable('Reader')}
+
+---
+
+## Misdirector
+
+**Target:** INVERSION — honest sounds nervous, lying sounds calm. The OPPOSITE of Reader.
+This persona punishes players who learned "shaky = lying" from Reader.
+
+> **⚠️ Misdirector inversion check**
+>
+> Misdirector's HONEST clip should sound NERVOUS. Misdirector's LYING clip should sound CALM.
+> If it sounds backwards (honest calm, lying nervous), the preset was accidentally normalised —
+> re-read \`voice-preset-conventions.md\` LOCKED invariant 2 and check \`presets.ts\`.
+> The invariant test (\`pnpm test\`) enforces: \`Misdirector.honest.stability < Misdirector.lying.stability\`.
+
+${personaTable('Misdirector')}
+
+---
+
+## Silent
+
+**Target:** Tells near-IMPERCEPTIBLE — expert-challenge persona. Even an attentive player
+should struggle to reliably distinguish honest from lying. The delta should be present
+(not literally identical) but very small.
+Invariant: \`|honest.stability − lying.stability| < 0.25\`.
+
+${personaTable('Silent')}
+
+---
+
+## Tuning Protocol
+
+1. Listen to each pair with headphones
+2. Mark "Tell audible?" in the table above
+3. If a persona's tells need adjustment, edit \`src/lib/voice/presets.ts\`:
+   - Adjust \`stability\` first: ±0.1 (most impactful for shaky/nervous quality)
+   - Then \`style\`: ±0.1 (emotional expressiveness)
+   - Then \`speed\`: ±0.04 (pacing changes are subtle but compound with the above)
+4. Run \`pnpm test\` to verify the Misdirector inversion invariant and Novice audibility invariant still hold
+5. Re-run for one persona at a time:
+   \`\`\`
+   pnpm pre-gen:tuning -- --force --persona <NAME>
+   \`\`\`
+6. Re-listen to the regenerated 8 clips and repeat until satisfied
+`;
+
+  fs.writeFileSync(LISTENING_MD_PATH, md);
+  console.log(`[done] LISTENING.md written → ${LISTENING_MD_PATH}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -284,6 +391,9 @@ async function main(): Promise<void> {
   } else {
     console.warn('[warn] Some expected files are missing — check failures above.');
   }
+
+  // Always regenerate LISTENING.md — cheap text, no API cost.
+  writeListeningMarkdown();
 
   if (anyFailed) {
     console.error('[warn] One or more clips failed — see errors above.');

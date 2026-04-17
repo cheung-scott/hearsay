@@ -73,7 +73,7 @@ if (!apiKey) {
   console.error('ERROR: ELEVENLABS_API_KEY is not set. Add it to .env.local');
   process.exit(1);
 }
-console.log(`[init] API key loaded (length: ${apiKey.length}, prefix: ${apiKey.slice(0, 4)}***)`);
+console.log(`[init] API key loaded (${apiKey.length} chars).`);
 
 // ---------------------------------------------------------------------------
 // Types
@@ -284,8 +284,9 @@ async function main() {
   let finalData: PreviewsJson;
 
   if (existingData && personaFilter) {
-    // Merge: update only the targeted persona
-    finalData = { ...existingData };
+    // Merge: update only the targeted persona.
+    // Deep-copy personas so we don't mutate existingData.personas in-place.
+    finalData = { ...existingData, personas: { ...existingData.personas } };
     for (const [persona, meta] of Object.entries(results) as [Persona, PersonaMetadata][]) {
       finalData.personas[persona] = meta;
     }
