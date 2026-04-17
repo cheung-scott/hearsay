@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "pre-gen:elim-beat": "tsx scripts/pre-gen-elimination-beat.ts",
+    "pre-gen:tuning": "tsx scripts/pre-gen-tuning-clips.ts",
     "design:voices": "tsx scripts/design-persona-voices.ts"
   },
   "dependencies": {
