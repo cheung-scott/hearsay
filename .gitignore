@@ -33,6 +33,10 @@
 .DS_Store
 *.pem
 
+# IDE — Kiro/VS Code user-local settings (commit `.kiro/` instead, which is
+# the hackathon-required spec-driven artifact folder)
+.vscode/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

@@ -98,11 +98,34 @@ Voice settings for these (non-gameplay emotional range):
 
 **Content rule:** non-violent only. No self-harm language. No slurs. These play in front of judges.
 
-## Voice ID selection
+## Voice ID selection (Day 2)
 
-- Pick 1 voice ID per persona from the ElevenLabs library (not cloned for MVP — PVC available via Creator tier as risk-#1 fallback only)
-- Voice IDs stored in `src/lib/ai/personas.ts` as `PERSONA_VOICE_IDS: Record<Persona, string>`
-- Document chosen voices (name + ID + characterization) in a `// VOICE CASTING` comment block at top of `personas.ts`
+Two paths, tried in parallel:
+
+**Path A — ElevenLabs preset library (baseline, always available):**
+- Pick 1 voice ID per persona from the curated library
+- Safe, quality-controlled, zero design risk
+
+**Path B — ElevenLabs Voice Generation API (stretch, A/B vs Path A):**
+- Design each persona's voice from a character description (~4 × 1-sentence prompts)
+- Example prompts:
+  - **Novice:** "Nervous young male voice, mid-20s, hesitant rhythm, slight upward inflection — sounds like someone trying their first-ever bluff"
+  - **Reader:** "Calm confident alto, late 30s, measured cadence, slight smoker's rasp — sounds like they've played this game many times"
+  - **Misdirector:** "Theatrical silky baritone, 40s, unpredictable pitch range, hint of a smile in every line — sounds like a stage magician"
+  - **Silent:** "Sparse deep voice, mid-50s, long pauses between words, minimal affect — sounds like someone who speaks only when necessary"
+- Generated voices saved to account, reusable at $0 per-call after one-time design credit spend
+- ~1000 credits per voice design × 4 = ~4000 credits one-time
+
+**A/B decision gate (~30 min):**
+1. Generate 1 sample claim ("One Queen.") in both Path A and Path B for each persona
+2. Listen back-to-back on headphones
+3. Keep whichever sounds closer to the persona character brief
+4. Lock the chosen voice ID per persona in `src/lib/ai/personas.ts` as `PERSONA_VOICE_IDS: Record<Persona, string>`
+5. Document chosen voice (name OR design prompt + ID + characterization) in a `// VOICE CASTING` comment block at top of `personas.ts`
+
+**Fallback rule:** If a designed voice sounds worse than any preset tested, take the preset. No attachment to "we designed it" if the audio is worse — better-sounding persona > more-creative-narrative.
+
+**Not cloned:** PVC (Professional Voice Cloning) from user-supplied recordings is NOT used for MVP. Architecture §11 risk #1 keeps it as a fallback ONLY if per-request voice-settings override fails on Flash v2.5.
 
 ## Cache policy
 

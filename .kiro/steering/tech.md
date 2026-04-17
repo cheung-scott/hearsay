@@ -11,6 +11,7 @@
 | Voice STT | **ElevenLabs Scribe** (word-level timestamps) | Native lie-heuristic signal (latency, fillers, pauses, speech rate) without custom VAD |
 | SFX (§1.5) | **ElevenLabs Sound Effects API** (`POST /v1/sound-generation`, model `eleven_text_to_sound_v2`, 40 credits/sec) | Pre-gen strike-3 stinger + silent-beat mechanical SFX. Cached as static MP3s. Never runtime. |
 | Music | **ElevenLabs Music API** (min 3s duration, tension-adaptive, 3 pre-gen tracks per session via `Promise.all`) + client-side **Web Audio `GainNode` ducking** | Extends ElevenLabs surface area beyond TTS; GainNode ducks to silence 400ms on every reveal (§1.5 silent beat) + 800ms fade on `session_over` |
+| Voice Design (Day 2 stretch) | **ElevenLabs Voice Generation API** | Design 4 persona voices from character descriptions at Day 2 tuning time. A/B vs preset library; keep whichever sounds better per persona. 5th ElevenLabs API surface = stronger "creative use" signal for judging priority #2. Design is one-time; generated voice IDs are free to reuse. |
 | Session state | In-memory `Map<sessionId, Session>` on server + `localStorage` on client (jokers / streak) | No DB — simplifies deploy, session is ephemeral by design |
 | Deploy | **Vercel** (`hearsay-hazel.vercel.app`) | <60s live URL; auto-deploy on push to main |
 | Testing | **Vitest** + Testing Library | Next.js-native, fast, no Jest config overhead |
