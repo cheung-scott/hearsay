@@ -1,0 +1,87 @@
+{
+  "generatedAt": "2026-04-17T19:55:56.755Z",
+  "model": "eleven_ttv_v3",
+  "sampleText": "One queen. Two kings. Just a jack. Your call. I've seen this hand before. You're either holding exactly what you say, or you're bluffing harder than anyone at this table. Either way, I'm watching. Make your move.",
+  "personas": {
+    "Novice": {
+      "brief": "Nervous young male voice, mid-20s, hesitant rhythm, slight upward inflection — sounds like someone trying their first-ever bluff",
+      "previews": [
+        {
+          "index": 1,
+          "generatedVoiceId": "aZS11VGKyNaxrLSt8D6W",
+          "file": "novice-1.mp3"
+        },
+        {
+          "index": 2,
+          "generatedVoiceId": "tOjbpfYBoC4zFl8sUDcH",
+          "file": "novice-2.mp3"
+        },
+        {
+          "index": 3,
+          "generatedVoiceId": "6dE8eyjzISAzrJvQVxBi",
+          "file": "novice-3.mp3"
+        }
+      ]
+    },
+    "Reader": {
+      "brief": "Calm confident alto, late 30s, measured cadence, slight smoker's rasp — sounds like they've played this game many times",
+      "previews": [
+        {
+          "index": 1,
+          "generatedVoiceId": "jckp5qagMBppRFRKz3W4",
+          "file": "reader-1.mp3"
+        },
+        {
+          "index": 2,
+          "generatedVoiceId": "x7VZXRUSX35XYTViS2Vz",
+          "file": "reader-2.mp3"
+        },
+        {
+          "index": 3,
+          "generatedVoiceId": "alwadYLmotr6GedBk9Q3",
+          "file": "reader-3.mp3"
+        }
+      ]
+    },
+    "Misdirector": {
+      "brief": "Theatrical silky baritone, 40s, unpredictable pitch range, hint of a smile in every line — sounds like a stage magician",
+      "previews": [
+        {
+          "index": 1,
+          "generatedVoiceId": "SNFe4fftdB4Vv0dF23p7",
+          "file": "misdirector-1.mp3"
+        },
+        {
+          "index": 2,
+          "generatedVoiceId": "U7jfwXAtUlFv8aXSCrHO",
+          "file": "misdirector-2.mp3"
+        },
+        {
+          "index": 3,
+          "generatedVoiceId": "bhoW4FiwHobu3h5RcWE9",
+          "file": "misdirector-3.mp3"
+        }
+      ]
+    },
+    "Silent": {
+      "brief": "Sparse deep voice, mid-50s, long pauses between words, minimal affect — sounds like someone who speaks only when necessary",
+      "previews": [
+        {
+          "index": 1,
+          "generatedVoiceId": "RUF8y3rdP9yPNmQ7T4s7",
+          "file": "silent-1.mp3"
+        },
+        {
+          "index": 2,
+          "generatedVoiceId": "t8uP2AkYTcjcCQ7yeOgP",
+          "file": "silent-2.mp3"
+        },
+        {
+          "index": 3,
+          "generatedVoiceId": "P7v23ayxhcoF7ObNotZa",
+          "file": "silent-3.mp3"
+        }
+      ]
+    }
+  }
+}

@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "pre-gen:elim-beat": "tsx scripts/pre-gen-elimination-beat.ts"
+    "pre-gen:elim-beat": "tsx scripts/pre-gen-elimination-beat.ts",
+    "design:voices": "tsx scripts/design-persona-voices.ts"
   },
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.43.0",
