@@ -45,10 +45,11 @@ hearsay/
 │   ├── components/              # React UI
 │   │   ├── ui/                  # shadcn/ui primitives
 │   │   ├── Card.tsx             # Playing card render
-│   │   ├── StrikeCounter.tsx    # 3-slot ✗ display per player
+│   │   ├── StrikeCounter.tsx    # 3-slot display — smoke-wisped tally marks per §1.5
 │   │   ├── VoiceClaim.tsx       # Mic record + button fallback
 │   │   ├── JokerPicker.tsx      # Between-rounds 1-of-3 picker
-│   │   └── RoundAutopsy.tsx     # Post-round reveal (innerThoughts, presets)
+│   │   ├── RoundAutopsy.tsx     # Post-round reveal (innerThoughts, presets)
+│   │   └── EliminationBeat.tsx  # §1.5 orchestrator — silent-beat + stinger + final-words on session_over
 │   ├── lib/
 │   │   ├── game/
 │   │   │   ├── fsm.ts           # Pure-TS state machine (spec: game-engine)
@@ -72,6 +73,15 @@ hearsay/
 │   │       └── store.ts         # In-memory Map<sessionId, Session>
 │   └── test/                    # Vitest specs mirror src/ tree
 ├── public/                      # Static assets (card SVGs, favicon)
+│   ├── sfx/                     # §1.5 elimination-beat audio assets (pre-generated, committed)
+│   │   ├── final-words/
+│   │   │   ├── novice.mp3       # Pre-gen via Eleven v3 Day 2 — [gasps] No— no, wait—
+│   │   │   ├── reader.mp3       # Pre-gen via Eleven v3 Day 2 — [whispers] ...huh.
+│   │   │   ├── misdirector.mp3  # Pre-gen via Eleven v3 Day 2 — [laughs darkly] ...well played.
+│   │   │   └── silent.mp3       # Pre-gen via Eleven v3 Day 2 — [long exhale]...
+│   │   ├── elimination-stinger.mp3  # Pre-gen via Sound Effects API Day 2 — non-firearm
+│   │   ├── silent-beat-mechanical.mp3  # §1.5 fill for 2s dead-air moment
+│   │   └── presets/             # Voice-tuning reference clips (dev-only, not runtime)
 ├── .env.local                   # ELEVENLABS_API_KEY, GEMINI_API_KEY (gitignored)
 ├── package.json
 ├── pnpm-lock.yaml

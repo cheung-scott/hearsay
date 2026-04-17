@@ -6,9 +6,11 @@
 | UI components | shadcn/ui (to install as needed) | Polished defaults without bespoke component work |
 | Backend | Next.js API routes (same repo) | Zero-infra overhead for API layer |
 | AI decisioning | **Gemini 2.5 Flash** (`@google/genai`, free tier) with deterministic math grounding + deterministic fallback on 2s LLM timeout or invalid JSON | Natural varied behavior; $0 cost; latency/failure safety net |
-| Voice TTS | **ElevenLabs JS SDK** (`@elevenlabs/elevenlabs-js`), model `eleven_flash_v2_5` | ~75ms latency — fastest ElevenLabs model, fits turn-by-turn gameplay |
+| Voice TTS (live gameplay) | **ElevenLabs JS SDK** (`@elevenlabs/elevenlabs-js`), model `eleven_flash_v2_5` | ~75ms latency — fastest ElevenLabs model, fits turn-by-turn gameplay |
+| Voice TTS (§1.5 elimination beat ONLY) | **ElevenLabs Eleven v3** | Emotional tags (`[gasps]`, `[laughs]`, `[whispers]`, `[sighs]`, `[breathing heavily]`) that Flash v2.5 ignores — used for 4 pre-gen per-persona final-words clips only. Not for live gameplay. |
 | Voice STT | **ElevenLabs Scribe** (word-level timestamps) | Native lie-heuristic signal (latency, fillers, pauses, speech rate) without custom VAD |
-| Music | **ElevenLabs Music API** (tension-adaptive, 3 pre-gen tracks per session via `Promise.all`) | Extends ElevenLabs surface area beyond TTS; creative differentiator |
+| SFX (§1.5) | **ElevenLabs Sound Effects API** (`POST /v1/sound-generation`, model `eleven_text_to_sound_v2`, 40 credits/sec) | Pre-gen strike-3 stinger + silent-beat mechanical SFX. Cached as static MP3s. Never runtime. |
+| Music | **ElevenLabs Music API** (min 3s duration, tension-adaptive, 3 pre-gen tracks per session via `Promise.all`) + client-side **Web Audio `GainNode` ducking** | Extends ElevenLabs surface area beyond TTS; GainNode ducks to silence 400ms on every reveal (§1.5 silent beat) + 800ms fade on `session_over` |
 | Session state | In-memory `Map<sessionId, Session>` on server + `localStorage` on client (jokers / streak) | No DB — simplifies deploy, session is ephemeral by design |
 | Deploy | **Vercel** (`hearsay-hazel.vercel.app`) | <60s live URL; auto-deploy on push to main |
 | Testing | **Vitest** + Testing Library | Next.js-native, fast, no Jest config overhead |

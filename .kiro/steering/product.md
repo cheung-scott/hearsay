@@ -52,9 +52,36 @@ This is the signature mechanic — zero precedent across 180 enumerated prior El
 - **Active-player timeout (30s):** auto-play 1 random card + claim "One [target]".
 - **Responder timeout (30s):** auto-accept.
 
+## Presentation: Elimination Beat (§1.5, theme layer — non-mechanic)
+
+Losing = elimination, not death. **Non-firearm, non-gore** — dodges ElevenLabs Prohibited Use Policy + AWS/Kiro enterprise judging panel risk. Theme-only layer; zero changes to state machine, data model, AI pipeline, specs 1-9 — iter-5 lock preserved.
+
+- **Silent-beat-before-reveal:** every challenge triggers ~2s of dead air. Music ducks via Web Audio `GainNode` (400ms linear ramp), one mechanical SFX fills the silence, then cards flip. The "Buckshot Roulette held breath" — demo's cinematic center of gravity.
+- **Strike-3 elimination stinger:** non-firearm SFX (flatline / deep bell / glass shatter / cell-door clang). Pre-generated once via ElevenLabs Sound Effects API (`POST /v1/sound-generation`), cached as `public/sfx/elimination-stinger.mp3`.
+- **Per-persona final-words** — 4 static MP3 clips, pre-generated once via **Eleven v3** (supports emotional tags `[gasps]`, `[laughs]`, `[whispers]`, `[sighs]`). Non-violent content. Files: `public/sfx/final-words/{persona}.mp3`.
+
+| Persona | Final-words clip |
+|---|---|
+| Novice | `[gasps] No— no, wait—[breathing heavily]` |
+| Reader | `[whispers] ...huh.` |
+| Misdirector | `[laughs darkly] ...well played. [sighs]` |
+| Silent | `[long exhale]...` |
+
+**Strike counter upgrade:** 3 empty boxes → smoke-wisped tally-mark SVGs (no red ✗ in final UI). Lighting dims via CSS filter on strike 2. Viewport crack + red bleed effect on strike 3 is a stretch (skip if Day 5 compressed).
+
+**Framing rules:**
+- Use "eliminated", "final hand", "lights out" — never "died", "killed", "murdered"
+- Never generate gunshot SFX (TOS risk + judge sensitivity)
+- Never generate runtime LLM final-words dialogue (adds prompt paths + Kiro code-gen risk #14)
+- Never rename `session_over` / `sessionWinner` / `strikes` — labels are display-layer only, typed contracts stay locked
+
+Full spec: `ARCHITECTURE-DRAFT.md` §1.5 + §6.4 + §9 spec 9.
+
 ## Out of scope
 
 Multiplayer, authentication, database persistence beyond `localStorage`, mobile app, real prosodic voice analysis (pitch / emotion / stress), real-time barge-in, voice cloning of player, custom DAW audio mixing.
+
+**Explicitly cut during §1.5 pivot risk analysis:** gunshot SFX, literal death framing, LLM-generated runtime final-words, 4th music track "death", state-machine renames, persistent deathcards, cold-open / flashback demo video structure.
 
 ## Signature differentiators (for judges)
 
