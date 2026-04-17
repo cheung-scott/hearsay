@@ -46,8 +46,8 @@ This is the signature mechanic — zero precedent across 180 enumerated prior El
 
 - **Unparseable voice input:** STT transcript fails regex `(one|two|1|2) (queen|king|ace|jack)s?`. UI shows retry prompt; button-based claim fallback always visible. 2 parse failures → auto-play random card + random-count claim.
 - **Wrong rank claimed:** UI flags "This round is Queens. Try again." Doesn't count as timeout retry.
-- **Caught on final card:** liar takes pile → hand non-empty → round continues (no exploit).
-- **Wrongly-challenged-on-honest-final-card:** hand empty + last claim honest → round won immediately.
+- **Caught on final card (lie):** liar takes pile to their `takenCards` + strike +1 → **round ends immediately, opponent wins the round.** (Iter-1 review resolved the earlier "round continues with empty hand" ambiguity — empty-handed liar can't continue, so round ends cleanly.)
+- **Wrongly-challenged-on-honest-final-card:** hand empty + last claim honest → **round ends immediately, active player wins**, challenger strikes +1.
 - **Forced lie:** 0 target-rank cards in hand → must lie. Expected to happen often.
 - **Active-player timeout (30s):** auto-play 1 random card + claim "One [target]".
 - **Responder timeout (30s):** auto-accept.
