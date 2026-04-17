@@ -159,7 +159,7 @@ const client = new ElevenLabsClient({ apiKey });
 // ---------------------------------------------------------------------------
 async function getUserCredits(): Promise<number | null> {
   try {
-    const sub = await client.user.subscription();
+    const sub = await client.user.subscription.get();
     // character_count / character_limit available; credits field varies by plan
     const remaining = (sub as Record<string, unknown>)['characterCount']
       ?? (sub as Record<string, unknown>)['character_count']
