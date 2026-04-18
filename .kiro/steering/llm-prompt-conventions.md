@@ -12,7 +12,7 @@ Applies when editing AI brain/LLM code. Codifies prompt structure, fallback rule
 **Google Gemini 2.5 Flash** via `@google/genai` SDK.
 
 - Free tier: 1500 req/day. Expected load: ~200/day dev + ~500 total judge plays = plenty of headroom.
-- JSON-mode: use `responseSchema` param to enforce output shape. Do NOT rely on "please output JSON" in the prompt text alone.
+- JSON-mode: use the `responseJsonSchema` field inside `config` (i.e. `config.responseJsonSchema`) to enforce output shape. Do NOT rely on "please output JSON" in the prompt text alone. Note: the legacy `@google/generative-ai` SDK called this field `responseSchema` — the current `@google/genai` SDK uses `responseJsonSchema`.
 
 ## Pipeline (hybrid — never pure-LLM)
 
