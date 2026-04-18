@@ -1329,3 +1329,151 @@ describe('reduce — JokerOfferSkippedSessionOver (7.2)', () => {
     ).toThrow(InvalidTransitionError);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Task 8.2 — Timeout handling
+// ---------------------------------------------------------------------------
+
+describe('reduce — Timeout (active_player)', () => {
+  /** Session in round_active / claim_phase. Player has a Queen and a King. */
+  function makeClaimPhaseSession() {
+    const queenCard: Card = { id: 'Queen-0', rank: 'Queen' };
+    const kingCard: Card = { id: 'King-0', rank: 'King' };
+    const round = makeRound({ targetRank: 'Queen', activePlayer: 'player', status: 'claim_phase' });
+    return makeSession({
+      status: 'round_active',
+      player: makePlayer({ hand: [queenCard, kingCard] }),
+      ai: makePlayer({ hand: [makeCard('King', 1)] }),
+      rounds: [round],
+      currentRoundIdx: 0,
+    });
+  }
+
+  it('consumes cardIdToPlay from active hand and moves card to pile', () => {
+    const session = makeClaimPhaseSession();
+    const out = reduce(session, { type: 'Timeout', kind: 'active_player', cardIdToPlay: 'Queen-0', now: 9000 });
+    expect(out.player.hand.find((c) => c.id === 'Queen-0')).toBeUndefined();
+    expect(out.player.hand).toHaveLength(1);
+    const round = out.rounds[out.currentRoundIdx];
+    expect(round.pile.some((c) => c.id === 'Queen-0')).toBe(true);
+  });
+
+  it('generates a 1-card claim with count=1, claimedRank=targetRank, actualCardIds=[cardIdToPlay]', () => {
+    const session = makeClaimPhaseSession();
+    const out = reduce(session, { type: 'Timeout', kind: 'active_player', cardIdToPlay: 'Queen-0', now: 9000 });
+    const round = out.rounds[out.currentRoundIdx];
+    expect(round.claimHistory).toHaveLength(1);
+    const claim = round.claimHistory[0];
+    expect(claim.count).toBe(1);
+    expect(claim.claimedRank).toBe('Queen');
+    expect(claim.actualCardIds).toEqual(['Queen-0']);
+    expect(claim.by).toBe('player');
+    expect(claim.timestamp).toBe(9000);
+  });
+
+  it('truthState is honest when cardIdToPlay rank matches targetRank', () => {
+    const session = makeClaimPhaseSession(); // Queen-0 rank=Queen, targetRank=Queen
+    const out = reduce(session, { type: 'Timeout', kind: 'active_player', cardIdToPlay: 'Queen-0', now: 9000 });
+    const claim = out.rounds[out.currentRoundIdx].claimHistory[0];
+    expect(claim.truthState).toBe('honest');
+  });
+
+  it('truthState is lying when cardIdToPlay rank does NOT match targetRank', () => {
+    const session = makeClaimPhaseSession(); // King-0 rank=King, targetRank=Queen
+    const out = reduce(session, { type: 'Timeout', kind: 'active_player', cardIdToPlay: 'King-0', now: 9000 });
+    const claim = out.rounds[out.currentRoundIdx].claimHistory[0];
+    expect(claim.truthState).toBe('lying');
+  });
+
+  it('round transitions to response_phase after active_player timeout', () => {
+    const session = makeClaimPhaseSession();
+    const out = reduce(session, { type: 'Timeout', kind: 'active_player', cardIdToPlay: 'Queen-0', now: 9000 });
+    expect(out.rounds[out.currentRoundIdx].status).toBe('response_phase');
+  });
+
+  it('purity — same Timeout event twice yields structurally-equal Session', () => {
+    const session = makeClaimPhaseSession();
+    const event: GameEvent = { type: 'Timeout', kind: 'active_player', cardIdToPlay: 'Queen-0', now: 9000 };
+    expect(JSON.stringify(reduce(session, event))).toBe(JSON.stringify(reduce(session, event)));
+  });
+
+  it('throws when round.status !== claim_phase', () => {
+    const session = makeClaimPhaseSession();
+    const inResponsePhase = makeSession({
+      ...session,
+      rounds: [makeRound({ status: 'response_phase' })],
+    });
+    expect(() =>
+      reduce(inResponsePhase, { type: 'Timeout', kind: 'active_player', cardIdToPlay: 'Queen-0', now: 9000 })
+    ).toThrow(InvalidTransitionError);
+  });
+
+  it('throws when cardIdToPlay is not in active hand', () => {
+    const session = makeClaimPhaseSession();
+    expect(() =>
+      reduce(session, { type: 'Timeout', kind: 'active_player', cardIdToPlay: 'nonexistent-card', now: 9000 })
+    ).toThrow(InvalidTransitionError);
+  });
+
+  it('does not mutate input session', () => {
+    const session = makeClaimPhaseSession();
+    const before = JSON.stringify(session);
+    reduce(session, { type: 'Timeout', kind: 'active_player', cardIdToPlay: 'Queen-0', now: 9000 });
+    expect(JSON.stringify(session)).toBe(before);
+  });
+});
+
+describe('reduce — Timeout (responder)', () => {
+  /** Session in round_active / response_phase — active player has cards remaining */
+  function makeResponsePhaseSession(activeHandSize = 2) {
+    const cards = Array.from({ length: activeHandSize }, (_, i) => makeCard('Queen', i));
+    const round = makeRound({ targetRank: 'Queen', activePlayer: 'player', status: 'response_phase' });
+    return makeSession({
+      status: 'round_active',
+      player: makePlayer({ hand: cards }),
+      ai: makePlayer({ hand: [makeCard('King', 0)] }),
+      rounds: [round],
+      currentRoundIdx: 0,
+    });
+  }
+
+  it('behaves as ClaimAccepted — swaps active player when hand non-empty', () => {
+    const session = makeResponsePhaseSession(2);
+    const out = reduce(session, { type: 'Timeout', kind: 'responder', now: 9100 });
+    const round = out.rounds[out.currentRoundIdx];
+    expect(round.status).toBe('claim_phase');
+    expect(round.activePlayer).toBe('ai');
+  });
+
+  it('behaves as ClaimAccepted — round ends when active hand is empty', () => {
+    const session = makeResponsePhaseSession(0);
+    const out = reduce(session, { type: 'Timeout', kind: 'responder', now: 9100 });
+    const round = out.rounds[out.currentRoundIdx];
+    expect(round.status).toBe('round_over');
+    expect(round.winner).toBe('player');
+  });
+
+  it('purity — same responder Timeout twice yields structurally-equal Session', () => {
+    const session = makeResponsePhaseSession(2);
+    const event: GameEvent = { type: 'Timeout', kind: 'responder', now: 9100 };
+    expect(JSON.stringify(reduce(session, event))).toBe(JSON.stringify(reduce(session, event)));
+  });
+
+  it('throws when round.status !== response_phase', () => {
+    const session = makeResponsePhaseSession(2);
+    const inClaimPhase = makeSession({
+      ...session,
+      rounds: [makeRound({ status: 'claim_phase' })],
+    });
+    expect(() =>
+      reduce(inClaimPhase, { type: 'Timeout', kind: 'responder', now: 9100 })
+    ).toThrow(InvalidTransitionError);
+  });
+
+  it('does not mutate input session', () => {
+    const session = makeResponsePhaseSession(2);
+    const before = JSON.stringify(session);
+    reduce(session, { type: 'Timeout', kind: 'responder', now: 9100 });
+    expect(JSON.stringify(session)).toBe(before);
+  });
+});

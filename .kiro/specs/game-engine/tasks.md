@@ -149,13 +149,13 @@ Pure-TypeScript finite state machine for a best-of-3 voice-bluffing card game. I
     - Test `JokerOfferSkippedSessionOver` → `session_over`
     - _Requirements: 8.1, 8.2, 11.1, 11.2, 12.1, 12.2, 12.3, 12.4, 21.1, 21.2, 21.3, 21.5_
 
-- [ ] 8. Implement reducer: timeout handling
-  - [ ] 8.1 Implement `Timeout` event handling in `src/lib/game/fsm.ts`
+- [x] 8. Implement reducer: timeout handling
+  - [x] 8.1 Implement `Timeout` event handling in `src/lib/game/fsm.ts`
     - `active_player` timeout during `claim_phase`: **consume `event.cardIdToPlay` (caller-provided)**, auto-generate `ClaimMade` with `count=1`, `claimedRank = round.targetRank`, `actualCardIds = [cardIdToPlay]`. Derive truthState: `honest` iff the card with `id === cardIdToPlay` in hand has `rank === targetRank`. **Reducer never rolls randomness.**
     - `responder` timeout during `response_phase`: treat as `ClaimAccepted`
     - _Requirements: 13.1, 13.2, 13.3, 13.4_
 
-  - [ ]* 8.2 Write tests for timeout handling in `src/lib/game/fsm.test.ts`
+  - [x]* 8.2 Write tests for timeout handling in `src/lib/game/fsm.test.ts`
     - Test active-player timeout consumes `event.cardIdToPlay` and generates valid 1-card claim
     - Test timeout truthState is `honest` when `cardIdToPlay` rank matches target, `lying` otherwise
     - Test purity — same Timeout event twice yields identical Session

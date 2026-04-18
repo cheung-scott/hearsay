@@ -513,6 +513,58 @@ function claimMade(
   };
 }
 
+/** spec §1.3 Timeout row + §3.3 */
+function timeout(
+  session: Session,
+  event: Extract<GameEvent, { type: 'Timeout' }>,
+): Session {
+  const currentRound = session.rounds[session.currentRoundIdx];
+
+  if (event.kind === 'active_player') {
+    if (!currentRound || currentRound.status !== 'claim_phase') {
+      throw new InvalidTransitionError(
+        `round_active(round.status=${currentRound?.status ?? 'none'})`,
+        event.type,
+      );
+    }
+
+    const activeKey = currentRound.activePlayer;
+    const activeHand = session[activeKey].hand;
+    const card = activeHand.find((c) => c.id === event.cardIdToPlay);
+    if (!card) {
+      throw new InvalidTransitionError(
+        'round_active(timeout card not in hand)',
+        event.type,
+      );
+    }
+
+    const syntheticClaim: Claim = {
+      by: activeKey,
+      count: 1,
+      claimedRank: currentRound.targetRank,
+      actualCardIds: [event.cardIdToPlay],
+      truthState: card.rank === currentRound.targetRank ? 'honest' : 'lying',
+      timestamp: event.now,
+    };
+
+    return claimMade(session, {
+      type: 'ClaimMade',
+      claim: syntheticClaim,
+      now: event.now,
+    });
+  }
+
+  // kind === 'responder'
+  if (!currentRound || currentRound.status !== 'response_phase') {
+    throw new InvalidTransitionError(
+      `round_active(round.status=${currentRound?.status ?? 'none'})`,
+      event.type,
+    );
+  }
+
+  return claimAccepted(session, { type: 'ClaimAccepted', now: event.now });
+}
+
 // ---------------------------------------------------------------------------
 // Public reducer — spec §3.2
 // ---------------------------------------------------------------------------
@@ -546,8 +598,7 @@ export function reduce(session: Session, event: GameEvent): Session {
       return jokerPicked(session, event);
     case 'JokerOfferSkippedSessionOver':
       return jokerOfferSkippedSessionOver(session, event);
-    // Task 8 will fill this in; stub remaining event.
     case 'Timeout':
-      throw new InvalidTransitionError(session.status, event.type);
+      return timeout(session, event);
   }
 }
