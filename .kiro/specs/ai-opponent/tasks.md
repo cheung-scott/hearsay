@@ -40,8 +40,8 @@ Hybrid AI opponent: deterministic math baseline + Gemini 2.5 Flash LLM orchestra
     - Import `templateHonest`, `templateLie`, `buildFallbackThought` from `constants.ts`
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
 
-- [ ] 4. Write math layer tests
-  - [ ] 4.1 Write tests in `src/lib/ai/math.test.ts`
+- [x] 4. Write math layer tests
+  - [x] 4.1 Write tests in `src/lib/ai/math.test.ts`
     - **Invariant 1:** For every Persona, `PERSONA_WEIGHTS[p].math + PERSONA_WEIGHTS[p].voice === 1.0`
     - **Invariant 2:** `claimMathProbability` output ∈ [0.15, 0.95] for various (myHand, claim.count, claimedRank, roundHistory) combos
     - **Invariant 3 — impossible:** `remainingSupport < claim.count` → returns 0.95
@@ -54,8 +54,8 @@ Hybrid AI opponent: deterministic math baseline + Gemini 2.5 Flash LLM orchestra
     - **Invariant 12:** Given `roundHistory` containing the just-made claim, `claimMathProbability` returns the correct probability (regression test for §6 caller contract — `alreadyClaimed` includes current claim)
     - _Requirements: 2.1, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 5.4, 5.6_
 
-- [ ] 5. Checkpoint: run all tests
-  - Run `pnpm vitest run src/lib/ai/math.test.ts` and verify all pass
+- [x] 5. Checkpoint: run all tests
+  - Run `pnpm vitest run src/lib/ai/math.test.ts` and verify all pass (16/16 passing)
 
 - [ ] 6. Implement LLM layer
   - [ ] 6.1 Create `src/lib/ai/llm.ts` — SDK setup, schemas, prompt assembly
