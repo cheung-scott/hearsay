@@ -65,6 +65,10 @@ export function checkRoundEnd(
  * spec — this FSM only fills the slot for `next_claim` here.
  *
  * Returns a new `Round`; never mutates the input.
+ *
+ * @pending consumer — exported + tested, but not yet called by `reduce()`.
+ *   Consumed by the `joker-system` spec (forthcoming). Keep the API shape
+ *   stable; do not inline into a caller until that spec lands.
  */
 export function applyJokerEffect(round: Round, joker: JokerType): Round {
   const effect: ActiveJokerEffect = {
@@ -82,6 +86,9 @@ export function applyJokerEffect(round: Round, joker: JokerType): Round {
  * effects (including `session`-lived ones) are preserved.
  *
  * Returns a new `Round`; never mutates the input.
+ *
+ * @pending consumer — exported + tested, but not yet called by `reduce()`.
+ *   Consumed by the `joker-system` spec (forthcoming).
  */
 export function expireJokerEffects(
   round: Round,
