@@ -6,8 +6,8 @@ Hybrid AI opponent: deterministic math baseline + Gemini 2.5 Flash LLM orchestra
 
 ## Tasks
 
-- [ ] 1. Define AI type definitions
-  - [ ] 1.1 Create all AI types and error classes in `src/lib/ai/types.ts`
+- [x] 1. Define AI type definitions
+  - [x] 1.1 Create all AI types and error classes in `src/lib/ai/types.ts`
     - Import `Persona`, `Rank`, `Card`, `PublicClaim`, `VoiceMeta`, `JokerType` from `src/lib/game/types.ts`
     - Define `DecisionContext` interface (persona, targetRank, myHand, myJokers, opponentJokers, opponentHandSize, roundHistory, claim with optional voiceMeta, pileSize, strikesMe, strikesPlayer)
     - Define `OwnPlayContext` interface (persona, targetRank, myHand, myJokers, opponentJokers, opponentHandSize, roundHistory, pileSize, strikesMe, strikesPlayer)
