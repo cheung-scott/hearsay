@@ -57,7 +57,7 @@ export async function aiDecideOnClaim(ctx: DecisionContext): Promise<AiDecision>
       // llmReasoning intentionally omitted on fallback paths (undefined)
       source:       errorToSource(err),
       latencyMs:    performance.now() - t0,
-      mathProb:     fb.mathProb,
+      mathProb, // outer — same value as fb.mathProb (pure function, same ctx)
     };
   } finally {
     clearTimeout(timer);
