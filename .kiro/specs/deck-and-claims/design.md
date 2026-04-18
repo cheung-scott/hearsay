@@ -5,6 +5,10 @@ fileMatchPattern: "src/lib/game/deck.ts|src/lib/game/claims.ts|src/lib/game/**/*
 
 # deck-and-claims — Design
 
+## Provenance
+
+Authored by Claude Code as a TypeScript-level codification of `Documents/Obsidian_Vault/Projects/ElevenHacks-Kiro/ARCHITECTURE-DRAFT.md` §1.1 (deck + deal mechanics) + §5.2 (voice-parsing regex), iter-5 locked 2026-04-16. Kiro Spec mode generated `requirements.md` + `tasks.md` from this design via seeded prompt. Tasks executed by Claude Code.
+
 The deck model + claim-parse layer for Hearsay. This spec owns **everything** about how cards are created, shuffled, dealt into a `RoundDeal`, and how player voice transcripts are parsed into structured `{ count, rank }` claims.
 
 **Scope of this spec:**

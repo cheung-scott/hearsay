@@ -5,6 +5,10 @@ fileMatchPattern: "src/lib/voice/presets.ts|src/lib/voice/heuristic.ts|src/lib/v
 
 # voice-tell-taxonomy — Design
 
+## Provenance
+
+Authored by Claude Code as a TypeScript-level codification of `Documents/Obsidian_Vault/Projects/ElevenHacks-Kiro/ARCHITECTURE-DRAFT.md` §6.1 (`VOICE_PRESETS` table) + §6.2 (STT heuristic formula), iter-5 locked 2026-04-16. Kiro Spec mode generated `requirements.md` + `tasks.md` from this design via seeded prompt. Tasks executed by Claude Code.
+
 The voice layer that makes Hearsay actually play: **how the AI's voice leaks truth-state** (TTS preset modulation) and **how the player's voice leaks lie-signal** (STT metadata heuristic).
 
 **Scope of this spec:**
