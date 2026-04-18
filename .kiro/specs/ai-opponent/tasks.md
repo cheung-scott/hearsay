@@ -18,8 +18,8 @@ Hybrid AI opponent: deterministic math baseline + Gemini 2.5 Flash LLM orchestra
     - Define `LLMTimeoutError`, `LLMInvalidJSONError` (with `raw` and `reason` fields), `LLMNetworkError` (with `cause` field) — all extending `Error`
     - _Requirements: 1.1, 1.2, 1.3_
 
-- [ ] 2. Create constants module
-  - [ ] 2.1 Create `src/lib/ai/constants.ts`
+- [x] 2. Create constants module
+  - [x] 2.1 Create `src/lib/ai/constants.ts`
     - Export `PERSONA_DESCRIPTIONS: Record<Persona, string>` matching the four strings from `llm-prompt-conventions.md`
     - Export `templateHonest(persona, count, rank): string` and `templateLie(persona, count, rank): string` — fallback dialogue banks with ≥4 variants per persona for TTS variety
     - Export `buildFallbackThought(persona, action, mathProb, voiceLie): string` — four small persona-flavoured templates
