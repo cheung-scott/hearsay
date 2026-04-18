@@ -30,46 +30,46 @@ Pure-TypeScript finite state machine for a best-of-3 voice-bluffing card game. I
     - **Invariant 1: Deck size** — assert a fresh deck factory produces exactly 20 cards: 5 Queen + 5 King + 5 Ace + 5 Jack, all IDs unique
     - _Requirements: 2.1, 2.2_
 
-- [ ] 2. Implement pure helper functions
-  - [ ] 2.1 Implement `checkSessionEnd` in `src/lib/game/fsm.ts`
+- [x] 2. Implement pure helper functions
+  - [x] 2.1 Implement `checkSessionEnd` in `src/lib/game/fsm.ts`
     - Return opponent as winner when `strikes === 3`
     - Return player as winner when `roundsWon === 2`
     - Prioritize strike-3 loss over rounds-won-2 win when both apply
     - Return `null` when neither condition met
     - _Requirements: 17.1, 17.2, 17.3, 17.4_
 
-  - [ ] 2.2 Implement `checkRoundEnd` in `src/lib/game/fsm.ts`
+  - [x] 2.2 Implement `checkRoundEnd` in `src/lib/game/fsm.ts`
     - Return `true` when active player hand is empty AND last claim was accepted or truthful
     - Return `false` when hand is empty but last claim was a caught lie
     - _Requirements: 18.1, 18.2_
 
-  - [ ] 2.3 Implement `applyJokerEffect` and `expireJokerEffects` in `src/lib/game/fsm.ts`
+  - [x] 2.3 Implement `applyJokerEffect` and `expireJokerEffects` in `src/lib/game/fsm.ts`
     - `applyJokerEffect`: push effect onto `Round.activeJokerEffects` for `next_claim` expiry
     - `expireJokerEffects`: filter out effects whose `expiresAfter` matches the trigger
     - Both return new `Round` objects — never mutate input
     - _Requirements: 19.1, 19.2, 19.3_
 
-  - [ ]* 2.4 Write unit tests for `checkSessionEnd` in `src/lib/game/fsm.test.ts`
+  - [x]* 2.4 Write unit tests for `checkSessionEnd` in `src/lib/game/fsm.test.ts`
     - **Invariant 10: Session loss trigger** — `strikes === 3` → returns opponent as winner
     - **Invariant 11: Best-of-3 win trigger** — `roundsWon === 2` → returns that player as winner
     - Test priority: strike-3 checked before rounds-won-2
     - Test null return when neither condition met
     - _Requirements: 17.1, 17.2, 17.3, 17.4_
 
-  - [ ]* 2.5 Write unit tests for `checkRoundEnd` in `src/lib/game/fsm.test.ts`
+  - [x]* 2.5 Write unit tests for `checkRoundEnd` in `src/lib/game/fsm.test.ts`
     - `checkRoundEnd` is ONLY invoked from the `ClaimAccepted` path per Req 18.2; it does NOT handle caught-on-final-card (that's in `RevealComplete`, tested in Task 5.4).
     - Test hand-non-empty + accepted → returns `false`
     - Test hand-empty + last claim was accepted or truthful → returns `true` with `winner = activePlayer`
     - Invariants 6 and 7 are covered by Task 5.4 (RevealComplete tests), NOT here.
     - _Requirements: 18.1, 18.2_
 
-  - [ ]* 2.6 Write unit tests for joker effect helpers in `src/lib/game/fsm.test.ts`
+  - [x]* 2.6 Write unit tests for joker effect helpers in `src/lib/game/fsm.test.ts`
     - Test `applyJokerEffect` pushes effect onto `activeJokerEffects`
     - Test `expireJokerEffects` removes matching effects, preserves non-matching
     - Test both return new objects (input not mutated)
     - _Requirements: 19.1, 19.2, 19.3_
 
-- [ ] 3. Checkpoint — Ensure all tests pass
+- [x] 3. Checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 4. Implement reducer: setup and claim transitions
