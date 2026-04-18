@@ -28,29 +28,37 @@ export const VOICE_PRESETS: Record<Persona, Record<TruthState, VoiceSettings>> =
   },
 };
 
-// VOICE CASTING — first-pass casting from ElevenLabs preset library.
-// Subject to A/B replacement during Day-2 tuning block.
-// To replace: swap the voice ID and annotate with // TUNED: YYYY-MM-DD <reason>.
+// VOICE CASTING — custom-designed voices via ElevenLabs Voice Design, 2026-04-18.
+// Each voice was prompted per the briefs in Obsidian_Vault/Projects/ElevenHacks-Kiro/VOICE-DESIGN.md.
+// Display-layer persona names are courtroom archetypes (Defendant/Prosecutor/Attorney/Judge);
+// internal Persona keys stay as Novice/Reader/Misdirector/Silent per game-engine type lock.
+// To replace a voice: update the ID and annotate with // TUNED: YYYY-MM-DD <reason>.
 //
-//   Novice      → Rachel (21m00Tcm4TlvDq8ikWAM)
-//                 Calm young-sounding female. Hesitant delivery maps well to the
-//                 starter persona's obvious tells and nervous energy.
+//   Novice      → "hearsay-defendant"
+//                 Working-class London nervous-young-male. Obvious tells, heavy fillers
+//                 when lying. The training-wheels opponent.
 //
-//   Reader      → George (JBFqnCBsd6RMkjVDRZzb)
-//                 Warm British baritone, measured and confident. Carried over from
-//                 /api/ping-voice smoke test; confirmed working on Flash v2.5.
+//   Reader      → "hearsay-prosecutor"
+//                 American neutral, late-50s male. Gus Fring register — soft-spoken,
+//                 measured, over-articulated, emotionally flat. Carries the demo video.
 //
-//   Misdirector → Arnold (VR6AewLTigWG4xSOukaG)
-//                 Crisp authoritative male, can go theatrical. The inversion persona
-//                 needs a voice that sounds convincingly calm when lying — Arnold's
-//                 controlled range fits.
+//   Misdirector → "hearsay-attorney"
+//                 British RP, 40s male. Theatrical narrative-spinner. Inverted tell —
+//                 halting when truthful, smooth when lying.
 //
-//   Silent      → Adam (pNInz6obpgDQGcFmaJgB)
-//                 Deep stoic male, minimal affect. Suits the expert-challenge persona
-//                 whose tells are near-imperceptible.
+//   Silent      → "hearsay-judge"
+//                 British RP, elderly (70s) male. Deep gravelly, dispassionate,
+//                 drawn-out. Act 4 climax voice; scarcity = weight.
 export const PERSONA_VOICE_IDS: Record<Persona, string> = {
-  Novice:      '21m00Tcm4TlvDq8ikWAM',  // Rachel — calm young-sounding female, hesitant-reads well
-  Reader:      'JBFqnCBsd6RMkjVDRZzb',  // George — warm British baritone, confident, kept from ping-voice
-  Misdirector: 'VR6AewLTigWG4xSOukaG',  // Arnold — crisp authoritative male, can go theatrical
-  Silent:      'pNInz6obpgDQGcFmaJgB',  // Adam — deep stoic male, minimal affect
+  Novice:      'Lrx118tn6NTNAXspnuEN',  // hearsay-defendant
+  Reader:      'NxGA8X3YhTrnf3TRQf6Q',  // hearsay-prosecutor
+  Misdirector: '0Q0MDAMrmHYYHDqFoGUx',  // hearsay-attorney
+  Silent:      '0XMldg7YUhIHRMJqiWHr',  // hearsay-judge
 };
+
+// Tutorial-only persona — not in the game's Persona union.
+// The Clerk welcomes new players in tutorial mode, explains the mechanic, then
+// "the court will see you now" cuts to the real trial.
+//   Clerk → "hearsay-clerk"
+//           British RP, 40s female. Warm-bureaucratic, procedural.
+export const CLERK_VOICE_ID = 'Al9pMcZxV70KAzzehiTE';  // hearsay-clerk
