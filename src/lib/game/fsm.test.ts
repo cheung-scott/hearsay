@@ -1037,3 +1037,295 @@ describe('Invariant 4: Card conservation through a challenge cycle', () => {
     expect(new Set(ids).size).toBe(20);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Task 7 — RoundSettled, JokerPicked, JokerOfferSkippedSessionOver
+// ---------------------------------------------------------------------------
+
+/** Build a session already in joker_offer with round_over round, ready to settle. */
+function makeJokerOfferSession({
+  roundWinner = 'player' as 'player' | 'ai',
+  playerRoundsWon = 1,
+  aiRoundsWon = 0,
+  playerStrikes = 0,
+  aiStrikes = 0,
+  playerJokers = [] as import('./types').JokerType[],
+  aiJokers = [] as import('./types').JokerType[],
+  playerTakenCards = [] as Card[],
+  aiTakenCards = [] as Card[],
+  roundPile = [] as Card[],
+} = {}): Session {
+  const round = makeRound({
+    roundNumber: 1,
+    status: 'round_over',
+    winner: roundWinner,
+    pile: roundPile,
+  });
+  return makeSession({
+    status: 'joker_offer',
+    rounds: [round],
+    currentRoundIdx: 0,
+    player: makePlayer({
+      roundsWon: playerRoundsWon,
+      strikes: playerStrikes,
+      jokers: playerJokers,
+      takenCards: playerTakenCards,
+    }),
+    ai: makePlayer({
+      roundsWon: aiRoundsWon,
+      strikes: aiStrikes,
+      jokers: aiJokers,
+      takenCards: aiTakenCards,
+    }),
+  });
+}
+
+/** A valid nextRoundDeal for JokerPicked — fresh 5/5 hands + 10-card deck. */
+function makeNextRoundDeal(overrides: Partial<import('./types').RoundDeal> = {}): import('./types').RoundDeal {
+  return {
+    playerHand: [0, 1, 2, 3, 4].map((i) => makeCard('King', i)),
+    aiHand: [0, 1, 2, 3, 4].map((i) => makeCard('Ace', i)),
+    remainingDeck: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => makeCard('Jack', i)),
+    targetRank: 'King' as const,
+    activePlayer: 'ai' as const,
+    ...overrides,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Task 7.1 — RoundSettled
+// ---------------------------------------------------------------------------
+
+describe('reduce — RoundSettled (7.1)', () => {
+  it('Invariant 11: player roundsWon reaches 2 → session_over, player wins', () => {
+    // Build a session where the round just ended with player winning, player has 1 roundsWon already.
+    // RoundSettled increments to 2 → session_over.
+    const round = makeRound({ roundNumber: 1, status: 'round_over', winner: 'player' });
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [round],
+      currentRoundIdx: 0,
+      player: makePlayer({ roundsWon: 1 }),
+      ai: makePlayer({ roundsWon: 0 }),
+    });
+
+    const out = reduce(session, { type: 'RoundSettled', now: 5000 });
+    expect(out.player.roundsWon).toBe(2);
+    expect(out.status).toBe('session_over');
+    expect(out.sessionWinner).toBe('player');
+  });
+
+  it('ai roundsWon reaches 2 → session_over, ai wins', () => {
+    const round = makeRound({ roundNumber: 2, status: 'round_over', winner: 'ai' });
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ roundNumber: 1, status: 'round_over', winner: 'ai' }), round],
+      currentRoundIdx: 1,
+      player: makePlayer({ roundsWon: 0 }),
+      ai: makePlayer({ roundsWon: 1 }),
+    });
+
+    const out = reduce(session, { type: 'RoundSettled', now: 5000 });
+    expect(out.ai.roundsWon).toBe(2);
+    expect(out.status).toBe('session_over');
+    expect(out.sessionWinner).toBe('ai');
+  });
+
+  it('winner does not yet reach 2 → joker_offer', () => {
+    const round = makeRound({ roundNumber: 1, status: 'round_over', winner: 'player' });
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [round],
+      currentRoundIdx: 0,
+      player: makePlayer({ roundsWon: 0 }),
+      ai: makePlayer({ roundsWon: 0 }),
+    });
+
+    const out = reduce(session, { type: 'RoundSettled', now: 5000 });
+    expect(out.player.roundsWon).toBe(1);
+    expect(out.status).toBe('joker_offer');
+    expect(out.sessionWinner).toBeUndefined();
+  });
+
+  it('throws when round.status !== round_over (Invariant 15)', () => {
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ status: 'claim_phase' })],
+    });
+    expect(() => reduce(session, { type: 'RoundSettled', now: 5000 })).toThrow(InvalidTransitionError);
+  });
+
+  it('throws when session.status === session_over (terminal guard)', () => {
+    const session = makeSession({ status: 'session_over' });
+    expect(() => reduce(session, { type: 'RoundSettled', now: 5000 })).toThrow(InvalidTransitionError);
+  });
+
+  it('round stays round_over — reducer does not mutate round status', () => {
+    const round = makeRound({ roundNumber: 1, status: 'round_over', winner: 'player' });
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [round],
+      currentRoundIdx: 0,
+      player: makePlayer({ roundsWon: 0 }),
+    });
+    const out = reduce(session, { type: 'RoundSettled', now: 5000 });
+    expect(out.rounds[0].status).toBe('round_over');
+  });
+
+  it('does not mutate input session', () => {
+    const round = makeRound({ roundNumber: 1, status: 'round_over', winner: 'player' });
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [round],
+      currentRoundIdx: 0,
+      player: makePlayer({ roundsWon: 0 }),
+    });
+    const before = JSON.stringify(session);
+    reduce(session, { type: 'RoundSettled', now: 5000 });
+    expect(JSON.stringify(session)).toBe(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 7.2 — JokerPicked
+// ---------------------------------------------------------------------------
+
+describe('reduce — JokerPicked (7.2, Invariant 16)', () => {
+  it('Invariant 16: both hands length 5, deck.length === 10, takenCards cleared', () => {
+    const all = make20Cards();
+    const session = makeJokerOfferSession({
+      roundWinner: 'player',
+      playerRoundsWon: 1,
+      playerTakenCards: [all[0], all[1]], // non-empty — should be cleared
+      aiTakenCards: [all[5]],             // non-empty — should be cleared
+      roundPile: [all[10]],               // non-empty — stays on round (not cleared by JokerPicked)
+    });
+
+    const deal = makeNextRoundDeal();
+    const out = reduce(session, { type: 'JokerPicked', joker: 'poker_face', nextRoundDeal: deal, now: 6000 });
+
+    expect(out.player.hand).toHaveLength(5);
+    expect(out.ai.hand).toHaveLength(5);
+    expect(out.deck).toHaveLength(10);
+    expect(out.player.takenCards).toEqual([]);
+    expect(out.ai.takenCards).toEqual([]);
+  });
+
+  it('Invariant 16: new Round appended with correct shape, currentRoundIdx incremented', () => {
+    const session = makeJokerOfferSession({ roundWinner: 'player', playerRoundsWon: 1 });
+    const deal = makeNextRoundDeal({ targetRank: 'Ace', activePlayer: 'player' });
+    const out = reduce(session, { type: 'JokerPicked', joker: 'stage_whisper', nextRoundDeal: deal, now: 6000 });
+
+    expect(out.currentRoundIdx).toBe(1);
+    expect(out.rounds).toHaveLength(2);
+
+    const newRound = out.rounds[1];
+    expect(newRound.roundNumber).toBe(2);
+    expect(newRound.targetRank).toBe('Ace');
+    expect(newRound.activePlayer).toBe('player');
+    expect(newRound.pile).toEqual([]);
+    expect(newRound.claimHistory).toEqual([]);
+    expect(newRound.status).toBe('claim_phase');
+    expect(newRound.activeJokerEffects).toEqual([]);
+    expect(newRound.tensionLevel).toBe(0);
+  });
+
+  it('Invariant 16: strikes/roundsWon/personaIfAi carried forward unchanged', () => {
+    const session = makeJokerOfferSession({
+      roundWinner: 'player',
+      playerRoundsWon: 1,
+      aiRoundsWon: 0,
+      playerStrikes: 1,
+      aiStrikes: 2,
+    });
+    const out = reduce(session, { type: 'JokerPicked', joker: 'earful', nextRoundDeal: makeNextRoundDeal(), now: 6000 });
+
+    expect(out.player.strikes).toBe(1);
+    expect(out.ai.strikes).toBe(2);
+    expect(out.player.roundsWon).toBe(1);
+    expect(out.ai.roundsWon).toBe(0);
+  });
+
+  it('Invariant 16: new joker appended to winner jokers array', () => {
+    const session = makeJokerOfferSession({
+      roundWinner: 'player',
+      playerJokers: ['cold_read'],
+    });
+    const out = reduce(session, { type: 'JokerPicked', joker: 'poker_face', nextRoundDeal: makeNextRoundDeal(), now: 6000 });
+    expect(out.player.jokers).toEqual(['cold_read', 'poker_face']);
+    expect(out.ai.jokers).toEqual([]); // loser unchanged
+  });
+
+  it('Invariant 16: joker goes to ai winner when ai won the round', () => {
+    const session = makeJokerOfferSession({
+      roundWinner: 'ai',
+      aiJokers: ['stage_whisper'],
+    });
+    const out = reduce(session, { type: 'JokerPicked', joker: 'earful', nextRoundDeal: makeNextRoundDeal(), now: 6000 });
+    expect(out.ai.jokers).toEqual(['stage_whisper', 'earful']);
+    expect(out.player.jokers).toEqual([]);
+  });
+
+  it('session.status → round_active', () => {
+    const session = makeJokerOfferSession({ roundWinner: 'player', playerRoundsWon: 1 });
+    const out = reduce(session, { type: 'JokerPicked', joker: 'second_wind', nextRoundDeal: makeNextRoundDeal(), now: 6000 });
+    expect(out.status).toBe('round_active');
+  });
+
+  it('JokerPicked is deterministic — identical event twice yields structurally equal Session (Invariant 14)', () => {
+    const session = makeJokerOfferSession({ roundWinner: 'player', playerRoundsWon: 1 });
+    const deal = makeNextRoundDeal();
+    const event: GameEvent = { type: 'JokerPicked', joker: 'poker_face', nextRoundDeal: deal, now: 6000 };
+    const out1 = reduce(session, event);
+    const out2 = reduce(session, event);
+    expect(JSON.stringify(out1)).toBe(JSON.stringify(out2));
+  });
+
+  it('throws when session.status !== joker_offer (Invariant 15)', () => {
+    const session = makeSession({ status: 'round_active', rounds: [makeRound()] });
+    expect(() =>
+      reduce(session, { type: 'JokerPicked', joker: 'poker_face', nextRoundDeal: makeNextRoundDeal(), now: 6000 })
+    ).toThrow(InvalidTransitionError);
+  });
+
+  it('does not mutate input session', () => {
+    const session = makeJokerOfferSession({ roundWinner: 'player', playerRoundsWon: 1 });
+    const before = JSON.stringify(session);
+    reduce(session, { type: 'JokerPicked', joker: 'cold_read', nextRoundDeal: makeNextRoundDeal(), now: 6000 });
+    expect(JSON.stringify(session)).toBe(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 7.2 — JokerOfferSkippedSessionOver
+// ---------------------------------------------------------------------------
+
+describe('reduce — JokerOfferSkippedSessionOver (7.2)', () => {
+  it('transitions joker_offer → session_over', () => {
+    const session = makeJokerOfferSession({ roundWinner: 'player', playerRoundsWon: 1 });
+    const out = reduce(session, { type: 'JokerOfferSkippedSessionOver', now: 7000 });
+    expect(out.status).toBe('session_over');
+  });
+
+  it('sets sessionWinner from checkSessionEnd when available', () => {
+    // Player has 2 roundsWon — should be detected as winner
+    const session = makeJokerOfferSession({ roundWinner: 'player', playerRoundsWon: 2 });
+    const out = reduce(session, { type: 'JokerOfferSkippedSessionOver', now: 7000 });
+    expect(out.status).toBe('session_over');
+    expect(out.sessionWinner).toBe('player');
+  });
+
+  it('throws when session.status !== joker_offer (Invariant 15)', () => {
+    const session = makeSession({ status: 'round_active', rounds: [makeRound()] });
+    expect(() =>
+      reduce(session, { type: 'JokerOfferSkippedSessionOver', now: 7000 })
+    ).toThrow(InvalidTransitionError);
+  });
+
+  it('throws when session.status === session_over (Invariant 15 terminal guard)', () => {
+    const session = makeSession({ status: 'session_over' });
+    expect(() =>
+      reduce(session, { type: 'JokerOfferSkippedSessionOver', now: 7000 })
+    ).toThrow(InvalidTransitionError);
+  });
+});

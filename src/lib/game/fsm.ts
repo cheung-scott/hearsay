@@ -11,6 +11,7 @@ import type {
   Claim,
   GameEvent,
   JokerType,
+  PlayerState,
   Rank,
   Round,
   Session,
@@ -324,6 +325,121 @@ function revealComplete(
   };
 }
 
+/** spec §1.3 row 7 — RoundSettled */
+function roundSettled(
+  session: Session,
+  event: Extract<GameEvent, { type: 'RoundSettled' }>,
+): Session {
+  const currentRound = session.rounds[session.currentRoundIdx];
+
+  if (!currentRound || currentRound.status !== 'round_over') {
+    throw new InvalidTransitionError(
+      `round_active(round.status=${currentRound?.status ?? 'none'})`,
+      event.type,
+    );
+  }
+
+  const winner = currentRound.winner;
+  if (!winner) {
+    throw new InvalidTransitionError('round_over(no winner set)', event.type);
+  }
+
+  // Increment roundsWon for the round winner
+  const updatedSession: Session = {
+    ...session,
+    [winner]: {
+      ...session[winner],
+      roundsWon: session[winner].roundsWon + 1,
+    },
+  };
+
+  const sessionWinner = checkSessionEnd(updatedSession);
+  if (sessionWinner !== null) {
+    return {
+      ...updatedSession,
+      status: 'session_over',
+      sessionWinner,
+    };
+  }
+
+  return {
+    ...updatedSession,
+    status: 'joker_offer',
+  };
+}
+
+/** spec §1.3 rows 8 + §1.4 rule 9 — JokerPicked */
+function jokerPicked(
+  session: Session,
+  event: Extract<GameEvent, { type: 'JokerPicked' }>,
+): Session {
+  if (session.status !== 'joker_offer') {
+    throw new InvalidTransitionError(session.status, event.type);
+  }
+
+  const currentRound = session.rounds[session.currentRoundIdx];
+  const winnerKey = currentRound?.winner;
+  if (!winnerKey) {
+    throw new InvalidTransitionError('joker_offer(no round winner)', event.type);
+  }
+
+  const { joker, nextRoundDeal } = event;
+
+  // Append joker to winner's jokers array
+  const updatedWinner: PlayerState = {
+    ...session[winnerKey],
+    jokers: [...session[winnerKey].jokers, joker],
+    hand: winnerKey === 'player' ? nextRoundDeal.playerHand : nextRoundDeal.aiHand,
+    takenCards: [], // §1.4 rule 9: inter-round reshuffle clears takenCards
+  };
+
+  const loserKey: 'player' | 'ai' = winnerKey === 'player' ? 'ai' : 'player';
+  const updatedLoser: PlayerState = {
+    ...session[loserKey],
+    hand: loserKey === 'player' ? nextRoundDeal.playerHand : nextRoundDeal.aiHand,
+    takenCards: [], // §1.4 rule 9
+  };
+
+  const newRoundNumber = (session.currentRoundIdx + 2) as 1 | 2 | 3;
+  const newRound: Round = {
+    roundNumber: newRoundNumber,
+    targetRank: nextRoundDeal.targetRank,
+    activePlayer: nextRoundDeal.activePlayer,
+    pile: [],
+    claimHistory: [],
+    status: 'claim_phase',
+    activeJokerEffects: [],
+    tensionLevel: 0,
+  };
+
+  return {
+    ...session,
+    status: 'round_active',
+    deck: nextRoundDeal.remainingDeck,
+    player: winnerKey === 'player' ? updatedWinner : updatedLoser,
+    ai: winnerKey === 'ai' ? updatedWinner : updatedLoser,
+    rounds: [...session.rounds, newRound],
+    currentRoundIdx: session.currentRoundIdx + 1,
+  };
+}
+
+/** spec §1.3 row 9 — JokerOfferSkippedSessionOver */
+function jokerOfferSkippedSessionOver(
+  session: Session,
+  event: Extract<GameEvent, { type: 'JokerOfferSkippedSessionOver' }>,
+): Session {
+  if (session.status !== 'joker_offer') {
+    throw new InvalidTransitionError(session.status, event.type);
+  }
+
+  const sessionWinner = checkSessionEnd(session);
+  return {
+    ...session,
+    status: 'session_over',
+    ...(sessionWinner !== null ? { sessionWinner } : {}),
+  };
+}
+
 /** spec §1.3 row 2 */
 function claimMade(
   session: Session,
@@ -424,10 +540,13 @@ export function reduce(session: Session, event: GameEvent): Session {
       return challengeCalled(session, event);
     case 'RevealComplete':
       return revealComplete(session, event);
-    // Tasks 7-8 will fill these in; stub remaining events.
     case 'RoundSettled':
+      return roundSettled(session, event);
     case 'JokerPicked':
+      return jokerPicked(session, event);
     case 'JokerOfferSkippedSessionOver':
+      return jokerOfferSkippedSessionOver(session, event);
+    // Task 8 will fill this in; stub remaining event.
     case 'Timeout':
       throw new InvalidTransitionError(session.status, event.type);
   }

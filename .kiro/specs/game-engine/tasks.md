@@ -128,21 +128,21 @@ Pure-TypeScript finite state machine for a best-of-3 voice-bluffing card game. I
 - [x] 6. Checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 7. Implement reducer: round settlement, joker, and session-end transitions
-  - [ ] 7.1 Implement `RoundSettled` transition in `src/lib/game/fsm.ts`
+- [x] 7. Implement reducer: round settlement, joker, and session-end transitions
+  - [x] 7.1 Implement `RoundSettled` transition in `src/lib/game/fsm.ts`
     - Increment `roundsWon` for the round winner
     - Check session-end via `checkSessionEnd`
     - If session ends: transition to `session_over`
     - Otherwise: transition to `joker_offer`
     - _Requirements: 11.1, 11.2, 12.1, 12.2_
 
-  - [ ] 7.2 Implement `JokerPicked` and `JokerOfferSkippedSessionOver` transitions in `src/lib/game/fsm.ts`
+  - [x] 7.2 Implement `JokerPicked` and `JokerOfferSkippedSessionOver` transitions in `src/lib/game/fsm.ts`
     - `JokerPicked`: append joker to winner's `jokers` array. **Consume `event.nextRoundDeal` (caller-provided, already-reshuffled 5/5 hands + 10-card remainingDeck + new targetRank + activePlayer)** — install fresh hands on both PlayerStates AND install `Session.deck = nextRoundDeal.remainingDeck`. Reset `player.takenCards = []` and `ai.takenCards = []`. Append new `Round` with `pile: []`, `claimHistory: []`, `status: 'claim_phase'`, `targetRank` from deal, `activePlayer` from deal, `activeJokerEffects: []`, `tensionLevel: 0`. Increment `currentRoundIdx`. Transition to `round_active`. **Never call Math.random() or shuffleDeck() — caller owns randomness.**
     - `JokerOfferSkippedSessionOver`: transition to `session_over`
     - Carry forward both players' `strikes`, `roundsWon`, `jokers`, and `personaIfAi` unchanged into next round
     - _Requirements: 8.1, 8.2, 12.3, 12.4, 21.1, 21.2, 21.3, 21.4, 21.5_
 
-  - [ ]* 7.3 Write tests for round settlement and joker transitions in `src/lib/game/fsm.test.ts`
+  - [x]* 7.3 Write tests for round settlement and joker transitions in `src/lib/game/fsm.test.ts`
     - **Invariant 11: Best-of-3 win trigger** — `roundsWon === 2` after `RoundSettled` → `session_over`
     - **Invariant 16: Inter-round reshuffle+redeal** — after `JokerPicked`: both hands length === 5; `Session.deck.length === 10`; both `takenCards === []`; new Round's `pile === []`; fresh `targetRank` set; `currentRoundIdx` incremented; strikes/roundsWon/jokers carried forward unchanged
     - Test `JokerPicked` uses `event.nextRoundDeal` values (not random); passing identical event twice yields identical Session
