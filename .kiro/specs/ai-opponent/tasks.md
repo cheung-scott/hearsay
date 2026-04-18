@@ -107,8 +107,8 @@ Hybrid AI opponent: deterministic math baseline + Gemini 2.5 Flash LLM orchestra
     - Always `clearTimeout` in both success and error paths
     - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 11.1, 11.2, 11.3_
 
-- [ ] 10. Write brain orchestrator tests
-  - [ ] 10.1 Write tests in `src/lib/ai/brain.test.ts` (mock LLM layer, real math layer)
+- [x] 10. Write brain orchestrator tests
+  - [x] 10.1 Write tests in `src/lib/ai/brain.test.ts` (mock LLM layer, real math layer)
     - **LLM success path (brain):** End-to-end — mock LLM success → `aiDecideOnClaim` returns `source: 'llm'` with correct action and `llmReasoning` populated. (Does NOT re-test invariant 3 — that's math-layer territory, covered in `math.test.ts`.)
     - **Invariant 7 (via brain):** Mock LLM that never resolves → `aiDecideOnClaim` resolves within 2100ms with `source: 'fallback-timeout'`
     - **Invariant 8 (via brain):** Mock LLM returns invalid JSON twice → `aiDecideOnClaim` returns `source: 'fallback-invalid-json'`
@@ -120,11 +120,11 @@ Hybrid AI opponent: deterministic math baseline + Gemini 2.5 Flash LLM orchestra
     - Test `errorToSource` maps `LLMTimeoutError` → `'fallback-timeout'`, `LLMInvalidJSONError` → `'fallback-invalid-json'`, other → `'fallback-network-error'`
     - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 11.1, 11.2, 11.3_
 
-- [ ] 11. Checkpoint: run all tests
-  - Run `pnpm vitest run src/lib/ai/` and verify all pass
+- [x] 11. Checkpoint: run all tests
+  - Run `pnpm vitest run src/lib/ai/` and verify all pass (51/51 — 16 math + 21 llm + 4 constants + 10 brain)
 
-- [ ] 12. Final review and invariant coverage audit
-  - [ ] 12.1 Verify all 13 invariants + requirement 12.3 drift-check are covered across test files
+- [x] 12. Final review and invariant coverage audit
+  - [x] 12.1 Verify all 13 invariants + requirement 12.3 drift-check are covered across test files
     - Invariant 1 (Persona weights sum to 1.0): `math.test.ts`
     - Invariant 2 (Math probability bounds): `math.test.ts`
     - Invariant 3 (Math probability key cases): `math.test.ts` *(math-layer only; `brain.test.ts`'s LLM-success bullet is not an invariant-3 test)*
@@ -139,8 +139,8 @@ Hybrid AI opponent: deterministic math baseline + Gemini 2.5 Flash LLM orchestra
     - Invariant 12 (`alreadyClaimed` includes current claim): `math.test.ts`, `brain.test.ts`
     - Invariant 13 (Gemini API key missing throws at module load): `llm.test.ts`
     - Requirement 12.3 (PERSONA_DESCRIPTIONS steering-file drift check): `constants.test.ts`
-  - [ ] 12.2 Run full test suite
-    - Run `pnpm vitest run src/lib/ai/` — all tests green
+  - [x] 12.2 Run full test suite
+    - Run `pnpm vitest run src/lib/ai/` — all tests green (51/51, 417ms)
 
 ## Notes
 
