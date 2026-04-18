@@ -163,7 +163,7 @@ type TruthState = 'honest' | 'lying';
 type JokerType = 'poker_face' | 'stage_whisper' | 'earful' | 'cold_read' | 'second_wind';
 
 interface Card {
-  id: string;        // stable per session, e.g. `Q-0`, `K-3`
+  id: string;        // stable per session, `${rank}-${i}` where i ∈ 0..4 — e.g. `Queen-0`, `King-3` (shipped convention per deck-and-claims spec Task 2.1)
   rank: Rank;
 }
 

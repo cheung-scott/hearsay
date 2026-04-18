@@ -6,8 +6,8 @@ Pure-TypeScript finite state machine for a best-of-3 voice-bluffing card game. I
 
 ## Tasks
 
-- [ ] 1. Define all type definitions and interfaces
-  - [ ] 1.1 Create core types and interfaces in `src/lib/game/types.ts`
+- [x] 1. Define all type definitions and interfaces
+  - [x] 1.1 Create core types and interfaces in `src/lib/game/types.ts`
     - Define `Rank`, `Persona`, `TruthState`, `JokerType` type aliases
     - Define `Card`, `VoiceSettings`, `VoiceMeta`, `Claim`, `PublicClaim` interfaces
     - Define `Round`, `PlayerState`, `Session` interfaces — **PlayerState MUST include `takenCards: Card[]`** (cards this player took after losing a challenge)
