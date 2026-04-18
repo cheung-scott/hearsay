@@ -458,10 +458,12 @@ function claimMade(
   const activeKey = currentRound.activePlayer; // 'player' | 'ai'
   const activeState = session[activeKey];
 
-  // Invariant 3 — count consistency
+  // Invariant 3 — count consistency (incl. no duplicate IDs within a 2-card claim,
+  // else Invariant 4 card-conservation breaks: pile gains 2 copies but hand loses 1)
   if (
     (claim.count !== 1 && claim.count !== 2) ||
-    claim.actualCardIds.length !== claim.count
+    claim.actualCardIds.length !== claim.count ||
+    new Set(claim.actualCardIds).size !== claim.count
   ) {
     throw new InvalidTransitionError(
       'round_active(invalid claim count)',

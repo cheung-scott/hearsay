@@ -475,6 +475,16 @@ describe('reduce — ClaimMade', () => {
     ).toThrow(InvalidTransitionError);
   });
 
+  it('Invariant 3 + 4: throws on duplicate actualCardIds (would break card conservation)', () => {
+    const session = makeActiveSession();
+    expect(() =>
+      reduce(
+        session,
+        makeClaimEvent({ count: 2, actualCardIds: ['Queen-0', 'Queen-0'] }),
+      ),
+    ).toThrow(InvalidTransitionError);
+  });
+
   // Invariant 15 — invalid transitions
   it('Invariant 15: throws when round.status === response_phase', () => {
     const session = makeSession({
