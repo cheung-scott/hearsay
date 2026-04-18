@@ -98,8 +98,8 @@ Hybrid AI opponent: deterministic math baseline + Gemini 2.5 Flash LLM orchestra
 - [x] 8. Checkpoint: run all tests
   - Run `pnpm vitest run src/lib/ai/` and verify all pass (41/41 passing — 16 math + 21 llm + 4 constants)
 
-- [ ] 9. Implement brain orchestrator
-  - [ ] 9.1 Create `src/lib/ai/brain.ts` — `aiDecideOnClaim` and `aiDecideOwnPlay`
+- [x] 9. Implement brain orchestrator
+  - [x] 9.1 Create `src/lib/ai/brain.ts` — `aiDecideOnClaim` and `aiDecideOwnPlay`
     - Implement `aiDecideOnClaim(ctx: DecisionContext): Promise<AiDecision>` — compute mathProb, create AbortController with 2000ms timeout, try LLM call, catch → fallback, always report latencyMs and source
     - Implement `aiDecideOwnPlay(ctx: OwnPlayContext): Promise<AiPlay>` — mirror pattern: try LLM call, catch → fallback
     - Implement `errorToSource(err): AiDecision['source']` — map error types to source strings
