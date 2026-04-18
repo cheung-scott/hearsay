@@ -144,6 +144,186 @@ function setupComplete(
   };
 }
 
+/** spec §1.3 row 3 — ClaimAccepted */
+function claimAccepted(
+  session: Session,
+  event: Extract<GameEvent, { type: 'ClaimAccepted' }>,
+): Session {
+  const currentRound = session.rounds[session.currentRoundIdx];
+
+  if (!currentRound || currentRound.status !== 'response_phase') {
+    throw new InvalidTransitionError(
+      `round_active(round.status=${currentRound?.status ?? 'none'})`,
+      event.type,
+    );
+  }
+
+  const activeKey = currentRound.activePlayer;
+  const activeHandSize = session[activeKey].hand.length;
+  const roundEndResult = checkRoundEnd(currentRound, activeKey, activeHandSize);
+
+  if (roundEndResult.ended) {
+    const newRound: Round = {
+      ...currentRound,
+      status: 'round_over',
+      winner: roundEndResult.winner,
+    };
+    return {
+      ...session,
+      rounds: session.rounds.map((r, i) =>
+        i === session.currentRoundIdx ? newRound : r,
+      ),
+    };
+  }
+
+  // Swap active player and continue
+  const nextActive: 'player' | 'ai' = activeKey === 'player' ? 'ai' : 'player';
+  const newRound: Round = {
+    ...currentRound,
+    activePlayer: nextActive,
+    status: 'claim_phase',
+  };
+  return {
+    ...session,
+    rounds: session.rounds.map((r, i) =>
+      i === session.currentRoundIdx ? newRound : r,
+    ),
+  };
+}
+
+/** spec §1.3 row 4 — ChallengeCalled */
+function challengeCalled(
+  session: Session,
+  event: Extract<GameEvent, { type: 'ChallengeCalled' }>,
+): Session {
+  const currentRound = session.rounds[session.currentRoundIdx];
+
+  if (!currentRound || currentRound.status !== 'response_phase') {
+    throw new InvalidTransitionError(
+      `round_active(round.status=${currentRound?.status ?? 'none'})`,
+      event.type,
+    );
+  }
+
+  const newRound: Round = { ...currentRound, status: 'resolving' };
+  return {
+    ...session,
+    rounds: session.rounds.map((r, i) =>
+      i === session.currentRoundIdx ? newRound : r,
+    ),
+  };
+}
+
+/** spec §1.3 row 5 + §1.4 rules 1-8 — RevealComplete */
+function revealComplete(
+  session: Session,
+  event: Extract<GameEvent, { type: 'RevealComplete' }>,
+): Session {
+  const currentRound = session.rounds[session.currentRoundIdx];
+
+  if (!currentRound || currentRound.status !== 'resolving') {
+    throw new InvalidTransitionError(
+      `round_active(round.status=${currentRound?.status ?? 'none'})`,
+      event.type,
+    );
+  }
+
+  const { challengeWasCorrect } = event;
+  const lastClaim = currentRound.claimHistory[currentRound.claimHistory.length - 1];
+  if (!lastClaim) {
+    throw new InvalidTransitionError('resolving(no claim history)', event.type);
+  }
+
+  // Step 1: determine who takes the strike
+  // challengeWasCorrect=true → claimant was caught lying → claimant loses
+  // challengeWasCorrect=false → challenger was wrong → challenger (non-claimant) loses
+  const claimantKey = lastClaim.by; // 'player' | 'ai'
+  const opponentKey: 'player' | 'ai' = claimantKey === 'player' ? 'ai' : 'player';
+  const loserKey: 'player' | 'ai' = challengeWasCorrect ? claimantKey : opponentKey;
+  const winnerKey: 'player' | 'ai' = loserKey === 'player' ? 'ai' : 'player';
+
+  // Step 2: pile → loser's takenCards; clear pile
+  const loserAfterPile = {
+    ...session[loserKey],
+    strikes: session[loserKey].strikes + 1,
+    takenCards: [...session[loserKey].takenCards, ...currentRound.pile],
+  };
+
+  // Build intermediate session with strike+pile applied
+  const sessionWithStrike: Session = {
+    ...session,
+    [loserKey]: loserAfterPile,
+  };
+
+  const activeKey = currentRound.activePlayer;
+
+  // Step 3: session-end check (strikes===3) — FIRST
+  if (loserAfterPile.strikes >= 3) {
+    const finalRound: Round = {
+      ...currentRound,
+      pile: [],
+      status: 'round_over',
+      winner: winnerKey,
+    };
+    return {
+      ...sessionWithStrike,
+      status: 'session_over',
+      sessionWinner: winnerKey,
+      rounds: session.rounds.map((r, i) =>
+        i === session.currentRoundIdx ? finalRound : r,
+      ),
+    };
+  }
+
+  // Step 4: caught-on-final-card-lie → opponent wins round
+  if (sessionWithStrike[activeKey].hand.length === 0 && challengeWasCorrect === true) {
+    const opponentOfActive: 'player' | 'ai' = activeKey === 'player' ? 'ai' : 'player';
+    const finalRound: Round = {
+      ...currentRound,
+      pile: [],
+      status: 'round_over',
+      winner: opponentOfActive,
+    };
+    return {
+      ...sessionWithStrike,
+      rounds: session.rounds.map((r, i) =>
+        i === session.currentRoundIdx ? finalRound : r,
+      ),
+    };
+  }
+
+  // Step 5: honest-final-wrongly-challenged → active wins round
+  if (sessionWithStrike[activeKey].hand.length === 0 && challengeWasCorrect === false) {
+    const finalRound: Round = {
+      ...currentRound,
+      pile: [],
+      status: 'round_over',
+      winner: activeKey,
+    };
+    return {
+      ...sessionWithStrike,
+      rounds: session.rounds.map((r, i) =>
+        i === session.currentRoundIdx ? finalRound : r,
+      ),
+    };
+  }
+
+  // Step 6: swap active player, back to claim_phase
+  const nextActive: 'player' | 'ai' = activeKey === 'player' ? 'ai' : 'player';
+  const continuedRound: Round = {
+    ...currentRound,
+    pile: [],
+    activePlayer: nextActive,
+    status: 'claim_phase',
+  };
+  return {
+    ...sessionWithStrike,
+    rounds: session.rounds.map((r, i) =>
+      i === session.currentRoundIdx ? continuedRound : r,
+    ),
+  };
+}
+
 /** spec §1.3 row 2 */
 function claimMade(
   session: Session,
@@ -238,10 +418,13 @@ export function reduce(session: Session, event: GameEvent): Session {
       return setupComplete(session, event);
     case 'ClaimMade':
       return claimMade(session, event);
-    // Tasks 5-8 will fill these in; stub all remaining events.
     case 'ClaimAccepted':
+      return claimAccepted(session, event);
     case 'ChallengeCalled':
+      return challengeCalled(session, event);
     case 'RevealComplete':
+      return revealComplete(session, event);
+    // Tasks 7-8 will fill these in; stub remaining events.
     case 'RoundSettled':
     case 'JokerPicked':
     case 'JokerOfferSkippedSessionOver':

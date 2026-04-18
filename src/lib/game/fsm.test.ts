@@ -495,3 +495,545 @@ describe('reduce — ClaimMade', () => {
     expect(JSON.stringify(out1)).toBe(JSON.stringify(out2));
   });
 });
+
+// ---------------------------------------------------------------------------
+// Task 5 helpers — shared factories
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a full 20-card set: 5 of each rank.
+ * IDs follow the convention `${rank}-${i}`.
+ */
+function make20Cards() {
+  const ranks: Card['rank'][] = ['Queen', 'King', 'Ace', 'Jack'];
+  const cards: Card[] = [];
+  for (const rank of ranks) {
+    for (let i = 0; i < 5; i++) {
+      cards.push({ id: `${rank}-${i}`, rank });
+    }
+  }
+  return cards;
+}
+
+/** Count total cards across all six pools (Invariant 4). */
+function countAllCards(session: Session): number {
+  const round = session.rounds[session.currentRoundIdx];
+  return (
+    session.deck.length +
+    session.player.hand.length +
+    session.ai.hand.length +
+    (round?.pile.length ?? 0) +
+    session.player.takenCards.length +
+    session.ai.takenCards.length
+  );
+}
+
+/** Collect all card IDs across the six pools for uniqueness check (Invariant 4). */
+function collectAllCardIds(session: Session): string[] {
+  const round = session.rounds[session.currentRoundIdx];
+  return [
+    ...session.deck.map((c) => c.id),
+    ...session.player.hand.map((c) => c.id),
+    ...session.ai.hand.map((c) => c.id),
+    ...(round?.pile.map((c) => c.id) ?? []),
+    ...session.player.takenCards.map((c) => c.id),
+    ...session.ai.takenCards.map((c) => c.id),
+  ];
+}
+
+/**
+ * Build a session already in `response_phase` with a specific pile + claimHistory.
+ * Player has played their first card (honest claim) from a known 20-card set.
+ */
+function makeSessionInResponsePhase({
+  activePlayer = 'player' as 'player' | 'ai',
+  playerHand,
+  aiHand,
+  deck,
+  pile,
+  lastClaim,
+  playerStrikes = 0,
+  aiStrikes = 0,
+  playerTakenCards = [] as Card[],
+  aiTakenCards = [] as Card[],
+}: {
+  activePlayer?: 'player' | 'ai';
+  playerHand: Card[];
+  aiHand: Card[];
+  deck: Card[];
+  pile: Card[];
+  lastClaim: Claim;
+  playerStrikes?: number;
+  aiStrikes?: number;
+  playerTakenCards?: Card[];
+  aiTakenCards?: Card[];
+}): Session {
+  const round = makeRound({
+    activePlayer,
+    status: 'response_phase',
+    pile,
+    claimHistory: [lastClaim],
+  });
+  return makeSession({
+    status: 'round_active',
+    deck,
+    rounds: [round],
+    currentRoundIdx: 0,
+    player: makePlayer({ hand: playerHand, strikes: playerStrikes, takenCards: playerTakenCards }),
+    ai: makePlayer({ hand: aiHand, strikes: aiStrikes, takenCards: aiTakenCards }),
+  });
+}
+
+/** Build a session in `resolving` phase. */
+function makeSessionInResolvingPhase(opts: {
+  activePlayer?: 'player' | 'ai';
+  playerHand: Card[];
+  aiHand: Card[];
+  deck: Card[];
+  pile: Card[];
+  lastClaim: Claim;
+  playerStrikes?: number;
+  aiStrikes?: number;
+  playerTakenCards?: Card[];
+  aiTakenCards?: Card[];
+}): Session {
+  const s = makeSessionInResponsePhase(opts);
+  return reduce(s, { type: 'ChallengeCalled', now: 3000 });
+}
+
+function makeClaimFor(by: 'player' | 'ai', cardIds: string[], honest: boolean): Claim {
+  return {
+    by,
+    count: cardIds.length,
+    claimedRank: 'Queen',
+    actualCardIds: cardIds,
+    truthState: honest ? 'honest' : 'lying',
+    timestamp: 2000,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Task 5.1 — ClaimAccepted
+// ---------------------------------------------------------------------------
+
+describe('reduce — ClaimAccepted (5.1)', () => {
+  it('sanity: hand non-empty → swaps active player, status claim_phase', () => {
+    // Player has 4 cards remaining after playing one (pile has 1)
+    const all = make20Cards();
+    const playerHand = all.slice(0, 4);  // Queen-0..3
+    const aiHand = all.slice(5, 10);     // King-0..4
+    const deck = all.slice(10, 20);      // Ace-0..4, Jack-0..4
+    const pile = [all[4]];               // Queen-4 was played
+    const claim = makeClaimFor('player', ['Queen-4'], true);
+
+    const session = makeSessionInResponsePhase({
+      activePlayer: 'player',
+      playerHand,
+      aiHand,
+      deck,
+      pile,
+      lastClaim: claim,
+    });
+
+    const out = reduce(session, { type: 'ClaimAccepted', now: 3000 });
+    const round = out.rounds[out.currentRoundIdx];
+    expect(round.status).toBe('claim_phase');
+    expect(round.activePlayer).toBe('ai'); // swapped
+    expect(out.player.hand).toHaveLength(4);
+    expect(out.ai.hand).toHaveLength(5);
+  });
+
+  it('hand empty after accepted claim → round_over, winner is claimant (active)', () => {
+    // Player played their LAST card (hand now empty)
+    const all = make20Cards();
+    const playerHand: Card[] = [];      // already empty — last card in pile
+    const aiHand = all.slice(5, 10);
+    const deck = all.slice(10, 20);
+    const pile = [all[0]];             // Queen-0 in pile
+    const claim = makeClaimFor('player', ['Queen-0'], true);
+
+    const session = makeSessionInResponsePhase({
+      activePlayer: 'player',
+      playerHand,
+      aiHand,
+      deck,
+      pile,
+      lastClaim: claim,
+    });
+
+    const out = reduce(session, { type: 'ClaimAccepted', now: 3000 });
+    const round = out.rounds[out.currentRoundIdx];
+    expect(round.status).toBe('round_over');
+    expect(round.winner).toBe('player');
+  });
+
+  it('throws when round.status === claim_phase (Invariant 15)', () => {
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ status: 'claim_phase' })],
+    });
+    expect(() => reduce(session, { type: 'ClaimAccepted', now: 3000 })).toThrow(InvalidTransitionError);
+  });
+
+  it('throws when round.status === resolving (Invariant 15)', () => {
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ status: 'resolving' })],
+    });
+    expect(() => reduce(session, { type: 'ClaimAccepted', now: 3000 })).toThrow(InvalidTransitionError);
+  });
+
+  it('does not mutate input', () => {
+    const all = make20Cards();
+    const claim = makeClaimFor('player', ['Queen-4'], true);
+    const session = makeSessionInResponsePhase({
+      playerHand: all.slice(0, 4),
+      aiHand: all.slice(5, 10),
+      deck: all.slice(10, 20),
+      pile: [all[4]],
+      lastClaim: claim,
+    });
+    const before = JSON.stringify(session);
+    reduce(session, { type: 'ClaimAccepted', now: 3000 });
+    expect(JSON.stringify(session)).toBe(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.2 — ChallengeCalled
+// ---------------------------------------------------------------------------
+
+describe('reduce — ChallengeCalled (5.2)', () => {
+  it('transitions response_phase → resolving', () => {
+    const all = make20Cards();
+    const claim = makeClaimFor('player', ['Queen-4'], false);
+    const session = makeSessionInResponsePhase({
+      playerHand: all.slice(0, 4),
+      aiHand: all.slice(5, 10),
+      deck: all.slice(10, 20),
+      pile: [all[4]],
+      lastClaim: claim,
+    });
+    const out = reduce(session, { type: 'ChallengeCalled', now: 3000 });
+    expect(out.rounds[out.currentRoundIdx].status).toBe('resolving');
+  });
+
+  it('throws when round.status === claim_phase (Invariant 15)', () => {
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ status: 'claim_phase' })],
+    });
+    expect(() => reduce(session, { type: 'ChallengeCalled', now: 3000 })).toThrow(InvalidTransitionError);
+  });
+
+  it('throws when round.status === resolving (Invariant 15)', () => {
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ status: 'resolving' })],
+    });
+    expect(() => reduce(session, { type: 'ChallengeCalled', now: 3000 })).toThrow(InvalidTransitionError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.3 — RevealComplete
+// ---------------------------------------------------------------------------
+
+describe('reduce — RevealComplete (5.3)', () => {
+  it('throws when round.status === claim_phase (Invariant 15)', () => {
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ status: 'claim_phase' })],
+    });
+    expect(() => reduce(session, { type: 'RevealComplete', challengeWasCorrect: true, now: 4000 })).toThrow(InvalidTransitionError);
+  });
+
+  it('throws when round.status === response_phase (Invariant 15)', () => {
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ status: 'response_phase' })],
+    });
+    expect(() => reduce(session, { type: 'RevealComplete', challengeWasCorrect: false, now: 4000 })).toThrow(InvalidTransitionError);
+  });
+
+  it('else-branch: challengeWasCorrect=true, hand non-empty → claimant struck, pile cleared, swap active, claim_phase', () => {
+    // Player (active) played a lying claim; AI challenged correctly; player hand still has cards
+    const all = make20Cards();
+    const pile = [all[0]]; // Queen-0 played by player
+    const claim = makeClaimFor('player', ['Queen-0'], false); // lying
+    const session = makeSessionInResolvingPhase({
+      activePlayer: 'player',
+      playerHand: all.slice(1, 5),   // 4 cards remain
+      aiHand: all.slice(5, 10),
+      deck: all.slice(10, 20),
+      pile,
+      lastClaim: claim,
+    });
+
+    const out = reduce(session, { type: 'RevealComplete', challengeWasCorrect: true, now: 4000 });
+    const round = out.rounds[out.currentRoundIdx];
+    expect(round.status).toBe('claim_phase');
+    expect(round.activePlayer).toBe('ai'); // swapped
+    expect(round.pile).toEqual([]);
+    expect(out.player.strikes).toBe(1);   // claimant punished
+    expect(out.ai.strikes).toBe(0);
+    expect(out.player.takenCards).toHaveLength(1);
+    expect(out.ai.takenCards).toHaveLength(0);
+  });
+
+  it('else-branch: challengeWasCorrect=false, hand non-empty → challenger struck, pile cleared, swap active, claim_phase', () => {
+    // Player (active) played honestly; AI challenged wrongly; player hand has cards
+    const all = make20Cards();
+    const pile = [all[0]];
+    const claim = makeClaimFor('player', ['Queen-0'], true); // honest
+    const session = makeSessionInResolvingPhase({
+      activePlayer: 'player',
+      playerHand: all.slice(1, 5),
+      aiHand: all.slice(5, 10),
+      deck: all.slice(10, 20),
+      pile,
+      lastClaim: claim,
+    });
+
+    const out = reduce(session, { type: 'RevealComplete', challengeWasCorrect: false, now: 4000 });
+    const round = out.rounds[out.currentRoundIdx];
+    expect(round.status).toBe('claim_phase');
+    expect(round.activePlayer).toBe('ai'); // swapped (same: ai was challenger, now their turn)
+    expect(round.pile).toEqual([]);
+    expect(out.ai.strikes).toBe(1);    // challenger (ai) punished
+    expect(out.player.strikes).toBe(0);
+    expect(out.ai.takenCards).toHaveLength(1);
+    expect(out.player.takenCards).toHaveLength(0);
+  });
+
+  // Invariant 6: Caught-on-final-card-lie → opponent wins round
+  it('Invariant 6: caught-on-final-card-lie → round_over, opponent wins, active strikes+1, pile → active.takenCards', () => {
+    const all = make20Cards();
+    const pile = [all[0]]; // Queen-0 was the final (only) card played by player
+    const claim = makeClaimFor('player', ['Queen-0'], false); // lying claim
+    const session = makeSessionInResolvingPhase({
+      activePlayer: 'player',
+      playerHand: [],          // hand NOW empty (played last card)
+      aiHand: all.slice(5, 10),
+      deck: all.slice(10, 20),
+      pile,
+      lastClaim: claim,
+    });
+
+    const out = reduce(session, { type: 'RevealComplete', challengeWasCorrect: true, now: 4000 });
+    const round = out.rounds[out.currentRoundIdx];
+    expect(round.status).toBe('round_over');
+    expect(round.winner).toBe('ai');       // opponent wins
+    expect(round.pile).toEqual([]);
+    expect(out.player.strikes).toBe(1);   // active (liar) struck
+    expect(out.player.takenCards).toEqual([all[0]]); // pile → active.takenCards
+    expect(out.ai.takenCards).toHaveLength(0);
+  });
+
+  // Invariant 7: Honest-final-wrongly-challenged → active wins round
+  it('Invariant 7: honest-final-wrongly-challenged → round_over, active wins, challenger strikes+1, pile → challenger.takenCards', () => {
+    const all = make20Cards();
+    const pile = [all[0]]; // Queen-0 was the final honest card played by player
+    const claim = makeClaimFor('player', ['Queen-0'], true); // honest claim
+    const session = makeSessionInResolvingPhase({
+      activePlayer: 'player',
+      playerHand: [],          // hand empty — last card in pile
+      aiHand: all.slice(5, 10),
+      deck: all.slice(10, 20),
+      pile,
+      lastClaim: claim,
+    });
+
+    const out = reduce(session, { type: 'RevealComplete', challengeWasCorrect: false, now: 4000 });
+    const round = out.rounds[out.currentRoundIdx];
+    expect(round.status).toBe('round_over');
+    expect(round.winner).toBe('player');   // active wins
+    expect(round.pile).toEqual([]);
+    expect(out.ai.strikes).toBe(1);        // challenger (ai) struck
+    expect(out.ai.takenCards).toEqual([all[0]]); // pile → challenger.takenCards
+    expect(out.player.takenCards).toHaveLength(0);
+  });
+
+  // Invariant 9: exactly ONE player's strikes increment per resolution
+  it('Invariant 9: exactly one player strikes+1 per RevealComplete (challengeWasCorrect=true)', () => {
+    const all = make20Cards();
+    const pile = [all[0]];
+    const claim = makeClaimFor('player', ['Queen-0'], false);
+    const session = makeSessionInResolvingPhase({
+      activePlayer: 'player',
+      playerHand: all.slice(1, 5),
+      aiHand: all.slice(5, 10),
+      deck: all.slice(10, 20),
+      pile,
+      lastClaim: claim,
+    });
+    const before = { p: session.player.strikes, ai: session.ai.strikes };
+    const out = reduce(session, { type: 'RevealComplete', challengeWasCorrect: true, now: 4000 });
+    const delta = (out.player.strikes - before.p) + (out.ai.strikes - before.ai);
+    expect(delta).toBe(1);
+  });
+
+  it('Invariant 9: exactly one player strikes+1 per RevealComplete (challengeWasCorrect=false)', () => {
+    const all = make20Cards();
+    const pile = [all[0]];
+    const claim = makeClaimFor('player', ['Queen-0'], true);
+    const session = makeSessionInResolvingPhase({
+      activePlayer: 'player',
+      playerHand: all.slice(1, 5),
+      aiHand: all.slice(5, 10),
+      deck: all.slice(10, 20),
+      pile,
+      lastClaim: claim,
+    });
+    const before = { p: session.player.strikes, ai: session.ai.strikes };
+    const out = reduce(session, { type: 'RevealComplete', challengeWasCorrect: false, now: 4000 });
+    const delta = (out.player.strikes - before.p) + (out.ai.strikes - before.ai);
+    expect(delta).toBe(1);
+  });
+
+  // Invariant 10: session-end when strikes reach 3
+  it('Invariant 10: loser reaching strikes=3 → session_over, correct winner, round_over consistent', () => {
+    const all = make20Cards();
+    const pile = [all[0]];
+    const claim = makeClaimFor('player', ['Queen-0'], false); // lying → player gets strike
+    const session = makeSessionInResolvingPhase({
+      activePlayer: 'player',
+      playerHand: all.slice(1, 5),
+      aiHand: all.slice(5, 10),
+      deck: all.slice(10, 20),
+      pile,
+      lastClaim: claim,
+      playerStrikes: 2, // one more → 3 → session_over
+    });
+
+    const out = reduce(session, { type: 'RevealComplete', challengeWasCorrect: true, now: 4000 });
+    expect(out.status).toBe('session_over');
+    expect(out.sessionWinner).toBe('ai');
+    const round = out.rounds[out.currentRoundIdx];
+    expect(round.status).toBe('round_over');
+    expect(round.winner).toBe('ai');
+    expect(out.player.strikes).toBe(3);
+  });
+
+  it('Invariant 10: ai reaching strikes=3 → session_over, player wins', () => {
+    const all = make20Cards();
+    const pile = [all[0]];
+    // Player is active, claim was honest → ai (challenger) loses → ai gets strike → ai at 3
+    const claim = makeClaimFor('player', ['Queen-0'], true); // honest → challenger (ai) gets strike
+    const session = makeSessionInResolvingPhase({
+      activePlayer: 'player',
+      playerHand: all.slice(1, 5),
+      aiHand: all.slice(5, 10),
+      deck: all.slice(10, 20),
+      pile,
+      lastClaim: claim,
+      aiStrikes: 2,
+    });
+
+    const out = reduce(session, { type: 'RevealComplete', challengeWasCorrect: false, now: 4000 });
+    expect(out.status).toBe('session_over');
+    expect(out.sessionWinner).toBe('player');
+    expect(out.ai.strikes).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.4 — Invariant 4: Card conservation across full cycle
+// ---------------------------------------------------------------------------
+
+describe('Invariant 4: Card conservation through a challenge cycle', () => {
+  /**
+   * Full cycle: SetupComplete → ClaimMade → ChallengeCalled → RevealComplete(correct)
+   * Assert 20 cards accounted for at each step.
+   */
+  it('20 cards conserved through SetupComplete→ClaimMade→ChallengeCalled→RevealComplete(true)', () => {
+    // Build a known 20-card session via SetupComplete
+    const all = make20Cards(); // 5Q 5K 5A 5J
+    const initialDeal = {
+      playerHand: all.slice(0, 5),   // Queen-0..4
+      aiHand: all.slice(5, 10),      // King-0..4
+      remainingDeck: all.slice(10, 20), // Ace+Jack
+      targetRank: 'Queen' as const,
+      activePlayer: 'player' as const,
+    };
+    const musicTracks: Session['musicTracks'] = [
+      { level: 'calm', url: 'c.mp3' },
+      { level: 'tense', url: 't.mp3' },
+      { level: 'critical', url: 'cr.mp3' },
+    ];
+
+    const s0 = makeSession();
+    const s1 = reduce(s0, { type: 'SetupComplete', now: 1000, initialDeal, musicTracks });
+    expect(countAllCards(s1)).toBe(20);
+
+    // Player plays Queen-0 (lying: claims King)
+    const s2 = reduce(s1, {
+      type: 'ClaimMade',
+      now: 2000,
+      claim: {
+        by: 'player',
+        count: 1,
+        claimedRank: 'King',
+        actualCardIds: ['Queen-0'],
+        truthState: 'honest',
+        timestamp: 2000,
+      },
+    });
+    expect(countAllCards(s2)).toBe(20);
+
+    const s3 = reduce(s2, { type: 'ChallengeCalled', now: 3000 });
+    expect(countAllCards(s3)).toBe(20);
+
+    // challengeWasCorrect=true → claimant (player) struck + gets pile
+    const s4 = reduce(s3, { type: 'RevealComplete', challengeWasCorrect: true, now: 4000 });
+    expect(countAllCards(s4)).toBe(20);
+
+    // Verify uniqueness — no duplicates
+    const ids = collectAllCardIds(s4);
+    expect(new Set(ids).size).toBe(20);
+  });
+
+  it('20 cards conserved through SetupComplete→ClaimMade→ChallengeCalled→RevealComplete(false)', () => {
+    const all = make20Cards();
+    const initialDeal = {
+      playerHand: all.slice(0, 5),
+      aiHand: all.slice(5, 10),
+      remainingDeck: all.slice(10, 20),
+      targetRank: 'Queen' as const,
+      activePlayer: 'player' as const,
+    };
+    const musicTracks: Session['musicTracks'] = [
+      { level: 'calm', url: 'c.mp3' },
+      { level: 'tense', url: 't.mp3' },
+      { level: 'critical', url: 'cr.mp3' },
+    ];
+
+    const s1 = reduce(makeSession(), { type: 'SetupComplete', now: 1000, initialDeal, musicTracks });
+    expect(countAllCards(s1)).toBe(20);
+
+    // Player plays Queen-0 honestly
+    const s2 = reduce(s1, {
+      type: 'ClaimMade',
+      now: 2000,
+      claim: {
+        by: 'player',
+        count: 1,
+        claimedRank: 'Queen',
+        actualCardIds: ['Queen-0'],
+        truthState: 'honest',
+        timestamp: 2000,
+      },
+    });
+    expect(countAllCards(s2)).toBe(20);
+
+    const s3 = reduce(s2, { type: 'ChallengeCalled', now: 3000 });
+    expect(countAllCards(s3)).toBe(20);
+
+    // challengeWasCorrect=false → challenger (ai) struck + gets pile
+    const s4 = reduce(s3, { type: 'RevealComplete', challengeWasCorrect: false, now: 4000 });
+    expect(countAllCards(s4)).toBe(20);
+
+    const ids = collectAllCardIds(s4);
+    expect(new Set(ids).size).toBe(20);
+  });
+});

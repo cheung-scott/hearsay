@@ -97,18 +97,18 @@ Pure-TypeScript finite state machine for a best-of-3 voice-bluffing card game. I
     - **Invariant 15: Invalid transitions** — `ClaimMade` during `response_phase` throws `InvalidTransitionError`
     - _Requirements: 1.1, 1.2, 1.3, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 15.1_
 
-- [ ] 5. Implement reducer: response and resolution transitions
-  - [ ] 5.1 Implement `ClaimAccepted` transition in `src/lib/game/fsm.ts`
+- [x] 5. Implement reducer: response and resolution transitions
+  - [x] 5.1 Implement `ClaimAccepted` transition in `src/lib/game/fsm.ts`
     - Check round-end conditions via `checkRoundEnd` before swapping active player
     - If round ends: set `round.status = 'round_over'`, `round.winner = activePlayer`
     - Otherwise: swap `activePlayer`, transition to `claim_phase`
     - _Requirements: 5.1, 10.1_
 
-  - [ ] 5.2 Implement `ChallengeCalled` transition in `src/lib/game/fsm.ts`
+  - [x] 5.2 Implement `ChallengeCalled` transition in `src/lib/game/fsm.ts`
     - Transition `response_phase` → `resolving`
     - _Requirements: 5.2_
 
-  - [ ] 5.3 Implement `RevealComplete` transition in `src/lib/game/fsm.ts`
+  - [x] 5.3 Implement `RevealComplete` transition in `src/lib/game/fsm.ts`
     - Increment strike on exactly one player: claimant if `challengeWasCorrect`, challenger otherwise
     - **Move `Round.pile` contents to the losing player's `takenCards` array (append); set `Round.pile = []`**
     - Check session-end (3 strikes) FIRST — if yes, set `session_over` with correct winner (opponent of 3-striker)
@@ -117,7 +117,7 @@ Pure-TypeScript finite state machine for a best-of-3 voice-bluffing card game. I
     - Else swap active player, transition to `claim_phase`
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 9.1, 9.2, 9.3, 10.1, 10.2, 10.3_
 
-  - [ ]* 5.4 Write tests for response and resolution transitions in `src/lib/game/fsm.test.ts`
+  - [x]* 5.4 Write tests for response and resolution transitions in `src/lib/game/fsm.test.ts`
     - **Invariant 4: Card conservation (expanded)** — total = `Session.deck + hand_p + hand_ai + round.pile + p.takenCards + ai.takenCards === 20` after every reducer call through a full accept/challenge cycle (all 20 cards across 6 pools)
     - **Invariant 6: Caught-on-final-card-lie → round ends opponent-wins** — lie on final card + correctly challenged → `round.status === 'round_over'`, `round.winner === opponent`, active.strikes +1, active.takenCards contains the former pile, Round.pile === []
     - **Invariant 7: Honest-final-wrongly-challenged → round ends active-wins** — honest final card + wrongly challenged → `round.status === 'round_over'`, `round.winner === active`, challenger.strikes +1, challenger.takenCards contains the former pile, Round.pile === []
@@ -125,7 +125,7 @@ Pure-TypeScript finite state machine for a best-of-3 voice-bluffing card game. I
     - **Invariant 10: Session loss trigger** — `strikes` reaches 3 in same tick → `session_over`, correct winner
     - _Requirements: 5.1, 5.2, 6.1, 6.2, 6.3, 6.4, 6.5, 7.1, 9.1, 9.2, 9.3, 10.1, 10.2, 10.3_
 
-- [ ] 6. Checkpoint — Ensure all tests pass
+- [x] 6. Checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 7. Implement reducer: round settlement, joker, and session-end transitions
