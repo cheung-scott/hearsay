@@ -25,8 +25,8 @@ Hybrid AI opponent: deterministic math baseline + Gemini 2.5 Flash LLM orchestra
     - Export `buildFallbackThought(persona, action, mathProb, voiceLie): string` — four small persona-flavoured templates
     - _Requirements: 12.1, 12.2_
 
-- [ ] 3. Implement deterministic math layer and fallback functions
-  - [ ] 3.1 Create `src/lib/ai/math.ts` — persona tables and `claimMathProbability`
+- [x] 3. Implement deterministic math layer and fallback functions
+  - [x] 3.1 Create `src/lib/ai/math.ts` — persona tables and `claimMathProbability`
     - Export `PERSONA_WEIGHTS: Record<Persona, { math: number; voice: number }>` — Novice {0.7, 0.3}, Reader {0.4, 0.6}, Misdirector {0.5, 0.5}, Silent {0.3, 0.7}
     - Export `PERSONA_THRESHOLDS: Record<Persona, number>` — Novice 0.70, Reader 0.55, Misdirector 0.50, Silent 0.45
     - Export `PERSONA_BLUFF_BIAS: Record<Persona, number>` — Novice 0.10, Reader 0.35, Misdirector 0.60, Silent 0.55
@@ -34,7 +34,7 @@ Hybrid AI opponent: deterministic math baseline + Gemini 2.5 Flash LLM orchestra
     - Implement private `countInHand(hand, rank): number`
     - _Requirements: 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4, 3.5_
 
-  - [ ] 3.2 Implement fallback functions in `src/lib/ai/math.ts`
+  - [x] 3.2 Implement fallback functions in `src/lib/ai/math.ts`
     - Implement `aiDecideOnClaimFallback(ctx: DecisionContext)` — compute combined score from persona weights × (mathProb, voiceLie), compare to threshold, return action + innerThought + mathProb. Use neutral 0.5 when voiceMeta is undefined.
     - Implement `aiDecideOwnPlayFallback(ctx: OwnPlayContext, rng = Math.random)` — four branches: (1) targets available + rng > bluffBias → honest, (2) mixed hand + bluff → lying 2 cards, (3) all-target → honest, (4) zero-target → forced lie 1 card. Accept injectable `rng` for test determinism.
     - Import `templateHonest`, `templateLie`, `buildFallbackThought` from `constants.ts`
