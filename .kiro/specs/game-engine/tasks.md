@@ -72,8 +72,8 @@ Pure-TypeScript finite state machine for a best-of-3 voice-bluffing card game. I
 - [x] 3. Checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 4. Implement reducer: setup and claim transitions
-  - [ ] 4.1 Implement `reduce` function scaffold and `SetupComplete` transition in `src/lib/game/fsm.ts`
+- [x] 4. Implement reducer: setup and claim transitions
+  - [x] 4.1 Implement `reduce` function scaffold and `SetupComplete` transition in `src/lib/game/fsm.ts`
     - Create `reduce(session: Session, event: GameEvent): Session` with event-type dispatch
     - `SetupComplete`: transition `setup` → `round_active`, append fresh `Round` with `claim_phase`
     - Install `Session.deck = event.initialDeal.remainingDeck` (length === 10). Install hands from `initialDeal.playerHand` / `initialDeal.aiHand`. Both `takenCards` start as [].
@@ -81,7 +81,7 @@ Pure-TypeScript finite state machine for a best-of-3 voice-bluffing card game. I
     - Throw `InvalidTransitionError` for any event when `session_over`
     - _Requirements: 1.1, 1.2, 1.3, 15.1, 15.2, 20.1, 20.2_
 
-  - [ ] 4.2 Implement `ClaimMade` transition in `src/lib/game/fsm.ts`
+  - [x] 4.2 Implement `ClaimMade` transition in `src/lib/game/fsm.ts`
     - Validate `claim.count ∈ {1, 2}` and `actualCardIds.length === claim.count`
     - Validate every card ID exists in active player's hand
     - Derive `truthState`: `honest` iff all actual cards match `claimedRank`
@@ -89,7 +89,7 @@ Pure-TypeScript finite state machine for a best-of-3 voice-bluffing card game. I
     - Transition `claim_phase` → `response_phase`
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2_
 
-  - [ ]* 4.3 Write tests for `SetupComplete` and `ClaimMade` in `src/lib/game/fsm.test.ts`
+  - [x]* 4.3 Write tests for `SetupComplete` and `ClaimMade` in `src/lib/game/fsm.test.ts`
     - **Invariant 2: Deal** — after `SetupComplete`, 5 cards each, `Session.deck.length === 10`, empty pile, both takenCards empty, valid target rank
     - **Invariant 3: Claim validation** — `actualCardIds.length === count`, IDs exist in hand
     - **Invariant 5: Truth derivation** — `honest` iff all actual cards match claimed rank
