@@ -57,8 +57,8 @@ Hybrid AI opponent: deterministic math baseline + Gemini 2.5 Flash LLM orchestra
 - [x] 5. Checkpoint: run all tests
   - Run `pnpm vitest run src/lib/ai/math.test.ts` and verify all pass (16/16 passing)
 
-- [ ] 6. Implement LLM layer
-  - [ ] 6.1 Create `src/lib/ai/llm.ts` — SDK setup, schemas, prompt assembly
+- [x] 6. Implement LLM layer
+  - [x] 6.1 Create `src/lib/ai/llm.ts` — SDK setup, schemas, prompt assembly
     - Import `{ GoogleGenAI, Type }` from `@google/genai` — the unified Google Gen AI SDK per steering file. **NOT** the legacy `@google/generative-ai` package (different npm package, different class name `GoogleGenerativeAI`, different schema field `responseSchema`).
     - Initialize `const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })` — throw synchronously at module load if the env var is unset
     - Define `JUDGMENT_SCHEMA` and `OWN_PLAY_SCHEMA` using `Type.OBJECT` / `Type.STRING` / `Type.ARRAY` / `Type.INTEGER`. These objects will be passed via `config.responseJsonSchema` (NOT `responseSchema`).
@@ -67,7 +67,7 @@ Hybrid AI opponent: deterministic math baseline + Gemini 2.5 Flash LLM orchestra
     - Import `PERSONA_DESCRIPTIONS` from `constants.ts`
     - _Requirements: 6.1, 6.2, 6.3, 7.1, 7.3, 7.4_
 
-  - [ ] 6.2 Implement LLM call functions in `src/lib/ai/llm.ts`
+  - [x] 6.2 Implement LLM call functions in `src/lib/ai/llm.ts`
     - Implement `callLLMJudgment(ctx, mathProb, signal): Promise<LLMJudgmentOutput>` — call `ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt, config: { responseMimeType: 'application/json', responseJsonSchema: JUDGMENT_SCHEMA, temperature: 0.7, abortSignal: signal } })`, parse `response.text` as JSON, validate against schema, retry once on `LLMInvalidJSONError` **passing the SAME `signal` instance**, throw typed errors
     - Implement `callLLMOwnPlay(ctx, signal): Promise<LLMOwnPlayOutput>` — same call-shape with `OWN_PLAY_SCHEMA`, temperature 0.8, plus validation (card IDs in hand, count match, truthState consistency)
     - Translate SDK abort-rejection into `LLMTimeoutError`; wrap other network/SDK errors in `LLMNetworkError`
