@@ -74,8 +74,8 @@ Hybrid AI opponent: deterministic math baseline + Gemini 2.5 Flash LLM orchestra
     - The SDK's `generateContent` MUST be invoked at MOST twice per public call (one original + at most one retry)
     - _Requirements: 7.1, 7.2, 7.3, 8.1, 8.2, 8.3, 8.4, 9.1, 9.2, 9.3, 9.4_
 
-- [ ] 7. Write LLM layer tests
-  - [ ] 7.1 Write tests in `src/lib/ai/llm.test.ts` (all tests mock `@google/genai` via `vi.mock`; no real API calls)
+- [x] 7. Write LLM layer tests
+  - [x] 7.1 Write tests in `src/lib/ai/llm.test.ts` (all tests mock `@google/genai` via `vi.mock`; no real API calls)
     - **Invariant 7:** Mock SDK `generateContent` that never resolves + AbortSignal that fires at 2000 ms → `callLLMJudgment` throws `LLMTimeoutError`
     - **Invariant 8 (count):** Mock SDK returns unparseable string twice → spy-assert `generateContent` was called EXACTLY 2 times, then `callLLMJudgment` throws `LLMInvalidJSONError` *(requirement 9.4)*
     - **Invariant 8 (same-signal on retry):** Spy on `generateContent`; mock first call returns invalid JSON, second call returns valid JSON. Assert `call[0].args.config.abortSignal === call[1].args.config.abortSignal` (reference equality). An implementation creating a fresh `AbortController` on retry fails this test. *(requirement 9.1, design §4.5)*
@@ -88,15 +88,15 @@ Hybrid AI opponent: deterministic math baseline + Gemini 2.5 Flash LLM orchestra
     - Test own-play additional validators: count-mismatch → `LLMInvalidJSONError` reason `'count-mismatch'`; truth-state-mismatch → reason `'truth-state-mismatch'`
     - _Requirements: 6.1, 6.2, 7.2, 7.4, 8.1, 8.2, 8.3, 8.4, 9.1, 9.2, 9.3, 9.4_
 
-  - [ ] 7.2 Write drift-check test in `src/lib/ai/constants.test.ts`
+  - [x] 7.2 Write drift-check test in `src/lib/ai/constants.test.ts`
     - Read `.kiro/steering/llm-prompt-conventions.md` at test time via `fs.readFileSync` (resolved relative to `process.cwd()` — Vitest runs from repo root)
     - Regex-extract each persona's description string from the steering file's `const PERSONA_DESCRIPTIONS: Record<Persona, string>` block (match single-line string literals per persona key)
     - Assert each extracted string equals (`===`) the corresponding entry in the runtime `PERSONA_DESCRIPTIONS` imported from `constants.ts`, for all four personas
     - Test fails with a clear message if the steering file and runtime constants drift — CI must block on this
     - _Requirements: 12.1, 12.3_
 
-- [ ] 8. Checkpoint: run all tests
-  - Run `pnpm vitest run src/lib/ai/` and verify all pass
+- [x] 8. Checkpoint: run all tests
+  - Run `pnpm vitest run src/lib/ai/` and verify all pass (41/41 passing — 16 math + 21 llm + 4 constants)
 
 - [ ] 9. Implement brain orchestrator
   - [ ] 9.1 Create `src/lib/ai/brain.ts` — `aiDecideOnClaim` and `aiDecideOwnPlay`
