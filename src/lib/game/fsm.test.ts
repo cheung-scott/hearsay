@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { Card, Claim, GameEvent, PlayerState, Round, Session } from './types';
+import type { Card, Claim, GameEvent, JokerType, PlayerState, Round, Session } from './types';
 import { InvalidTransitionError } from './types';
 import {
   applyJokerEffect,
@@ -8,6 +8,18 @@ import {
   expireJokerEffects,
   reduce,
 } from './fsm';
+
+// ---------------------------------------------------------------------------
+// mulberry32 — deterministic seeded PRNG (inline helper for integration tests)
+// ---------------------------------------------------------------------------
+function mulberry32(seed: number): () => number {
+  return function () {
+    seed |= 0; seed = seed + 0x6d2b79f5 | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = t + Math.imul(t ^ (t >>> 7), 61 | t) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Factories — minimal seeds; tests pass `overrides` for the fields they care about
@@ -1475,5 +1487,645 @@ describe('reduce — Timeout (responder)', () => {
     const before = JSON.stringify(session);
     reduce(session, { type: 'Timeout', kind: 'responder', now: 9100 });
     expect(JSON.stringify(session)).toBe(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 11.1 — Reducer purity (Invariant 14)
+// ---------------------------------------------------------------------------
+
+describe('Invariant 14: Reducer purity', () => {
+  it('SetupComplete called twice with identical inputs → structurally equal outputs', () => {
+    const session = makeSession();
+    const event = makeSetupCompleteEvent();
+    const out1 = reduce(session, event);
+    const out2 = reduce(session, event);
+    expect(out1).toEqual(out2);
+  });
+
+  it('ClaimMade called twice with identical inputs → structurally equal outputs', () => {
+    const session = reduce(makeSession(), makeSetupCompleteEvent());
+    const event = makeClaimEvent({ count: 1, actualCardIds: ['Queen-0'] });
+    const out1 = reduce(session, event);
+    const out2 = reduce(session, event);
+    expect(out1).toEqual(out2);
+  });
+
+  it('Timeout(active_player) called twice → identical output (Invariant 14 specific clause)', () => {
+    const queenCard: Card = { id: 'Queen-0', rank: 'Queen' };
+    const round = makeRound({ targetRank: 'Queen', activePlayer: 'player', status: 'claim_phase' });
+    const session = makeSession({
+      status: 'round_active',
+      player: makePlayer({ hand: [queenCard, makeCard('King', 0)] }),
+      ai: makePlayer({ hand: [makeCard('King', 1)] }),
+      rounds: [round],
+      currentRoundIdx: 0,
+    });
+    const event: GameEvent = { type: 'Timeout', kind: 'active_player', cardIdToPlay: 'Queen-0', now: 9000 };
+    const out1 = reduce(session, event);
+    const out2 = reduce(session, event);
+    expect(out1).toEqual(out2);
+    expect(JSON.stringify(out1)).toBe(JSON.stringify(out2));
+  });
+
+  it('full claim→accept cycle: reduce called twice from same start → equal', () => {
+    const s0 = reduce(makeSession(), makeSetupCompleteEvent());
+    const s1 = reduce(s0, makeClaimEvent({ count: 1, actualCardIds: ['Queen-0'] }));
+    const event: GameEvent = { type: 'ClaimAccepted', now: 3000 };
+    expect(reduce(s1, event)).toEqual(reduce(s1, event));
+  });
+
+  it('input session not mutated after reduce (all event types)', () => {
+    // SetupComplete
+    const s0 = makeSession();
+    const snap0 = JSON.stringify(s0);
+    reduce(s0, makeSetupCompleteEvent());
+    expect(JSON.stringify(s0)).toBe(snap0);
+
+    // ClaimMade
+    const s1 = reduce(makeSession(), makeSetupCompleteEvent());
+    const snap1 = JSON.stringify(s1);
+    reduce(s1, makeClaimEvent({ count: 1, actualCardIds: ['Queen-0'] }));
+    expect(JSON.stringify(s1)).toBe(snap1);
+
+    // ClaimAccepted
+    const s2 = reduce(s1, makeClaimEvent({ count: 1, actualCardIds: ['Queen-0'] }));
+    const snap2 = JSON.stringify(s2);
+    reduce(s2, { type: 'ClaimAccepted', now: 3000 });
+    expect(JSON.stringify(s2)).toBe(snap2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 11.2 — Invalid transition tests (Invariant 15)
+// ---------------------------------------------------------------------------
+
+describe('Invariant 15: Invalid transitions', () => {
+  // All 10 event types throw when session_over
+  const allEventVariants: GameEvent[] = [
+    { type: 'SetupComplete', now: 0, initialDeal: makeInitialDeal(), musicTracks: [
+        { level: 'calm', url: 'c.mp3' },
+        { level: 'tense', url: 't.mp3' },
+        { level: 'critical', url: 'cr.mp3' },
+      ] },
+    { type: 'ClaimMade', now: 0, claim: { by: 'player', count: 1, claimedRank: 'Queen', actualCardIds: ['Queen-0'], truthState: 'honest', timestamp: 0 } },
+    { type: 'ClaimAccepted', now: 0 },
+    { type: 'ChallengeCalled', now: 0 },
+    { type: 'RevealComplete', now: 0, challengeWasCorrect: true },
+    { type: 'RoundSettled', now: 0 },
+    { type: 'JokerPicked', now: 0, joker: 'poker_face', nextRoundDeal: makeNextRoundDeal() },
+    { type: 'JokerOfferSkippedSessionOver', now: 0 },
+    { type: 'Timeout', kind: 'active_player', cardIdToPlay: 'Queen-0', now: 0 },
+    { type: 'Timeout', kind: 'responder', now: 0 },
+  ];
+
+  it('every event type throws InvalidTransitionError when session.status === session_over', () => {
+    const terminated = makeSession({ status: 'session_over' });
+    for (const event of allEventVariants) {
+      expect(() => reduce(terminated, event), `event type ${event.type}`).toThrow(InvalidTransitionError);
+    }
+  });
+
+  it('ClaimAccepted during claim_phase throws (Invariant 15)', () => {
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ status: 'claim_phase' })],
+    });
+    expect(() => reduce(session, { type: 'ClaimAccepted', now: 0 })).toThrow(InvalidTransitionError);
+  });
+
+  it('SetupComplete throws when session.status !== setup (from round_active)', () => {
+    const session = makeSession({ status: 'round_active', rounds: [makeRound()] });
+    expect(() => reduce(session, makeSetupCompleteEvent())).toThrow(InvalidTransitionError);
+  });
+
+  it('SetupComplete throws when session.status is joker_offer', () => {
+    const session = makeSession({ status: 'joker_offer', rounds: [makeRound()] });
+    expect(() => reduce(session, makeSetupCompleteEvent())).toThrow(InvalidTransitionError);
+  });
+
+  it('ClaimMade throws when round.status !== claim_phase (response_phase)', () => {
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ status: 'response_phase' })],
+      player: makePlayer({ hand: [makeCard('Queen', 0)] }),
+    });
+    expect(() => reduce(session, makeClaimEvent())).toThrow(InvalidTransitionError);
+  });
+
+  it('ClaimMade throws when round.status === resolving', () => {
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ status: 'resolving' })],
+      player: makePlayer({ hand: [makeCard('Queen', 0)] }),
+    });
+    expect(() => reduce(session, makeClaimEvent())).toThrow(InvalidTransitionError);
+  });
+
+  it('RoundSettled throws when round.status !== round_over', () => {
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ status: 'claim_phase' })],
+    });
+    expect(() => reduce(session, { type: 'RoundSettled', now: 0 })).toThrow(InvalidTransitionError);
+  });
+
+  it('RoundSettled throws when round.status === response_phase', () => {
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ status: 'response_phase' })],
+    });
+    expect(() => reduce(session, { type: 'RoundSettled', now: 0 })).toThrow(InvalidTransitionError);
+  });
+
+  it('JokerPicked throws outside joker_offer', () => {
+    const session = makeSession({ status: 'round_active', rounds: [makeRound()] });
+    expect(() =>
+      reduce(session, { type: 'JokerPicked', joker: 'poker_face', nextRoundDeal: makeNextRoundDeal(), now: 0 })
+    ).toThrow(InvalidTransitionError);
+  });
+
+  it('ChallengeCalled throws outside response_phase', () => {
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ status: 'claim_phase' })],
+    });
+    expect(() => reduce(session, { type: 'ChallengeCalled', now: 0 })).toThrow(InvalidTransitionError);
+  });
+
+  it('RevealComplete throws outside resolving (from claim_phase)', () => {
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ status: 'claim_phase' })],
+    });
+    expect(() => reduce(session, { type: 'RevealComplete', now: 0, challengeWasCorrect: true })).toThrow(InvalidTransitionError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 12.1 — Integration walkthrough: 2-round session
+// ---------------------------------------------------------------------------
+
+describe('Integration: 2-round session walkthrough', () => {
+  /**
+   * Helper: count all cards across the 6 pools (deck + two hands + pile + two takenCards).
+   * Invariant 4 (expanded): sum === 20 at every reducer tick.
+   */
+  function assertCardConservation(session: Session, round: Round): void {
+    const total =
+      session.deck.length +
+      session.player.hand.length +
+      session.ai.hand.length +
+      round.pile.length +
+      session.player.takenCards.length +
+      session.ai.takenCards.length;
+    expect(total).toBe(20);
+
+    // All 20 IDs must be unique
+    const ids = [
+      ...session.deck.map((c) => c.id),
+      ...session.player.hand.map((c) => c.id),
+      ...session.ai.hand.map((c) => c.id),
+      ...round.pile.map((c) => c.id),
+      ...session.player.takenCards.map((c) => c.id),
+      ...session.ai.takenCards.map((c) => c.id),
+    ];
+    expect(new Set(ids).size).toBe(20);
+  }
+
+  it('complete 2-round session: setup→claims→resolution→joker→round2→session win (Invariants 4, 9, 16)', () => {
+    // 20 cards in fixed layout: Queen-0..4, King-0..4, Ace-0..4, Jack-0..4
+    const queens = [0,1,2,3,4].map((i) => makeCard('Queen', i));
+    const kings  = [0,1,2,3,4].map((i) => makeCard('King', i));
+    const aces   = [0,1,2,3,4].map((i) => makeCard('Ace', i));
+    const jacks  = [0,1,2,3,4].map((i) => makeCard('Jack', i));
+
+    // ----- SETUP -----
+    // Player hand: 5 Queens; AI hand: 5 Kings; deck: 5 Aces + 5 Jacks
+    const s0 = makeSession();
+    const s1 = reduce(s0, {
+      type: 'SetupComplete',
+      now: 1000,
+      initialDeal: {
+        playerHand: queens,
+        aiHand: kings,
+        remainingDeck: [...aces, ...jacks],
+        targetRank: 'Queen',
+        activePlayer: 'player',
+      },
+      musicTracks: [
+        { level: 'calm', url: 'calm.mp3' },
+        { level: 'tense', url: 'tense.mp3' },
+        { level: 'critical', url: 'critical.mp3' },
+      ],
+    });
+    assertCardConservation(s1, s1.rounds[s1.currentRoundIdx]);
+    expect(s1.status).toBe('round_active');
+    expect(s1.rounds[0].status).toBe('claim_phase');
+    expect(s1.rounds[0].activePlayer).toBe('player');
+
+    // ----- Round 1, player plays 1 Queen honestly; AI challenges wrongly → AI gets strike -----
+    const s2 = reduce(s1, {
+      type: 'ClaimMade',
+      now: 2000,
+      claim: {
+        by: 'player',
+        count: 1,
+        claimedRank: 'Queen',
+        actualCardIds: ['Queen-0'],
+        truthState: 'honest',
+        timestamp: 2000,
+      },
+    });
+    assertCardConservation(s2, s2.rounds[s2.currentRoundIdx]);
+    expect(s2.rounds[0].status).toBe('response_phase');
+    expect(s2.player.hand).toHaveLength(4); // Queen-0 played
+
+    // AI challenges (wrongly — player was honest)
+    const s3 = reduce(s2, { type: 'ChallengeCalled', now: 3000 });
+    assertCardConservation(s3, s3.rounds[s3.currentRoundIdx]);
+
+    // Invariant 9: exactly 1 strike delta
+    const aiStrikesBefore = s3.ai.strikes;
+    const playerStrikesBefore = s3.player.strikes;
+    const s4 = reduce(s3, { type: 'RevealComplete', challengeWasCorrect: false, now: 4000 });
+    assertCardConservation(s4, s4.rounds[s4.currentRoundIdx]);
+    const totalDelta = (s4.player.strikes - playerStrikesBefore) + (s4.ai.strikes - aiStrikesBefore);
+    expect(totalDelta).toBe(1);
+    expect(s4.ai.strikes).toBe(1);   // challenger (AI) struck
+    expect(s4.player.strikes).toBe(0);
+    // Active swapped to AI after RevealComplete (pile cleared)
+    expect(s4.rounds[0].activePlayer).toBe('ai');
+
+    // AI plays 1 King; player accepts → swap to player
+    const s5 = reduce(s4, {
+      type: 'ClaimMade',
+      now: 5000,
+      claim: {
+        by: 'ai',
+        count: 1,
+        claimedRank: 'Queen',
+        actualCardIds: ['King-0'],
+        truthState: 'lying',
+        timestamp: 5000,
+      },
+    });
+    assertCardConservation(s5, s5.rounds[s5.currentRoundIdx]);
+
+    const s6 = reduce(s5, { type: 'ClaimAccepted', now: 6000 });
+    assertCardConservation(s6, s6.rounds[s6.currentRoundIdx]);
+    expect(s6.rounds[0].activePlayer).toBe('player');
+
+    // Player plays Queen-1; AI accepts → swap to AI
+    const s7 = reduce(s6, {
+      type: 'ClaimMade',
+      now: 7000,
+      claim: {
+        by: 'player',
+        count: 1,
+        claimedRank: 'Queen',
+        actualCardIds: ['Queen-1'],
+        truthState: 'honest',
+        timestamp: 7000,
+      },
+    });
+    assertCardConservation(s7, s7.rounds[s7.currentRoundIdx]);
+
+    const s8 = reduce(s7, { type: 'ClaimAccepted', now: 8000 });
+    assertCardConservation(s8, s8.rounds[s8.currentRoundIdx]);
+    expect(s8.rounds[0].activePlayer).toBe('ai');
+
+    // AI plays King-1; player accepts → swap to player
+    const s9 = reduce(s8, {
+      type: 'ClaimMade',
+      now: 9000,
+      claim: {
+        by: 'ai',
+        count: 1,
+        claimedRank: 'Queen',
+        actualCardIds: ['King-1'],
+        truthState: 'lying',
+        timestamp: 9000,
+      },
+    });
+    assertCardConservation(s9, s9.rounds[s9.currentRoundIdx]);
+
+    const s10 = reduce(s9, { type: 'ClaimAccepted', now: 10000 });
+    assertCardConservation(s10, s10.rounds[s10.currentRoundIdx]);
+    expect(s10.rounds[0].activePlayer).toBe('player');
+    expect(s10.player.hand).toHaveLength(3); // Queen-2,3,4 remaining
+
+    // Player plays Queen-2; AI accepts → swap to AI
+    const s11a = reduce(s10, {
+      type: 'ClaimMade',
+      now: 11000,
+      claim: {
+        by: 'player',
+        count: 1,
+        claimedRank: 'Queen',
+        actualCardIds: ['Queen-2'],
+        truthState: 'honest',
+        timestamp: 11000,
+      },
+    });
+    assertCardConservation(s11a, s11a.rounds[s11a.currentRoundIdx]);
+
+    const s11b = reduce(s11a, { type: 'ClaimAccepted', now: 11100 });
+    assertCardConservation(s11b, s11b.rounds[s11b.currentRoundIdx]);
+    expect(s11b.rounds[0].activePlayer).toBe('ai');
+
+    // AI plays King-2; player accepts → player's turn
+    const s11c = reduce(s11b, {
+      type: 'ClaimMade',
+      now: 11200,
+      claim: {
+        by: 'ai',
+        count: 1,
+        claimedRank: 'Queen',
+        actualCardIds: ['King-2'],
+        truthState: 'lying',
+        timestamp: 11200,
+      },
+    });
+    assertCardConservation(s11c, s11c.rounds[s11c.currentRoundIdx]);
+
+    const s11d = reduce(s11c, { type: 'ClaimAccepted', now: 11300 });
+    assertCardConservation(s11d, s11d.rounds[s11d.currentRoundIdx]);
+    expect(s11d.rounds[0].activePlayer).toBe('player');
+    expect(s11d.player.hand).toHaveLength(2); // Queen-3,4
+
+    // Player plays Queen-3; AI accepts
+    const s11e = reduce(s11d, {
+      type: 'ClaimMade',
+      now: 11400,
+      claim: {
+        by: 'player',
+        count: 1,
+        claimedRank: 'Queen',
+        actualCardIds: ['Queen-3'],
+        truthState: 'honest',
+        timestamp: 11400,
+      },
+    });
+    assertCardConservation(s11e, s11e.rounds[s11e.currentRoundIdx]);
+
+    const s11f = reduce(s11e, { type: 'ClaimAccepted', now: 11500 });
+    assertCardConservation(s11f, s11f.rounds[s11f.currentRoundIdx]);
+    expect(s11f.rounds[0].activePlayer).toBe('ai');
+
+    // AI plays King-3; player accepts
+    const s11g = reduce(s11f, {
+      type: 'ClaimMade',
+      now: 11600,
+      claim: {
+        by: 'ai',
+        count: 1,
+        claimedRank: 'Queen',
+        actualCardIds: ['King-3'],
+        truthState: 'lying',
+        timestamp: 11600,
+      },
+    });
+    assertCardConservation(s11g, s11g.rounds[s11g.currentRoundIdx]);
+
+    const s11h = reduce(s11g, { type: 'ClaimAccepted', now: 11700 });
+    assertCardConservation(s11h, s11h.rounds[s11h.currentRoundIdx]);
+    expect(s11h.rounds[0].activePlayer).toBe('player');
+    expect(s11h.player.hand).toHaveLength(1); // Queen-4 only
+
+    // Player plays final Queen-4 → hand empty → round_over (player wins) when accepted
+    const s11i = reduce(s11h, {
+      type: 'ClaimMade',
+      now: 11800,
+      claim: {
+        by: 'player',
+        count: 1,
+        claimedRank: 'Queen',
+        actualCardIds: ['Queen-4'],
+        truthState: 'honest',
+        timestamp: 11800,
+      },
+    });
+    assertCardConservation(s11i, s11i.rounds[s11i.currentRoundIdx]);
+    expect(s11i.player.hand).toHaveLength(0);
+
+    // AI accepts → round_over (player hand empty + claim accepted)
+    const s12 = reduce(s11i, { type: 'ClaimAccepted', now: 11900 });
+    assertCardConservation(s12, s12.rounds[s12.currentRoundIdx]);
+    expect(s12.rounds[0].status).toBe('round_over');
+    expect(s12.rounds[0].winner).toBe('player');
+
+    // ----- RoundSettled → joker_offer -----
+    const s13 = reduce(s12, { type: 'RoundSettled', now: 12000 });
+    expect(s13.status).toBe('joker_offer');
+    expect(s13.player.roundsWon).toBe(1);
+
+    // Round 2 deal: caller reshuffles all 20 cards (aces + jacks now in play)
+    // Player gets aces, AI gets jacks, deck gets queens+kings
+    const round2DealClean = {
+      playerHand: aces,
+      aiHand: jacks,
+      remainingDeck: [...queens, ...kings], // caller-collected all 20
+      targetRank: 'Ace' as const,
+      activePlayer: 'player' as const,
+    };
+
+    const s14 = reduce(s13, {
+      type: 'JokerPicked',
+      joker: 'poker_face',
+      nextRoundDeal: round2DealClean,
+      now: 13000,
+    });
+
+    // Invariant 16: both hands 5, deck 10, takenCards cleared
+    expect(s14.player.hand).toHaveLength(5);
+    expect(s14.ai.hand).toHaveLength(5);
+    expect(s14.deck).toHaveLength(10);
+    expect(s14.player.takenCards).toEqual([]);
+    expect(s14.ai.takenCards).toEqual([]);
+    expect(s14.rounds[1].pile).toEqual([]);
+    expect(s14.currentRoundIdx).toBe(1);
+    assertCardConservation(s14, s14.rounds[s14.currentRoundIdx]);
+
+    // Invariant 16: strikes carried forward unchanged
+    expect(s14.player.strikes).toBe(s13.player.strikes);
+    expect(s14.ai.strikes).toBe(s13.ai.strikes);
+
+    // ----- Round 2: player is active, targetRank = Ace -----
+    expect(s14.status).toBe('round_active');
+    expect(s14.rounds[1].status).toBe('claim_phase');
+    expect(s14.rounds[1].activePlayer).toBe('player');
+
+    // Player plays Ace-0 (honest); AI accepts → AI's turn
+    const s15 = reduce(s14, {
+      type: 'ClaimMade',
+      now: 14000,
+      claim: {
+        by: 'player',
+        count: 1,
+        claimedRank: 'Ace',
+        actualCardIds: ['Ace-0'],
+        truthState: 'honest',
+        timestamp: 14000,
+      },
+    });
+    assertCardConservation(s15, s15.rounds[s15.currentRoundIdx]);
+
+    const s16 = reduce(s15, { type: 'ClaimAccepted', now: 15000 });
+    assertCardConservation(s16, s16.rounds[s16.currentRoundIdx]);
+    expect(s16.rounds[1].activePlayer).toBe('ai');
+
+    // AI plays Jack-0 (lying — not an Ace); player accepts → player's turn
+    const s17 = reduce(s16, {
+      type: 'ClaimMade',
+      now: 16000,
+      claim: {
+        by: 'ai',
+        count: 1,
+        claimedRank: 'Ace',
+        actualCardIds: ['Jack-0'],
+        truthState: 'lying',
+        timestamp: 16000,
+      },
+    });
+    assertCardConservation(s17, s17.rounds[s17.currentRoundIdx]);
+
+    const s18 = reduce(s17, { type: 'ClaimAccepted', now: 17000 });
+    assertCardConservation(s18, s18.rounds[s18.currentRoundIdx]);
+    expect(s18.rounds[1].activePlayer).toBe('player');
+
+    // Player plays remaining 4 Aces (Ace-1..4), all in one 2-card then 2-card claim
+    const s19 = reduce(s18, {
+      type: 'ClaimMade',
+      now: 18000,
+      claim: {
+        by: 'player',
+        count: 2,
+        claimedRank: 'Ace',
+        actualCardIds: ['Ace-1', 'Ace-2'],
+        truthState: 'honest',
+        timestamp: 18000,
+      },
+    });
+    assertCardConservation(s19, s19.rounds[s19.currentRoundIdx]);
+
+    const s20 = reduce(s19, { type: 'ClaimAccepted', now: 19000 });
+    assertCardConservation(s20, s20.rounds[s20.currentRoundIdx]);
+    expect(s20.rounds[1].activePlayer).toBe('ai');
+
+    // AI plays Jack-1; player accepts → player's turn
+    const s21 = reduce(s20, {
+      type: 'ClaimMade',
+      now: 19500,
+      claim: {
+        by: 'ai',
+        count: 1,
+        claimedRank: 'Ace',
+        actualCardIds: ['Jack-1'],
+        truthState: 'lying',
+        timestamp: 19500,
+      },
+    });
+    assertCardConservation(s21, s21.rounds[s21.currentRoundIdx]);
+
+    const s22 = reduce(s21, { type: 'ClaimAccepted', now: 20000 });
+    assertCardConservation(s22, s22.rounds[s22.currentRoundIdx]);
+    expect(s22.rounds[1].activePlayer).toBe('player');
+    expect(s22.player.hand).toHaveLength(2); // Ace-3, Ace-4
+
+    // Player plays Ace-3; AI accepts
+    const s23 = reduce(s22, {
+      type: 'ClaimMade',
+      now: 20500,
+      claim: {
+        by: 'player',
+        count: 1,
+        claimedRank: 'Ace',
+        actualCardIds: ['Ace-3'],
+        truthState: 'honest',
+        timestamp: 20500,
+      },
+    });
+    assertCardConservation(s23, s23.rounds[s23.currentRoundIdx]);
+
+    const s24 = reduce(s23, { type: 'ClaimAccepted', now: 21000 });
+    assertCardConservation(s24, s24.rounds[s24.currentRoundIdx]);
+    expect(s24.rounds[1].activePlayer).toBe('ai');
+
+    // AI plays Jack-2; player accepts → player's final Ace
+    const s25 = reduce(s24, {
+      type: 'ClaimMade',
+      now: 21500,
+      claim: {
+        by: 'ai',
+        count: 1,
+        claimedRank: 'Ace',
+        actualCardIds: ['Jack-2'],
+        truthState: 'lying',
+        timestamp: 21500,
+      },
+    });
+    assertCardConservation(s25, s25.rounds[s25.currentRoundIdx]);
+
+    const s26 = reduce(s25, { type: 'ClaimAccepted', now: 22000 });
+    assertCardConservation(s26, s26.rounds[s26.currentRoundIdx]);
+    expect(s26.rounds[1].activePlayer).toBe('player');
+    expect(s26.player.hand).toHaveLength(1); // Ace-4 only
+
+    // Player plays final Ace-4 → hand empty
+    const s27 = reduce(s26, {
+      type: 'ClaimMade',
+      now: 22500,
+      claim: {
+        by: 'player',
+        count: 1,
+        claimedRank: 'Ace',
+        actualCardIds: ['Ace-4'],
+        truthState: 'honest',
+        timestamp: 22500,
+      },
+    });
+    assertCardConservation(s27, s27.rounds[s27.currentRoundIdx]);
+    expect(s27.player.hand).toHaveLength(0);
+
+    // AI accepts → round_over, player wins round 2
+    const s28 = reduce(s27, { type: 'ClaimAccepted', now: 23000 });
+    assertCardConservation(s28, s28.rounds[s28.currentRoundIdx]);
+    expect(s28.rounds[1].status).toBe('round_over');
+    expect(s28.rounds[1].winner).toBe('player');
+
+    // RoundSettled → session_over (player wins 2nd round → 2 total)
+    const s29 = reduce(s28, { type: 'RoundSettled', now: 24000 });
+    expect(s29.status).toBe('session_over');
+    expect(s29.sessionWinner).toBe('player');
+    expect(s29.player.roundsWon).toBe(2);
+  });
+
+  it('Invariant 9 across all RevealComplete firings: exactly ONE player strikes per resolution', () => {
+    const all = make20Cards();
+    const pile = [all[0]];
+    const claim: Claim = {
+      by: 'player',
+      count: 1,
+      claimedRank: 'Queen',
+      actualCardIds: ['Queen-0'],
+      truthState: 'lying',
+      timestamp: 2000,
+    };
+    const session = makeSessionInResolvingPhase({
+      activePlayer: 'player',
+      playerHand: all.slice(1, 5),
+      aiHand: all.slice(5, 10),
+      deck: all.slice(10, 20),
+      pile,
+      lastClaim: claim,
+    });
+
+    for (const correct of [true, false]) {
+      const before = { p: session.player.strikes, ai: session.ai.strikes };
+      const out = reduce(session, { type: 'RevealComplete', challengeWasCorrect: correct, now: 4000 });
+      const delta = (out.player.strikes - before.p) + (out.ai.strikes - before.ai);
+      expect(delta).toBe(1);
+    }
   });
 });

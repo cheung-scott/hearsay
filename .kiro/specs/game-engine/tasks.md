@@ -162,8 +162,8 @@ Pure-TypeScript finite state machine for a best-of-3 voice-bluffing card game. I
     - Test responder timeout behaves as `ClaimAccepted`
     - _Requirements: 13.1, 13.2, 13.3, 13.4_
 
-- [ ] 9. Implement `toClientView` projection
-  - [ ] 9.1 Implement `toClientView` in `src/lib/game/toClientView.ts`
+- [x] 9. Implement `toClientView` projection
+  - [x] 9.1 Implement `toClientView` in `src/lib/game/toClientView.ts`
     - Strip `actualCardIds` from all claims in all rounds
     - Strip `llmReasoning` from opponent's claims (keep for own claims — supports Earful autopsy UI)
     - Replace opponent's `hand` with `handSize`
@@ -173,31 +173,31 @@ Pure-TypeScript finite state machine for a best-of-3 voice-bluffing card game. I
     - Map current music track URL based on tension level
     - _Requirements: 16.1, 16.2, 16.3, 16.4, 16.5_
 
-  - [ ]* 9.2 Write tests for `toClientView` in `src/lib/game/fsm.test.ts`
+  - [x]* 9.2 Write tests for `toClientView` in `src/lib/game/toClientView.test.ts`
     - **Invariant 12: toClientView isolation** — serialized output contains zero `actualCardIds` fields; opponent `hand` absent, `handSize` present
     - Test `llmReasoning` stripped from opponent claims but preserved for own claims
     - Test `PublicClaim` shape (only `by`, `count`, `claimedRank`, `claimText`, `timestamp`)
     - Test viewer symmetry: player view hides AI hand, AI view hides player hand
     - _Requirements: 16.1, 16.2, 16.3, 16.4, 16.5_
 
-- [ ] 10. Checkpoint — Ensure all tests pass
+- [x] 10. Checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 11. Reducer purity and invalid-transition coverage
-  - [ ]* 11.1 Write reducer purity tests in `src/lib/game/fsm.test.ts`
+- [x] 11. Reducer purity and invalid-transition coverage
+  - [x]* 11.1 Write reducer purity tests in `src/lib/game/fsm.test.ts`
     - **Invariant 14: Reducer purity** — call `reduce` twice with identical inputs → structurally-equal outputs; no dependency on `Date.now()` / `Math.random()`
     - Test input session is not mutated after `reduce` call (deep-equal check on original)
     - _Requirements: 14.1, 14.2, 14.3, 14.4_
 
-  - [ ]* 11.2 Write invalid-transition tests in `src/lib/game/fsm.test.ts`
+  - [x]* 11.2 Write invalid-transition tests in `src/lib/game/fsm.test.ts`
     - **Invariant 15: Invalid transitions throw** — `ClaimAccepted` during `claim_phase` throws `InvalidTransitionError`
     - Test every event type throws when `Session.status === 'session_over'`
     - Test `SetupComplete` throws when `Session.status !== 'setup'`
     - Test `ClaimMade` throws when `Round.status !== 'claim_phase'`
     - _Requirements: 15.1, 15.2, 20.1, 20.2_
 
-- [ ] 12. Full integration: multi-round session walkthrough
-  - [ ] 12.1 Wire all transitions together and verify full session flow in `src/lib/game/fsm.test.ts`
+- [x] 12. Full integration: multi-round session walkthrough
+  - [x] 12.1 Wire all transitions together and verify full session flow in `src/lib/game/fsm.test.ts`
     - Test a complete 2-round session: setup → claims → accept/challenge → round settlement → joker pick (with fresh `nextRoundDeal`) → round 2 → session win
     - **Invariant 4: Card conservation (expanded)** — assert `Session.deck + hand_p + hand_ai + round.pile + p.takenCards + ai.takenCards === 20` at every intermediate state (all 6 pools)
     - **Invariant 9: Simultaneous strike-3 impossible** — verify across all resolutions
@@ -205,7 +205,7 @@ Pure-TypeScript finite state machine for a best-of-3 voice-bluffing card game. I
     - Verify `checkSessionEnd` and `checkRoundEnd` integrate correctly with reducer
     - _Requirements: 7.1, 8.1, 8.2, 9.1, 9.2, 9.3, 10.1, 11.1, 11.2, 20.1, 21.1, 21.2, 21.3, 21.5_
 
-- [ ] 13. Final checkpoint — Ensure all tests pass
+- [x] 13. Final checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes
