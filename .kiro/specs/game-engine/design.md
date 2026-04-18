@@ -5,6 +5,10 @@ fileMatchPattern: "src/lib/game/**/*.ts|src/lib/game/fsm.ts|src/lib/game/types.t
 
 # game-engine — Design
 
+## Provenance
+
+Authored by Claude Code as a TypeScript-level codification of `Documents/Obsidian_Vault/Projects/ElevenHacks-Kiro/ARCHITECTURE-DRAFT.md` §4 (data model) + §5 (turn flow), iter-5 locked 2026-04-16. Kiro Spec mode generated `requirements.md` + `tasks.md` from this design via seeded prompt. Tasks executed by Claude Code with Sonnet 4.6 implementation subagents + Opus 4.7 review subagent per spec.
+
 Pure-TypeScript finite state machine for a best-of-3 voice-bluffing card game (1 human vs 1 AI).
 
 **Scope of this spec:** turn / round / session transitions, hand/pile/takenCards bookkeeping, strike accounting, round-end and session-end detection, joker-effect slots, inter-round reshuffle+redeal.
