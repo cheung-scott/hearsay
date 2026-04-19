@@ -1,3 +1,7 @@
+packages:
+  - .
+  - powers/*
+
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
