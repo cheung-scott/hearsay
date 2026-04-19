@@ -129,16 +129,15 @@ Phase 1 only — no jokers UI, no probe phase, no elimination beat, no tension m
 
 - [x] 12. Checkpoint: run all tests (384/384 passing across 16 files — tsc clean)
 
-- [ ] 13. API route tests (invariants 8-11)
-  - [ ] 13.1 Create `src/app/api/turn/route.test.ts` — mock game-engine, ai-opponent, voice modules, and Vercel KV store. Tests:
+- [x] 13. API route tests (invariants 8-11)
+  - [x] 13.1 Create `src/app/api/turn/route.test.ts` — mock game-engine, ai-opponent, voice modules, and Vercel KV store. Tests:
     - `PlayerClaim` with invalid card IDs → 400 response, session unchanged (invariant 8)
     - `PlayerClaim` with valid cards → response includes `aiDecision` (invariant 9)
     - `AiAct` → TTS call uses `VOICE_PRESETS[persona][truthState]` args (invariant 10)
     - Every response `ClientSession` has zero `actualCardIds`, opponent as `handSize` not array (invariant 11)
     _Requirements: 10.1, 10.2, 10.3, 12.2, 21.1_
 
-- [ ] 14. Final checkpoint: full test suite
-  - Run `pnpm vitest --run`. All tests green. Run `pnpm tsc --noEmit`. Zero type errors. Verify all 12 design invariants are covered:
+- [x] 14. Final checkpoint: full test suite (391/391 green across 17 files, tsc clean). All 12 invariants covered:
     - Invariant 1 (phase derivation): Task 3.5
     - Invariant 2 (dispatch → fetch): Task 3.5
     - Invariant 3 (fetch failure → error): Task 3.5
