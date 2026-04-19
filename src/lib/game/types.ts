@@ -121,6 +121,13 @@ export interface PublicClaim {
   claimedRank: Rank;
   claimText?: string;
   timestamp: number;
+  /**
+   * Cold Read projection only (joker-system §7.4.2, Task 12).
+   * Retained by toClientView on the LAST AI claim when `cold_read` is in
+   * `Round.activeJokerEffects`. Stripped on all other claims + all non-Cold-Read rounds.
+   * Strictly additive — does not affect any existing PublicClaim construction site.
+   */
+  voiceMeta?: { lieScore: number };
 }
 
 // ---------------------------------------------------------------------------

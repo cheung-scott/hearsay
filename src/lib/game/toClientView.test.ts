@@ -411,3 +411,225 @@ describe('toClientView — input not mutated', () => {
     expect(session.player.hand).toHaveLength(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// I5 — Cold Read lie-score retention (joker-system §7.4.2)
+// ---------------------------------------------------------------------------
+
+describe('toClientView — I5: Cold Read lie-score retention', () => {
+  const coldReadEffect = { type: 'cold_read' as const, expiresAfter: 'next_challenge' as const };
+
+  function makeAiClaimWithLieScore(lieScore: number): Claim {
+    return makeFullClaim({
+      by: 'ai',
+      voiceMeta: {
+        latencyMs: 150,
+        fillerCount: 0,
+        pauseCount: 1,
+        speechRateWpm: 110,
+        lieScore,
+        parsed: { count: 1, rank: 'Queen' },
+      },
+    });
+  }
+
+  it('Cold Read active: last AI claim retains lieScore in projection', () => {
+    const aiClaim = makeAiClaimWithLieScore(0.73);
+    const round = makeRound({
+      claimHistory: [aiClaim],
+      activeJokerEffects: [coldReadEffect],
+    });
+    const session = makeSession({ status: 'round_active', rounds: [round] });
+    const client = toClientView(session, 'player');
+    const publicClaim = client.rounds[0].claimHistory[0];
+    expect(publicClaim.voiceMeta?.lieScore).toBe(0.73);
+  });
+
+  it('Cold Read inactive: last AI claim has voiceMeta stripped (undefined)', () => {
+    const aiClaim = makeAiClaimWithLieScore(0.73);
+    const round = makeRound({
+      claimHistory: [aiClaim],
+      activeJokerEffects: [], // no cold_read
+    });
+    const session = makeSession({ status: 'round_active', rounds: [round] });
+    const client = toClientView(session, 'player');
+    const publicClaim = client.rounds[0].claimHistory[0];
+    expect(publicClaim.voiceMeta).toBeUndefined();
+  });
+
+  it('Cold Read active: only lieScore retained on AI claim (no other voiceMeta fields leaked)', () => {
+    const aiClaim = makeAiClaimWithLieScore(0.55);
+    const round = makeRound({
+      claimHistory: [aiClaim],
+      activeJokerEffects: [coldReadEffect],
+    });
+    const session = makeSession({ status: 'round_active', rounds: [round] });
+    const client = toClientView(session, 'player');
+    const publicClaim = client.rounds[0].claimHistory[0];
+    expect(publicClaim.voiceMeta).toEqual({ lieScore: 0.55 });
+    // No other voiceMeta fields (e.g. latencyMs, fillerCount) should leak
+    expect(Object.keys(publicClaim.voiceMeta!)).toEqual(['lieScore']);
+  });
+
+  it('Cold Read active: last AI claim targeted (player claim after AI claim stays stripped)', () => {
+    const aiClaim = makeAiClaimWithLieScore(0.8);
+    const playerClaim = makeFullClaim({ by: 'player', timestamp: 2000 });
+    const round = makeRound({
+      claimHistory: [aiClaim, playerClaim],
+      activeJokerEffects: [coldReadEffect],
+    });
+    const session = makeSession({ status: 'round_active', rounds: [round] });
+    const client = toClientView(session, 'player');
+    const history = client.rounds[0].claimHistory;
+    // AI claim (index 0) is last AI claim → gets lieScore
+    expect(history[0].voiceMeta?.lieScore).toBe(0.8);
+    // Player claim (index 1) → voiceMeta stripped
+    expect(history[1].voiceMeta).toBeUndefined();
+  });
+
+  it('Cold Read active: with multiple AI claims, only the LAST AI claim gets lieScore', () => {
+    const aiClaim1 = makeAiClaimWithLieScore(0.3);
+    const aiClaim2 = makeAiClaimWithLieScore(0.9);
+    const round = makeRound({
+      claimHistory: [aiClaim1, aiClaim2],
+      activeJokerEffects: [coldReadEffect],
+    });
+    const session = makeSession({ status: 'round_active', rounds: [round] });
+    const client = toClientView(session, 'player');
+    const history = client.rounds[0].claimHistory;
+    // Only the last AI claim (index 1) gets lieScore
+    expect(history[0].voiceMeta).toBeUndefined();
+    expect(history[1].voiceMeta?.lieScore).toBe(0.9);
+  });
+
+  it('Cold Read active: no crash when claimHistory is empty', () => {
+    const round = makeRound({
+      claimHistory: [],
+      activeJokerEffects: [coldReadEffect],
+    });
+    const session = makeSession({ status: 'round_active', rounds: [round] });
+    expect(() => toClientView(session, 'player')).not.toThrow();
+    const client = toClientView(session, 'player');
+    expect(client.rounds[0].claimHistory).toHaveLength(0);
+  });
+
+  it('Cold Read active: no crash and no lieScore when all claims are player claims (no AI claim)', () => {
+    const playerClaim = makeFullClaim({ by: 'player' });
+    const round = makeRound({
+      claimHistory: [playerClaim],
+      activeJokerEffects: [coldReadEffect],
+    });
+    const session = makeSession({ status: 'round_active', rounds: [round] });
+    const client = toClientView(session, 'player');
+    const publicClaim = client.rounds[0].claimHistory[0];
+    expect(publicClaim.voiceMeta).toBeUndefined();
+  });
+
+  it('Cold Read active: AI claim with no voiceMeta — voiceMeta stays undefined (no crash)', () => {
+    const aiClaim: Claim = {
+      by: 'ai',
+      count: 1,
+      claimedRank: 'King',
+      actualCardIds: ['King-0'],
+      truthState: 'honest',
+      // voiceMeta intentionally absent
+      claimText: 'I play one King',
+      timestamp: 3000,
+    };
+    const round = makeRound({
+      claimHistory: [aiClaim],
+      activeJokerEffects: [coldReadEffect],
+    });
+    const session = makeSession({ status: 'round_active', rounds: [round] });
+    const client = toClientView(session, 'player');
+    const publicClaim = client.rounds[0].claimHistory[0];
+    expect(publicClaim.voiceMeta).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// I12 — joker field projections (joker-system spec §7.1.9 gates)
+// ---------------------------------------------------------------------------
+
+describe('toClientView — I12: joker field projections', () => {
+  it('jokerDrawPile absent from both player and ai views', () => {
+    const session = makeSession({
+      status: 'round_active',
+      jokerDrawPile: ['cold_read', 'poker_face'],
+    });
+    const playerView = toClientView(session, 'player');
+    const aiView = toClientView(session, 'ai');
+    expect(JSON.stringify(playerView)).not.toContain('jokerDrawPile');
+    expect(JSON.stringify(aiView)).not.toContain('jokerDrawPile');
+  });
+
+  it('discardedJokers absent when status === round_active', () => {
+    const session = makeSession({
+      status: 'round_active',
+      discardedJokers: ['earful'],
+    });
+    const client = toClientView(session, 'player');
+    expect(client.discardedJokers).toBeUndefined();
+  });
+
+  it('discardedJokers present when status === joker_offer', () => {
+    const session = makeSession({
+      status: 'joker_offer',
+      discardedJokers: ['earful', 'second_wind'],
+    });
+    const client = toClientView(session, 'player');
+    expect(client.discardedJokers).toEqual(['earful', 'second_wind']);
+  });
+
+  it('discardedJokers present when status === session_over', () => {
+    const session = makeSession({
+      status: 'session_over',
+      discardedJokers: ['poker_face'],
+    });
+    const client = toClientView(session, 'player');
+    expect(client.discardedJokers).toEqual(['poker_face']);
+  });
+
+  it('currentOffer present ONLY for the offeredToWinner viewer', () => {
+    const offer = {
+      offered: ['cold_read' as const, 'earful' as const],
+      offeredToWinner: 'player' as const,
+    };
+    const session = makeSession({
+      status: 'joker_offer',
+      currentOffer: offer,
+    });
+    const playerView = toClientView(session, 'player');
+    const aiView = toClientView(session, 'ai');
+    expect(playerView.currentOffer).toBeDefined();
+    expect(playerView.currentOffer?.offered).toEqual(['cold_read', 'earful']);
+    expect(aiView.currentOffer).toBeUndefined();
+  });
+
+  it('jokerSlots present in both self and opponent views', () => {
+    const slots = [{ joker: 'cold_read' as const, state: 'held' as const, acquiredRoundIdx: 0, acquiredAt: 1000 }];
+    const session = makeSession({
+      player: makePlayer({ jokerSlots: slots }),
+      ai: makePlayer({ jokerSlots: slots }),
+    });
+    const playerView = toClientView(session, 'player');
+    // self view has jokerSlots
+    expect(playerView.self.jokerSlots).toEqual(slots);
+    // opponent view has jokerSlots (public info)
+    expect(playerView.opponent.jokerSlots).toEqual(slots);
+  });
+
+  it('autopsy present for self viewer only (not opponent)', () => {
+    const autopsy = { preset: 'confident_honest' as const, roundIdx: 0, turnIdx: 2 };
+    const session = makeSession({
+      status: 'round_active',
+      autopsy,
+    });
+    const playerView = toClientView(session, 'player');
+    const aiView = toClientView(session, 'ai');
+    // self viewer (player) gets autopsy
+    expect(playerView.autopsy).toEqual(autopsy);
+    // opponent viewer (ai) does NOT get autopsy
+    expect(aiView.autopsy).toBeUndefined();
+  });
+});

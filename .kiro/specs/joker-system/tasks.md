@@ -2,6 +2,20 @@
 
 ## ⚠ Spec drift flag (escalation — do not silently resolve)
 
+**2026-04-19 — Additive type extension for Cold Read (Task 12):**
+Added optional `PublicClaim.voiceMeta?: { lieScore: number }` to
+`src/lib/game/types.ts` so toClientView can retain lieScore when Cold
+Read is active. Strictly additive — no breakage. The orchestrator
+brief said "do not modify types.ts field declarations"; this is a new
+optional field that the pre-land commit did not anticipate because
+Cold Read's projection contract depends on effect semantics in this
+worktree. Flagged for Scott's awareness.
+
+Also corrected autopsy projection gate: pre-land code spread autopsy to
+both viewers; Task 12 corrects it to `viewer === 'player'` only, matching
+spec §7.4.3 ("self viewer only") and task description. Strictly additive
+fix — no existing test relied on the incorrect ai-viewer autopsy path.
+
 **Cross-spec drift found during Task 2 implementation (2026-04-19):**
 
 Three flavor strings in `.kiro/steering/product.md` "Session-Jokers" table exceed the 80-char cap specified by Requirement 1.2 / Task 3:
@@ -110,7 +124,7 @@ Pre-landed in commit `29f6a34`: `src/lib/jokers/types.ts` (JokerSlot, JokerOffer
   - **I5:** `applyColdRead` returns `true` when `cold_read` in activeJokerEffects, `false` otherwise
   - _Requirements: 10.2, 13.2, 14.1, 14.4_
 
-- [ ] 12. Extend `toClientView` projections in `src/lib/game/toClientView.ts`
+- [x] 12. Extend `toClientView` projections in `src/lib/game/toClientView.ts`
   - Strip `Session.jokerDrawPile` entirely from client view
   - Project `Session.discardedJokers` ONLY when `Session.status !== 'round_active'`
   - Project `Session.currentOffer` ONLY when `viewer === currentOffer.offeredToWinner`

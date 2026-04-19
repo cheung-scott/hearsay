@@ -12,6 +12,7 @@ import type {
   Round,
   Session,
 } from './types';
+import { applyColdRead } from '../jokers/effects';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -50,10 +51,29 @@ function toClientRound(round: Round): ClientRound {
     pendingJokerActivation: _pendingJokerActivation,
     ...rest
   } = round;
+  const projectedHistory = claimHistory.map(toPublicClaim);
+
+  // Cold Read (§7.4.2): when active, retain lieScore on the LAST AI claim only.
+  if (applyColdRead(round)) {
+    for (let i = projectedHistory.length - 1; i >= 0; i--) {
+      const c = projectedHistory[i];
+      if (c.by === 'ai') {
+        const srcClaim = claimHistory[i];
+        if (srcClaim.voiceMeta?.lieScore !== undefined) {
+          projectedHistory[i] = {
+            ...c,
+            voiceMeta: { lieScore: srcClaim.voiceMeta.lieScore },
+          };
+        }
+        break;
+      }
+    }
+  }
+
   return {
     ...rest,
     pileSize: pile.length,
-    claimHistory: claimHistory.map(toPublicClaim),
+    claimHistory: projectedHistory,
   };
 }
 
@@ -120,8 +140,8 @@ export function toClientView(session: Session, viewer: 'player' | 'ai'): ClientS
   // Worktrees will extend these as the features fill in.
   // -------------------------------------------------------------------------
 
-  // Earful autopsy — self viewer only.
-  const autopsy = session.autopsy ? { ...session.autopsy } : undefined;
+  // Earful autopsy — self (player) viewer only; opponent never sees it.
+  const autopsy = viewer === 'player' && session.autopsy ? { ...session.autopsy } : undefined;
 
   // discardedJokers — both viewers see post-round only (spec §7.1.9).
   const discardedJokers =
