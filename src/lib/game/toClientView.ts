@@ -34,9 +34,22 @@ function toPublicClaim(claim: Claim): PublicClaim {
 
 /** Map a server Round to a ClientRound (drop pile, add pileSize; strip claim internals). */
 function toClientRound(round: Round): ClientRound {
-  // Spread all Round fields, then override claimHistory + pile → pileSize.
-  // Explicit omit: pile (replaced), claimHistory (replaced). All other fields pass through.
-  const { pile, claimHistory, ...rest } = round;
+  // Strip server-only Round fields before spreading:
+  //   pile              → replaced with pileSize
+  //   claimHistory      → replaced with PublicClaim[]
+  //   activeProbe       → server-only; probe-phase worktree projects
+  //                       Round.activeProbe → ClientRound.currentProbe via
+  //                       the filter pipeline (pre-land: not projected yet).
+  //   jokerTriggeredThisRound → joker-system internal
+  //   pendingJokerActivation  → joker-system internal
+  const {
+    pile,
+    claimHistory,
+    activeProbe: _activeProbe,
+    jokerTriggeredThisRound: _jokerTriggeredThisRound,
+    pendingJokerActivation: _pendingJokerActivation,
+    ...rest
+  } = round;
   return {
     ...rest,
     pileSize: pile.length,
@@ -102,12 +115,36 @@ export function toClientView(session: Session, viewer: 'player' | 'ai'): ClientS
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Day-5 pre-land (orchestrator, 2026-04-19) — gated joker + autopsy fields.
+  // Worktrees will extend these as the features fill in.
+  // -------------------------------------------------------------------------
+
+  // Earful autopsy — self viewer only.
+  const autopsy = session.autopsy ? { ...session.autopsy } : undefined;
+
+  // discardedJokers — both viewers see post-round only (spec §7.1.9).
+  const discardedJokers =
+    session.discardedJokers && session.status !== 'round_active'
+      ? [...session.discardedJokers]
+      : undefined;
+
+  // currentOffer — only the offeredToWinner viewer sees the live offer.
+  const currentOffer =
+    session.currentOffer && session.currentOffer.offeredToWinner === viewer
+      ? {
+          ...session.currentOffer,
+          offered: [...session.currentOffer.offered],
+        }
+      : undefined;
+
   return {
     id: session.id,
     self: {
       ...selfState,
       hand: [...selfState.hand],
       takenCards: [...selfState.takenCards],
+      ...(selfState.jokerSlots ? { jokerSlots: [...selfState.jokerSlots] } : {}),
     },
     opponent,
     rounds: clientRounds,
@@ -115,5 +152,8 @@ export function toClientView(session: Session, viewer: 'player' | 'ai'): ClientS
     status: session.status,
     sessionWinner: session.sessionWinner,
     currentMusicUrl,
+    ...(autopsy ? { autopsy } : {}),
+    ...(discardedJokers ? { discardedJokers } : {}),
+    ...(currentOffer ? { currentOffer } : {}),
   };
 }

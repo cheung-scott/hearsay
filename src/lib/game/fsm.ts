@@ -609,5 +609,26 @@ export function reduce(session: Session, event: GameEvent): Session {
       return jokerOfferSkippedSessionOver(session, event);
     case 'Timeout':
       return timeout(session, event);
+    // -----------------------------------------------------------------------
+    // Day-5 pre-land stubs (orchestrator, 2026-04-19).
+    // These case branches exist so the GameEvent union is exhaustively
+    // covered at compile time. Each throws until the corresponding worktree
+    // lands its reducer slice. No existing test fires these events — the
+    // 391-test baseline is unaffected by these stubs.
+    // -----------------------------------------------------------------------
+    case 'JokerOffered':
+    case 'JokerOfferEmpty':
+    case 'UseJoker':
+      throw new InvalidTransitionError(
+        `${session.status} (pending joker-system worktree)`,
+        event.type,
+      );
+    case 'ProbeStart':
+    case 'ProbeComplete':
+    case 'ProbeExpired':
+      throw new InvalidTransitionError(
+        `${session.status} (pending probe-phase worktree)`,
+        event.type,
+      );
   }
 }

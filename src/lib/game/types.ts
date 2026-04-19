@@ -6,8 +6,30 @@
 // Claim/PublicClaim, Round, PlayerState, Session, Client* projections, the
 // GameEvent discriminated union, and the InvalidTransitionError class.
 //
+// Day-5 pre-land (orchestrator, 2026-04-19) adds OPTIONAL fields for
+// joker-system / probe-phase / tension-music-system / Earful autopsy,
+// 6 new GameEvent variants (JokerOffered / JokerOfferEmpty / UseJoker /
+// ProbeStart / ProbeComplete / ProbeExpired), and 3 new top-level types
+// (ActiveProbe / RevealedProbe / ProbeFilterSource). All additions are
+// optional so existing tests continue to construct Round/PlayerState/
+// Session without providing the new fields; the Day-5 worktrees fill in
+// the reducer logic + populate the new slots via the new events.
+//
 // All types here are pure data shapes — no runtime behavior lives in this
 // file; the reducer and projections are in `fsm.ts` / `toClientView.ts`.
+
+// ---------------------------------------------------------------------------
+// Re-exports (Day-5 pre-land)
+// ---------------------------------------------------------------------------
+// Joker slot/offer shapes live in `src/lib/jokers/types.ts` per joker-system
+// spec §7.1. We import them here to wire into PlayerState + Session, and
+// re-export so downstream code can `import { JokerSlot } from '@/lib/game/types'`.
+// `VoiceTellPreset` lives in `src/lib/voice/presets.ts` — same pattern.
+
+import type { JokerSlot, JokerOffer } from '../jokers/types';
+import type { VoiceTellPreset } from '../voice/presets';
+export type { JokerSlot, JokerOffer } from '../jokers/types';
+export type { VoiceTellPreset } from '../voice/presets';
 
 // ---------------------------------------------------------------------------
 // Primitive aliases
@@ -82,6 +104,14 @@ export interface Claim {
   llmReasoning?: string;
   /** Optional dialogue variant the TTS layer spoke. */
   claimText?: string;
+  /**
+   * AI claims only — the voice-tell preset active on this TTS turn. Day-5
+   * pre-land (joker-system spec §7.4.3 Earful autopsy). Read by the reducer
+   * when populating `ClientSession.autopsy` on `ChallengeWon` while Earful
+   * is in `activeJokerEffects`. Populated by the AI claim construction site
+   * (ai-opponent worktree Day-5).
+   */
+  voicePreset?: VoiceTellPreset;
   timestamp: number;
 }
 
@@ -102,6 +132,38 @@ export interface ActiveJokerEffect {
   expiresAfter: 'next_claim' | 'next_challenge' | 'session';
 }
 
+// ---------------------------------------------------------------------------
+// Probe (Day-5 pre-land — probe-phase spec)
+// ---------------------------------------------------------------------------
+
+/** Which internal lane produced the revealed reasoning snippet. Spec §5. */
+export type ProbeFilterSource = 'llm-layered' | 'regex-scrub' | 'static-fallback';
+
+/**
+ * Server-side in-flight probe state. Lives on `Round.activeProbe?` (pseudo-
+ * state per game-engine §1.1 — NOT a Round.status enum value). Set by the
+ * `ProbeStart` reducer, cleared by `ProbeComplete` / `ProbeExpired`.
+ *
+ * `rawLlmReasoning` is stripped by toClientView before projecting into
+ * `ClientRound.currentProbe`.
+ */
+export interface ActiveProbe {
+  whisperId: string;
+  startedAt: number;
+  expiresAt: number;
+  /** SERVER-ONLY — stripped by toClientView. */
+  rawLlmReasoning?: string;
+  filterSource: ProbeFilterSource;
+}
+
+/** Client-side filtered projection of ActiveProbe. Self-only view. */
+export interface RevealedProbe {
+  whisperId: string;
+  revealedReasoning: string;
+  decayMs: number;
+  filterSource: ProbeFilterSource;
+}
+
 export interface Round {
   roundNumber: 1 | 2 | 3;
   targetRank: Rank;
@@ -113,6 +175,24 @@ export interface Round {
   /** 0..1 — consumed by tension-music-system spec. */
   tensionLevel: number;
   winner?: 'player' | 'ai';
+  /**
+   * Day-5 pre-land (probe-phase spec). Probe is a PSEUDO-state per
+   * game-engine §1.1 — NO `Round.status: 'probing'` value is added. Instead,
+   * presence of `activeProbe` on a Round with `status: 'response_phase'` is
+   * the derivation key for `ClientSession.phase === 'probe-reveal'`.
+   */
+  activeProbe?: ActiveProbe;
+  /**
+   * Day-5 pre-land (joker-system spec §7.1.4). Tracks joker types that fired
+   * during this round for invariants and UI state. Worktrees populate.
+   */
+  jokerTriggeredThisRound?: JokerType[];
+  /**
+   * Day-5 pre-land (joker-system spec). Non-probe async effects only —
+   * Stage Whisper delegates its in-flight state to `activeProbe` above, per
+   * orchestrator reconciliation 2026-04-19.
+   */
+  pendingJokerActivation?: { joker: JokerType; by: 'player' | 'ai' };
 }
 
 // ---------------------------------------------------------------------------
@@ -128,6 +208,13 @@ export interface PlayerState {
   strikes: number;
   jokers: JokerType[];
   personaIfAi?: Persona;
+  /**
+   * Day-5 pre-land (joker-system spec §7.1.5). Authoritative per-player joker
+   * slots. Additive — the existing `jokers: JokerType[]` field is kept as a
+   * derived alias during migration (joker-system worktree mirrors both fields
+   * on `JokerPicked` / `UseJoker`).
+   */
+  jokerSlots?: JokerSlot[];
 }
 
 export interface MusicTrack {
@@ -146,6 +233,30 @@ export interface Session {
   status: 'setup' | 'round_active' | 'joker_offer' | 'session_over';
   sessionWinner?: 'player' | 'ai';
   musicTracks: MusicTrack[];
+  /**
+   * Day-5 pre-land (joker-system spec §7.1.1). Server-only — stripped by
+   * toClientView. Seeded at SetupComplete (caller-provided via optional
+   * `initialJokerDrawPile` or reducer default via `seedDrawPile()`).
+   */
+  jokerDrawPile?: JokerType[];
+  /**
+   * Day-5 pre-land (joker-system spec §7.1.9). Visible to opponent ONLY
+   * when `Session.status !== 'round_active'` per projection gate.
+   */
+  discardedJokers?: JokerType[];
+  /**
+   * Day-5 pre-land (joker-system spec §7.1.1). Projected only to the
+   * `offeredToWinner` viewer — opponent sees the flash of 2 unpicked
+   * jokers land in `discardedJokers` after pick.
+   */
+  currentOffer?: JokerOffer;
+  /**
+   * Day-5 pre-land (joker-system spec §7.4.3 — Earful preset-reveal).
+   * Set by the `ChallengeWon` reducer when Earful is in the player's
+   * `activeJokerEffects`. Cleared on next `ChallengeCalled` or `RoundSettled`.
+   * Projected as-is into `ClientSession.autopsy` for the self viewer only.
+   */
+  autopsy?: { preset: VoiceTellPreset; roundIdx: number; turnIdx: number };
 }
 
 // ---------------------------------------------------------------------------
@@ -155,9 +266,24 @@ export interface Session {
 /** Opponent keeps `takenCards` (public info) but `hand` is replaced with `handSize`. */
 export type ClientOpponent = Omit<PlayerState, 'hand'> & { handSize: number };
 
-export interface ClientRound extends Omit<Round, 'claimHistory' | 'pile'> {
+export interface ClientRound
+  extends Omit<
+    Round,
+    | 'claimHistory'
+    | 'pile'
+    | 'activeProbe'
+    | 'jokerTriggeredThisRound'
+    | 'pendingJokerActivation'
+  > {
   claimHistory: PublicClaim[];
   pileSize: number;
+  /**
+   * Day-5 pre-land (probe-phase spec §4). Filtered projection of
+   * `Round.activeProbe` — `rawLlmReasoning` is stripped; `revealedReasoning`
+   * is the filter output that's safe to show the player. The probe-phase
+   * worktree populates this via the filter; pre-land leaves it undefined.
+   */
+  currentProbe?: RevealedProbe;
 }
 
 export interface ClientSession {
@@ -169,6 +295,29 @@ export interface ClientSession {
   status: Session['status'];
   sessionWinner?: Session['sessionWinner'];
   currentMusicUrl?: string;
+  /**
+   * Day-5 pre-land (joker-system Earful preset-reveal). Projected from
+   * `Session.autopsy` for the self viewer only. Opponent view has no autopsy.
+   */
+  autopsy?: { preset: VoiceTellPreset; roundIdx: number; turnIdx: number };
+  /**
+   * Day-5 pre-land (tension-music-system spec §6.6). Populated client-side
+   * (via `useMusicBed` hook state), NOT projected by toClientView. Exposed
+   * on ClientSession so React components can react to disabled/muted state.
+   */
+  musicState?: { disabled: boolean; userMuted: boolean };
+  /**
+   * Day-5 pre-land (joker-system spec §7.1.9). Projected from
+   * `Session.discardedJokers` only when `Session.status !== 'round_active'`
+   * (both viewers see it post-round for autopsy UI).
+   */
+  discardedJokers?: JokerType[];
+  /**
+   * Day-5 pre-land (joker-system spec §7.1.1). Projected from
+   * `Session.currentOffer` only when viewer === `offeredToWinner`.
+   * Opponent sees the 2 unpicked jokers land in `discardedJokers` after pick.
+   */
+  currentOffer?: JokerOffer;
 }
 
 // ---------------------------------------------------------------------------
@@ -204,6 +353,12 @@ export type GameEvent =
       now: number;
       initialDeal: RoundDeal;
       musicTracks: MusicTrack[];
+      /**
+       * Day-5 pre-land (joker-system spec §7.1.3). Optional — if omitted,
+       * the reducer default-seeds via `seedDrawPile()` (5 types × 3 copies
+       * = 15 jokers). Backward-compatible with existing SetupComplete tests.
+       */
+      initialJokerDrawPile?: JokerType[];
     }
   | { type: 'ClaimMade'; claim: Claim; now: number }
   | { type: 'ClaimAccepted'; now: number }
@@ -223,7 +378,31 @@ export type GameEvent =
       cardIdToPlay: string;
       now: number;
     }
-  | { type: 'Timeout'; kind: 'responder'; now: number };
+  | { type: 'Timeout'; kind: 'responder'; now: number }
+  // -------------------------------------------------------------------------
+  // Day-5 pre-land (joker-system + probe-phase). Reducer stubs in fsm.ts
+  // throw InvalidTransitionError with a "pending implementation" marker
+  // until the corresponding worktree fills in the transition logic.
+  // -------------------------------------------------------------------------
+  /** joker-system spec §7.1.1 — offer a 1-of-3 joker selection to round winner. */
+  | { type: 'JokerOffered'; offer: JokerOffer; now: number }
+  /** joker-system spec §7.1.1 — offer skipped because draw pile is empty. */
+  | { type: 'JokerOfferEmpty'; now: number }
+  /**
+   * joker-system spec §7.1.1 — activate a held joker. `second_wind` is
+   * NEVER used here — it auto-consumes on strike events. See spec §5.
+   */
+  | { type: 'UseJoker'; joker: JokerType; by: 'player' | 'ai'; now: number }
+  /** probe-phase spec §7.1 — begin a Stage Whisper probe; sets Round.activeProbe. */
+  | { type: 'ProbeStart'; probe: ActiveProbe; now: number }
+  /**
+   * probe-phase spec §7.1 — probe reveal acknowledged. Owned by joker-system
+   * (declares the type) but CONSUMED by probe-phase reducer slice that
+   * clears Round.activeProbe.
+   */
+  | { type: 'ProbeComplete'; whisperId: string; now: number }
+  /** probe-phase spec §7.1 — probe timeout. Clears Round.activeProbe. */
+  | { type: 'ProbeExpired'; whisperId: string; now: number };
 
 // ---------------------------------------------------------------------------
 // Error class

@@ -1,5 +1,12 @@
 import type { Persona, TruthState, VoiceSettings } from '@/lib/game/types';
 
+// Day-5 pre-land (2026-04-19). Placeholder string alias pending the
+// voice-tell-taxonomy Day-5 worktree narrowing to a literal union
+// ('CONFIDENT' | 'HESITANT' | 'RAMBLE' | 'CLIPPED' | 'PROBE' — exact names
+// land with that spec). Referenced by `Claim.voicePreset?` (game/types.ts)
+// and `ClientSession.autopsy.preset` for the Earful preset-reveal mechanic.
+export type VoiceTellPreset = string;
+
 // Locked from architecture §6.1 + voice-tell-taxonomy spec §2.
 // Any change here must re-run presets.test.ts invariants (Misdirector inversion,
 // Novice obvious, Silent subtle, Reader middle). Day-2 tuning may nudge values
