@@ -77,7 +77,7 @@ Pre-landed in commit `29f6a34`: `src/lib/jokers/types.ts` (JokerSlot, JokerOffer
 - [ ] 6. Checkpoint — run `pnpm vitest run src/lib/jokers/`
   - Ensure catalog + lifecycle tests pass before touching the FSM reducer
 
-- [ ] 7. Implement FSM reducer additions in `src/lib/game/fsm.ts` — JokerOffered, JokerOfferEmpty, JokerPicked extension
+- [x] 7. Implement FSM reducer additions in `src/lib/game/fsm.ts` — JokerOffered, JokerOfferEmpty, JokerPicked extension
   - **JokerOffered handler:** validate `Session.status === 'joker_offer'`, set `Session.currentOffer = { offered, offeredToWinner: <round winner> }`, update `Session.jokerDrawPile = event.newDrawPile`
   - **JokerOfferEmpty handler:** validate `Session.status === 'joker_offer'` and pile empty, transition directly to next round via `event.nextRoundDeal` (same as JokerPicked's round-creation logic minus joker pick), no `currentOffer` set
   - **JokerPicked extension:** in addition to existing logic, push new `JokerSlot { joker, state: 'held', acquiredRoundIdx }` to winner's `jokerSlots`, push 2 un-picked from `currentOffer.offered` to `Session.discardedJokers`, clear `currentOffer`, mirror to legacy `jokers[]`. Validate joker is in `currentOffer.offered` (throw `joker_not_offered`), validate `currentOffer` exists (throw `no_current_offer`), validate slot cap ≤ 3 (throw `slot_cap_exceeded`)

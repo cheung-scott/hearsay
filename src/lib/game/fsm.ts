@@ -17,6 +17,7 @@ import type {
   Session,
 } from './types';
 import { InvalidTransitionError } from './types';
+import { seedDrawPile } from '../jokers/lifecycle';
 
 /**
  * Determine session winner if the session should end, else `null`.
@@ -138,17 +139,20 @@ function setupComplete(
     status: 'claim_phase',
     activeJokerEffects: [],
     tensionLevel: 0,
+    jokerTriggeredThisRound: [],
   };
 
   return {
     ...session,
     status: 'round_active',
     deck: initialDeal.remainingDeck,
-    player: { ...session.player, hand: initialDeal.playerHand },
-    ai: { ...session.ai, hand: initialDeal.aiHand },
+    player: { ...session.player, hand: initialDeal.playerHand, jokerSlots: [] },
+    ai: { ...session.ai, hand: initialDeal.aiHand, jokerSlots: [] },
     rounds: [...session.rounds, newRound],
     currentRoundIdx: 0,
     musicTracks,
+    jokerDrawPile: event.initialJokerDrawPile ?? seedDrawPile(),
+    discardedJokers: [],
   };
 }
 
@@ -390,12 +394,41 @@ function jokerPicked(
     throw new InvalidTransitionError('joker_offer(no round winner)', event.type);
   }
 
+  // Validate currentOffer exists
+  if (!session.currentOffer) {
+    throw new InvalidTransitionError('joker_offer(no_current_offer)', event.type);
+  }
+
   const { joker, nextRoundDeal } = event;
 
-  // Append joker to winner's jokers array
+  // Validate joker is in offer
+  if (!session.currentOffer.offered.includes(joker)) {
+    throw new InvalidTransitionError('joker_offer(joker_not_offered)', event.type);
+  }
+
+  // Validate slot cap — winner may not hold more than 3 jokers simultaneously
+  const winnerHeldCount =
+    session[winnerKey].jokerSlots?.filter((s) => s.state === 'held').length ?? 0;
+  if (winnerHeldCount >= 3) {
+    throw new InvalidTransitionError('joker_offer(slot_cap_exceeded)', event.type);
+  }
+
+  // Build new JokerSlot — acquiredRoundIdx is the NEXT round (current + 1)
+  const newSlot = {
+    joker,
+    acquiredAt: event.now,
+    state: 'held' as const,
+    acquiredRoundIdx: session.currentRoundIdx + 1,
+  };
+
+  // Compute newly-discarded jokers (all offered except the picked one)
+  const newlyDiscarded = session.currentOffer.offered.filter((t) => t !== joker);
+
+  // Append joker to winner's jokers array + slots
   const updatedWinner: PlayerState = {
     ...session[winnerKey],
     jokers: [...session[winnerKey].jokers, joker],
+    jokerSlots: [...(session[winnerKey].jokerSlots ?? []), newSlot],
     hand: winnerKey === 'player' ? nextRoundDeal.playerHand : nextRoundDeal.aiHand,
     takenCards: [], // §1.4 rule 9: inter-round reshuffle clears takenCards
   };
@@ -417,16 +450,21 @@ function jokerPicked(
     status: 'claim_phase',
     activeJokerEffects: [],
     tensionLevel: 0,
+    jokerTriggeredThisRound: [],
   };
 
+  // Drop currentOffer from returned session (clear after pick)
+  const { currentOffer: _dropped, ...sessionWithoutOffer } = session;
+
   return {
-    ...session,
+    ...sessionWithoutOffer,
     status: 'round_active',
     deck: nextRoundDeal.remainingDeck,
     player: winnerKey === 'player' ? updatedWinner : updatedLoser,
     ai: winnerKey === 'ai' ? updatedWinner : updatedLoser,
     rounds: [...session.rounds, newRound],
     currentRoundIdx: session.currentRoundIdx + 1,
+    discardedJokers: [...(session.discardedJokers ?? []), ...newlyDiscarded],
   };
 }
 
@@ -444,6 +482,75 @@ function jokerOfferSkippedSessionOver(
     ...session,
     status: 'session_over',
     ...(sessionWinner !== null ? { sessionWinner } : {}),
+  };
+}
+
+/** joker-system spec §7.1.1 — JokerOffered */
+function jokerOffered(
+  session: Session,
+  event: Extract<GameEvent, { type: 'JokerOffered' }>,
+): Session {
+  if (session.status !== 'joker_offer') {
+    throw new InvalidTransitionError(session.status, event.type);
+  }
+  const currentRound = session.rounds[session.currentRoundIdx];
+  const winnerKey = currentRound?.winner;
+  if (!winnerKey) {
+    throw new InvalidTransitionError('joker_offer(no round winner)', event.type);
+  }
+  // Set currentOffer and replace jokerDrawPile with caller-computed updated pile.
+  return {
+    ...session,
+    currentOffer: {
+      offered: [...event.offered],
+      offeredToWinner: winnerKey,
+    },
+    jokerDrawPile: [...event.newDrawPile],
+  };
+}
+
+/** joker-system spec §7.1.1 — JokerOfferEmpty (pile exhausted at offer time) */
+function jokerOfferEmpty(
+  session: Session,
+  event: Extract<GameEvent, { type: 'JokerOfferEmpty' }>,
+): Session {
+  if (session.status !== 'joker_offer') {
+    throw new InvalidTransitionError(session.status, event.type);
+  }
+  if (!session.jokerDrawPile || session.jokerDrawPile.length !== 0) {
+    throw new InvalidTransitionError('joker_offer(pile_not_empty)', event.type);
+  }
+  // Transition directly to next round — same round-creation pattern as
+  // JokerPicked's post-conditions, but without any joker being added.
+  const { nextRoundDeal } = event;
+  const newRoundNumber = (session.currentRoundIdx + 2) as 1 | 2 | 3;
+  const newRound: Round = {
+    roundNumber: newRoundNumber,
+    targetRank: nextRoundDeal.targetRank,
+    activePlayer: nextRoundDeal.activePlayer,
+    pile: [],
+    claimHistory: [],
+    status: 'claim_phase',
+    activeJokerEffects: [],
+    tensionLevel: 0,
+    jokerTriggeredThisRound: [],
+  };
+  return {
+    ...session,
+    status: 'round_active',
+    deck: nextRoundDeal.remainingDeck,
+    player: {
+      ...session.player,
+      hand: nextRoundDeal.playerHand,
+      takenCards: [],
+    },
+    ai: {
+      ...session.ai,
+      hand: nextRoundDeal.aiHand,
+      takenCards: [],
+    },
+    rounds: [...session.rounds, newRound],
+    currentRoundIdx: session.currentRoundIdx + 1,
   };
 }
 
@@ -617,10 +724,13 @@ export function reduce(session: Session, event: GameEvent): Session {
     // 391-test baseline is unaffected by these stubs.
     // -----------------------------------------------------------------------
     case 'JokerOffered':
+      return jokerOffered(session, event);
     case 'JokerOfferEmpty':
+      return jokerOfferEmpty(session, event);
     case 'UseJoker':
+      // Task 8 fills this in.
       throw new InvalidTransitionError(
-        `${session.status} (pending joker-system worktree)`,
+        `${session.status} (pending joker-system Task 8)`,
         event.type,
       );
     case 'ProbeStart':
