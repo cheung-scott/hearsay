@@ -63,3 +63,6 @@ next-env.d.ts
 
 # worktrees (local git worktrees)
 .worktrees/
+
+# Worktrees (local-only, never committed)
+.worktrees/
