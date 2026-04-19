@@ -1,5 +1,23 @@
 # Implementation Plan: Joker System
 
+## ⚠ Spec drift flag (escalation — do not silently resolve)
+
+**Cross-spec drift found during Task 2 implementation (2026-04-19):**
+
+Three flavor strings in `.kiro/steering/product.md` "Session-Jokers" table exceed the 80-char cap specified by Requirement 1.2 / Task 3:
+
+| Joker | chars | status |
+|---|---|---|
+| poker_face | 88 | exceeds |
+| stage_whisper | 112 | exceeds |
+| earful | 77 | OK |
+| cold_read | 87 | exceeds |
+| second_wind | 56 | OK |
+
+Additionally, `design.md` §5 has a DIFFERENT set of courtroom-themed flavors (all ≤80) plus a "Naming + flavor lock" clause saying product.md and design.md must be updated in the same PR — but they are currently out of sync.
+
+**Current resolution (provisional, pending Scott's call):** Task 2 copied product.md strings verbatim per its explicit "character-for-character" instruction and Req 1.4. In Task 3, the I13 drift guard (product.md ↔ catalog) is kept live; the standalone `flavor.length ≤ 80` assertion is commented-out with a reference to this flag. Scott to decide: either (a) shorten product.md flavors to ≤80, (b) raise the cap, or (c) resync product.md to design.md §5's courtroom flavors.
+
 ## Overview
 
 Cross-cutting joker meta-system extending the game-engine FSM with 5 joker definitions, draw-pile/offer mechanics, slot lifecycle, and effect handlers. Implementation follows strict dependency order: types extension → catalog → lifecycle (pure, no FSM coupling) → FSM reducer additions → effects (simplest-3 first) → toClientView projections → Earful (blocks on voice-tell-taxonomy) → Stage Whisper (blocks on probe-phase) → integration suite. All code is pure (no I/O). Testing via Vitest with co-located test files.
@@ -29,7 +47,7 @@ Pre-landed in commit `29f6a34`: `src/lib/jokers/types.ts` (JokerSlot, JokerOffer
   - Flavor strings MUST match `steering/product.md` character-for-character
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 3. Write catalog tests in `src/lib/jokers/catalog.test.ts`
+- [x] 3. Write catalog tests in `src/lib/jokers/catalog.test.ts`
   - **I13 drift guard:** load `steering/product.md`, extract the 5 one-line descriptions from the "Session-Jokers" table, assert each matches `JOKER_CATALOG[type].flavor` character-for-character
   - Assert catalog has exactly 5 entries matching the 5 `JokerType` literals
   - Assert all `accentVar` values are valid CSS custom property format (`--joker-*`)
