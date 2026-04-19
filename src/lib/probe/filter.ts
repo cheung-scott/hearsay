@@ -16,7 +16,6 @@
 //   - output is always non-empty, ≤ 120 chars
 //   - filter is pure and never throws
 
-import type { Persona } from '../game/types';
 import type { ProbeFilter, ProbeFilterSource } from './types';
 
 // ---------------------------------------------------------------------------

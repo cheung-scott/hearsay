@@ -175,7 +175,7 @@ describe('client projections', () => {
     expect(Object.keys(revealed).sort()).toEqual(
       ['decayMs', 'expiresAt', 'filterSource', 'revealedReasoning', 'whisperId'].sort(),
     );
-    expect((revealed as Record<string, unknown>).rawLlmReasoning).toBeUndefined();
+    expect((revealed as unknown as Record<string, unknown>).rawLlmReasoning).toBeUndefined();
   });
 
   it('toProbeResponse projects 4 fields', () => {

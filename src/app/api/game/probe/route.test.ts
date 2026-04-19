@@ -322,7 +322,7 @@ describe('I10 — rawLlmReasoning never crosses the wire', () => {
     expect(Object.keys(projected!).sort()).toEqual(
       ['decayMs', 'expiresAt', 'filterSource', 'revealedReasoning', 'whisperId'].sort(),
     );
-    expect((projected as Record<string, unknown>).rawLlmReasoning).toBeUndefined();
+    expect((projected as unknown as Record<string, unknown>).rawLlmReasoning).toBeUndefined();
 
     // Completion request itself succeeded.
     expect(res.status).toBe(200);
