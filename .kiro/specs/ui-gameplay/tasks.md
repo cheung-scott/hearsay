@@ -18,11 +18,11 @@ Phase 1 only — no jokers UI, no probe phase, no elimination beat, no tension m
   - [x] 1.3 Create `src/lib/persona/displayNames.test.ts` — assert all four keys present, sorted equals `['Misdirector','Novice','Reader','Silent']`, and each value is a non-empty string.
     _Requirements: 14.2_
 
-- [ ] 2. Vercel KV session store
-  - [ ] 2.1 Run `pnpm add @vercel/kv`. Add `KV_URL` and `KV_REST_API_TOKEN` to `.env.local` (gitignored). Document required env vars in a comment at top of store.ts.
+- [x] 2. Vercel KV session store
+  - [x] 2.1 Run `pnpm add @vercel/kv`. Add `KV_URL` and `KV_REST_API_TOKEN` to `.env.local` (gitignored). Document required env vars in a comment at top of store.ts.
     _Requirements: 13.3_
 
-  - [ ] 2.2 Create `src/lib/session/store.ts` — export `get(id): Promise<Session | null>`, `set(id, session): Promise<void>`, `delete(id): Promise<void>`. Use `@vercel/kv` client. `set()` applies TTL of 1 hour (`ex: 3600`). Serialize/deserialize `Session` as JSON. Same interface shape as an in-memory Map so callers don't care about backend.
+  - [x] 2.2 Create `src/lib/session/store.ts` — export `get(id): Promise<Session | null>`, `set(id, session): Promise<void>`, `delete(id): Promise<void>`. Use `@vercel/kv` client. `set()` applies TTL of 1 hour (`ex: 3600`). Serialize/deserialize `Session` as JSON. Same interface shape as an in-memory Map so callers don't care about backend.
     _Requirements: 13.1, 13.2_
 
 - [ ] 3. Client hooks (test-first)
