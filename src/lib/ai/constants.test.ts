@@ -5,8 +5,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { PERSONA_DESCRIPTIONS } from './constants';
-import type { Persona } from '../game/types';
+import { PERSONA_DESCRIPTIONS, templateHonest, templateLie } from './constants';
+import type { Persona, Rank, TruthState } from '../game/types';
 
 const STEERING_PATH = resolve(
   process.cwd(),
@@ -41,4 +41,40 @@ describe('constants.ts drift check vs steering file (req 12.3)', () => {
       expect(PERSONA_DESCRIPTIONS[persona]).toBe(expected);
     },
   );
+});
+
+// ai-personas spec invariants (design.md §9 — I7 partial, I9)
+
+const PERSONAS: Persona[] = ['Novice', 'Reader', 'Misdirector', 'Silent'];
+const TRUTH_STATES: TruthState[] = ['honest', 'lying'];
+
+describe('PERSONA_DESCRIPTIONS — exhaustive persona coverage (I7 partial)', () => {
+  it('has exactly the four canonical Persona keys', () => {
+    expect(Object.keys(PERSONA_DESCRIPTIONS).sort()).toEqual([
+      'Misdirector',
+      'Novice',
+      'Reader',
+      'Silent',
+    ]);
+  });
+});
+
+// I9 — every (persona, truthState) dialogue bank exposes 4 distinct variants.
+// The variant arrays are module-private, so we probe via rng stubs that
+// deterministically hit indices 0, 1, 2, 3 (Math.floor(rng() * 4)).
+describe('templateHonest / templateLie — 4 distinct variants per (persona, truthState) (I9)', () => {
+  const RNG_INDICES = [0.0, 0.25, 0.5, 0.75];
+  const RANK: Rank = 'Queen';
+  const COUNT = 1 as const;
+
+  const pairs = PERSONAS.flatMap((p) =>
+    TRUTH_STATES.map((t) => [p, t] as [Persona, TruthState]),
+  );
+
+  it.each(pairs)('%s.%s has 4 distinct variants across rng indices 0..3', (persona, truth) => {
+    const fn = truth === 'honest' ? templateHonest : templateLie;
+    const outputs = RNG_INDICES.map((r) => fn(persona, COUNT, RANK, () => r));
+    expect(outputs).toHaveLength(4);
+    expect(new Set(outputs).size).toBe(4);
+  });
 });
