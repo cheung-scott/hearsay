@@ -25,23 +25,23 @@ Phase 1 only — no jokers UI, no probe phase, no elimination beat, no tension m
   - [x] 2.2 Create `src/lib/session/store.ts` — export `get(id): Promise<Session | null>`, `set(id, session): Promise<void>`, `delete(id): Promise<void>`. Use `@vercel/kv` client. `set()` applies TTL of 1 hour (`ex: 3600`). Serialize/deserialize `Session` as JSON. Same interface shape as an in-memory Map so callers don't care about backend.
     _Requirements: 13.1, 13.2_
 
-- [ ] 3. Client hooks (test-first)
-  - [ ] 3.1 Create `src/hooks/useTypewriter.ts` — `useTypewriter(text, charDelayMs, onDone)` hook using `setInterval` to reveal one character per tick. Returns `{ displayedText, isDone }`. Fires `onDone` exactly once on completion. AND create `src/hooks/useTypewriter.test.ts` — with `vi.useFakeTimers()`, advance by N×charDelayMs and assert: `displayedText` equals full string, `isDone === true`, and `onDone` was called exactly once (invariant 6, MANDATORY).
+- [x] 3. Client hooks (test-first)
+  - [x] 3.1 Create `src/hooks/useTypewriter.ts` — `useTypewriter(text, charDelayMs, onDone)` hook using `setInterval` to reveal one character per tick. Returns `{ displayedText, isDone }`. Fires `onDone` exactly once on completion. AND create `src/hooks/useTypewriter.test.ts` — with `vi.useFakeTimers()`, advance by N×charDelayMs and assert: `displayedText` equals full string, `isDone === true`, and `onDone` was called exactly once (invariant 6, MANDATORY).
     _Requirements: 7.1, 7.2_
 
-  - [ ] 3.2 Create `src/hooks/useHoldToSpeak.ts` — `useHoldToSpeak()` hook wrapping `MediaRecorder` + `AnalyserNode`. Returns `{ state, start(), stop(), audioBlob, waveformData }`. `stop()` before `start()` is no-op; double-`start()` is idempotent. AND create `src/hooks/useHoldToSpeak.test.ts` — mock `navigator.mediaDevices.getUserMedia` + `MediaRecorder` + `AudioContext`/`AnalyserNode` via `vi.stubGlobal`. Assert: `stop()` before `start()` is no-op (no state change, no error), double-`start()` is idempotent (single active recorder, no duplicate state transition) (invariant 7, MANDATORY).
+  - [x] 3.2 Create `src/hooks/useHoldToSpeak.ts` — `useHoldToSpeak()` hook wrapping `MediaRecorder` + `AnalyserNode`. Returns `{ state, start(), stop(), audioBlob, waveformData }`. `stop()` before `start()` is no-op; double-`start()` is idempotent. AND create `src/hooks/useHoldToSpeak.test.ts` — mock `navigator.mediaDevices.getUserMedia` + `MediaRecorder` + `AudioContext`/`AnalyserNode` via `vi.stubGlobal`. Assert: `stop()` before `start()` is no-op (no state change, no error), double-`start()` is idempotent (single active recorder, no duplicate state transition) (invariant 7, MANDATORY).
     _Requirements: 8.1, 8.2, 8.3_
 
-  - [ ] 3.3 Create `src/hooks/useAudioPlayer.ts` — `useAudioPlayer()` hook for queued TTS playback. Plays one clip at a time; exposes `play(url)`, `isPlaying`, and `onEnded` callback.
+  - [x] 3.3 Create `src/hooks/useAudioPlayer.ts` — `useAudioPlayer()` hook for queued TTS playback. Plays one clip at a time; exposes `play(url)`, `isPlaying`, and `onEnded` callback.
     _Requirements: 3.3, 3.4_
 
-  - [ ] 3.4 Create `src/hooks/useGameSession.ts` — `useGameSession()` hook implementing the `GameSessionState` interface from design §3.1. Phase derivation from `ClientSession.status` + local async state per §3.3 gate table. `dispatch(event)` issues `POST /api/turn`, applies returned `ClientSession`, handles errors. Includes `useCardSelection` logic (local `Set<CardId>` with toggle, clears on phase exit from `recording`).
+  - [x] 3.4 Create `src/hooks/useGameSession.ts` — `useGameSession()` hook implementing the `GameSessionState` interface from design §3.1. Phase derivation from `ClientSession.status` + local async state per §3.3 gate table. `dispatch(event)` issues `POST /api/turn`, applies returned `ClientSession`, handles errors. Includes `useCardSelection` logic (local `Set<CardId>` with toggle, clears on phase exit from `recording`).
     _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 5.1, 5.2, 5.3, 6.1, 6.2_
 
-  - [ ] 3.5 Create `src/hooks/useGameSession.test.ts` — mock `fetch` for `/api/turn`. Test: phase derivation from ClientSession snapshots across all 6 gate-table rows (invariant 1, covers AC 3.1-3.6), dispatch issues exactly one POST (invariant 2), fetch failure populates `state.error` without advancing phase (invariant 3), card selection clears on phase change (invariant 5).
+  - [x] 3.5 Create `src/hooks/useGameSession.test.ts` — mock `fetch` for `/api/turn`. Test: phase derivation from ClientSession snapshots across all 6 gate-table rows (invariant 1, covers AC 3.1-3.6), dispatch issues exactly one POST (invariant 2), fetch failure populates `state.error` without advancing phase (invariant 3), card selection clears on phase change (invariant 5).
     _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 5.1, 5.2, 5.3, 6.2_
 
-- [ ] 4. Checkpoint: run all tests
+- [x] 4. Checkpoint: run all tests (383/383 passing across 15 test files)
   - Run `pnpm vitest --run`. Verify `displayNames.test.ts` and `useGameSession.test.ts` pass. Fix any failures before proceeding.
 
 - [ ] 5. Presentational components — Scene layer
