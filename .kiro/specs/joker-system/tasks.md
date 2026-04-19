@@ -103,7 +103,7 @@ Pre-landed in commit `29f6a34`: `src/lib/jokers/types.ts` (JokerSlot, JokerOffer
   - All functions are pure — no I/O
   - _Requirements: 10.1, 10.2, 13.1, 13.2, 13.3, 14.1_
 
-- [ ] 11. Write effects tests in `src/lib/jokers/effects.test.ts` — Cold Read, Poker Face, Second Wind
+- [x] 11. Write effects tests in `src/lib/jokers/effects.test.ts` — Cold Read, Poker Face, Second Wind
   - **I6:** `applyPokerFace(0.87)` returns exactly `0.5`; `applyPokerFace(0.12)` returns exactly `0.5`
   - **I4:** `applySecondWind` with no held `second_wind` returns `shouldCancel: false`, slots unchanged
   - **I4b:** `applySecondWind` with held `second_wind` returns `shouldCancel: true`, slot consumed
