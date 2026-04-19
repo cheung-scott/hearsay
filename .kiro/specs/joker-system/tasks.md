@@ -8,7 +8,7 @@ Pre-landed in commit `29f6a34`: `src/lib/jokers/types.ts` (JokerSlot, JokerOffer
 
 ## Tasks
 
-- [ ] 1. Extend joker types in `src/lib/jokers/types.ts`
+- [x] 1. Extend joker types in `src/lib/jokers/types.ts`
   - Extend the pre-landed `JokerSlot` to add `state: 'held' | 'consumed'`, `acquiredRoundIdx: number`, `consumedRoundIdx?: number` (the pre-landed version only has `joker` and `acquiredAt` — extend, don't break existing shape)
   - Define `Joker` interface (type, name, flavor, triggers, duration, cost, visibleOnActivate, accentVar)
   - Define `JokerTrigger` union: `self_claim_phase | pre_ai_claim | opponent_claim_resolved | on_my_strike`
