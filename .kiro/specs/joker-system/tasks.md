@@ -157,7 +157,7 @@ Pre-landed in commit `29f6a34`: `src/lib/jokers/types.ts` (JokerSlot, JokerOffer
     - Test `produceProbeRequest` with `mathProb: undefined` → field absent in output
   - _Requirements: 11.1, 11.2, 11.3, 11.4_
 
-- [ ] 16. Write full integration tests in `src/lib/game/fsm.test.ts` — joker lifecycle walkthrough
+- [x] 16. Write full integration tests in `src/lib/game/fsm.test.ts` — joker lifecycle walkthrough
   - Test complete joker flow: SetupComplete (pile seeded) → round play → RoundSettled → JokerOffered → JokerPicked (slot populated, unpicked discarded, offer cleared) → next round with joker held → UseJoker (Cold Read) → effect active → ClaimAccepted (effect expired)
   - Test Second Wind auto-consume: player has second_wind held → RevealComplete with player-strike → strike cancelled, joker consumed
   - Test Earful auto-consume: player has earful held → RevealComplete with challengeWasCorrect:true → autopsy projected

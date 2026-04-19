@@ -2171,3 +2171,682 @@ describe('Integration: 2-round session walkthrough', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Task 16 — Integration: joker lifecycle walkthrough (I2, I8, I10)
+// ---------------------------------------------------------------------------
+
+import type { ActiveJokerEffect, JokerSlot } from './types';
+
+/**
+ * Build a Session in `round_active` with specific joker slots and round state.
+ * Useful for UseJoker / RevealComplete joker-path tests.
+ */
+function makeRoundActiveSession(opts: {
+  roundStatus?: Round['status'];
+  activePlayer?: 'player' | 'ai';
+  playerSlots?: JokerSlot[];
+  aiSlots?: JokerSlot[];
+  claimHistory?: Claim[];
+  activeJokerEffects?: ActiveJokerEffect[];
+  jokerTriggeredThisRound?: import('./types').JokerType[];
+  playerStrikes?: number;
+  aiStrikes?: number;
+  pile?: Card[];
+} = {}): Session {
+  const round = makeRound({
+    status: opts.roundStatus ?? 'claim_phase',
+    activePlayer: opts.activePlayer ?? 'player',
+    claimHistory: opts.claimHistory ?? [],
+    activeJokerEffects: opts.activeJokerEffects ?? [],
+    jokerTriggeredThisRound: opts.jokerTriggeredThisRound ?? [],
+    pile: opts.pile ?? [],
+  });
+  return makeSession({
+    status: 'round_active',
+    rounds: [round],
+    currentRoundIdx: 0,
+    player: makePlayer({
+      strikes: opts.playerStrikes ?? 0,
+      hand: [makeCard('Queen', 0), makeCard('Queen', 1)],
+      jokerSlots: opts.playerSlots ?? [],
+    }),
+    ai: makePlayer({
+      strikes: opts.aiStrikes ?? 0,
+      hand: [makeCard('King', 0), makeCard('King', 1)],
+      jokerSlots: opts.aiSlots ?? [],
+    }),
+    jokerDrawPile: [],
+    discardedJokers: [],
+  });
+}
+
+describe('Integration: joker lifecycle walkthrough (I2, I8, I10)', () => {
+
+  // -------------------------------------------------------------------------
+  // Test 1: Complete joker flow — offer → pick → use → expire
+  // -------------------------------------------------------------------------
+
+  describe('Test 1: Complete joker flow (offer → pick → use → expire)', () => {
+    it('before JokerOffered: currentOffer is undefined (default state)', () => {
+      // Build joker_offer session without a pre-set currentOffer
+      const round = makeRound({ roundNumber: 1, status: 'round_over', winner: 'player' });
+      const session = makeSession({
+        status: 'joker_offer',
+        rounds: [round],
+        currentRoundIdx: 0,
+        player: makePlayer({ roundsWon: 1 }),
+        ai: makePlayer({ roundsWon: 0 }),
+        jokerDrawPile: ['cold_read', 'earful', 'poker_face', 'cold_read', 'earful', 'poker_face'],
+        discardedJokers: [],
+      });
+      expect(session.currentOffer).toBeUndefined();
+    });
+
+    it('after JokerOffered: currentOffer has 3 jokers, offeredToWinner = round winner, jokerDrawPile updated', () => {
+      const round = makeRound({ roundNumber: 1, status: 'round_over', winner: 'player' });
+      const initialPile: import('./types').JokerType[] = [
+        'cold_read', 'cold_read', 'cold_read',
+        'earful', 'earful', 'earful',
+        'poker_face', 'poker_face', 'poker_face',
+      ];
+      const session = makeSession({
+        status: 'joker_offer',
+        rounds: [round],
+        currentRoundIdx: 0,
+        player: makePlayer({ roundsWon: 1 }),
+        ai: makePlayer({ roundsWon: 0 }),
+        jokerDrawPile: initialPile,
+        discardedJokers: [],
+      });
+
+      const offered: import('./types').JokerType[] = ['cold_read', 'earful', 'poker_face'];
+      const newDrawPile: import('./types').JokerType[] = []; // all types consumed in offer
+      const s = reduce(session, { type: 'JokerOffered', offered, newDrawPile, now: 5000 });
+
+      expect(s.currentOffer).toBeDefined();
+      expect(s.currentOffer!.offered).toHaveLength(3);
+      expect(s.currentOffer!.offeredToWinner).toBe('player');
+      expect(s.jokerDrawPile).toEqual(newDrawPile);
+    });
+
+    it('I8 — after JokerPicked: discardedJokers has 2 unpicked, currentOffer cleared, winner slot populated', () => {
+      // Use makeJokerOfferSession with explicit offered subset so we can assert discardedJokers
+      const round = makeRound({ roundNumber: 1, status: 'round_over', winner: 'player' });
+      const session = makeSession({
+        status: 'joker_offer',
+        rounds: [round],
+        currentRoundIdx: 0,
+        player: makePlayer({ roundsWon: 1, jokerSlots: [] }),
+        ai: makePlayer({ roundsWon: 0, jokerSlots: [] }),
+        jokerDrawPile: [],
+        discardedJokers: [],
+        currentOffer: {
+          offered: ['cold_read', 'earful', 'poker_face'],
+          offeredToWinner: 'player',
+        },
+      });
+
+      const deal = makeNextRoundDeal();
+      const out = reduce(session, { type: 'JokerPicked', joker: 'cold_read', nextRoundDeal: deal, now: 6000 });
+
+      // I8: the 2 un-picked jokers land in discardedJokers
+      expect(out.discardedJokers).toContain('earful');
+      expect(out.discardedJokers).toContain('poker_face');
+      expect(out.discardedJokers).not.toContain('cold_read');
+      expect(out.discardedJokers).toHaveLength(2);
+
+      // currentOffer cleared
+      expect(out.currentOffer).toBeUndefined();
+
+      // Winner's jokerSlots has the new slot
+      const slot = out.player.jokerSlots?.find((s) => s.joker === 'cold_read');
+      expect(slot).toBeDefined();
+      expect(slot!.state).toBe('held');
+      expect(slot!.acquiredRoundIdx).toBe(1); // session.currentRoundIdx + 1 = 0 + 1
+      expect(slot!.acquiredAt).toBe(6000);
+
+      // Legacy jokers[] also updated
+      expect(out.player.jokers).toContain('cold_read');
+
+      // Session moves to round_active with new round
+      expect(out.status).toBe('round_active');
+      expect(out.rounds).toHaveLength(2);
+    });
+
+    it('I2 — UseJoker cold_read: slot → consumed, activeJokerEffects has cold_read, jokerTriggeredThisRound updated', () => {
+      // cold_read trigger: opponent_claim_resolved = response_phase, activePlayer !== by
+      // Means: AI is activePlayer (AI just claimed), player fires cold_read from response side
+      const heldSlot: JokerSlot = {
+        joker: 'cold_read',
+        state: 'held',
+        acquiredRoundIdx: 1,
+        acquiredAt: 6000,
+      };
+      const session = makeRoundActiveSession({
+        roundStatus: 'response_phase',
+        activePlayer: 'ai',   // AI just claimed — player is the responder
+        playerSlots: [heldSlot],
+        claimHistory: [{
+          by: 'ai',
+          count: 1,
+          claimedRank: 'Queen',
+          actualCardIds: ['King-0'],
+          truthState: 'lying',
+          timestamp: 7000,
+        }],
+      });
+
+      const out = reduce(session, { type: 'UseJoker', joker: 'cold_read', by: 'player', now: 7500 });
+      const round = out.rounds[out.currentRoundIdx];
+
+      // Slot consumed
+      const slot = out.player.jokerSlots?.find((s) => s.joker === 'cold_read');
+      expect(slot).toBeDefined();
+      expect(slot!.state).toBe('consumed');
+      expect(slot!.consumedRoundIdx).toBe(0);
+
+      // Effect pushed to activeJokerEffects with next_challenge expiry
+      const effect = round.activeJokerEffects.find((e) => e.type === 'cold_read');
+      expect(effect).toBeDefined();
+      expect(effect!.expiresAfter).toBe('next_challenge');
+
+      // jokerTriggeredThisRound updated
+      expect(round.jokerTriggeredThisRound).toContain('cold_read');
+    });
+
+    it('Effect expiry on ChallengeCalled: cold_read removed from activeJokerEffects (Req 9.2)', () => {
+      // Build session already with cold_read in activeJokerEffects (as if UseJoker already fired)
+      const session = makeRoundActiveSession({
+        roundStatus: 'response_phase',
+        activePlayer: 'ai',
+        activeJokerEffects: [{ type: 'cold_read', expiresAfter: 'next_challenge' }],
+        claimHistory: [{
+          by: 'ai',
+          count: 1,
+          claimedRank: 'Queen',
+          actualCardIds: ['King-0'],
+          truthState: 'lying',
+          timestamp: 7000,
+        }],
+      });
+
+      const out = reduce(session, { type: 'ChallengeCalled', now: 8000 });
+      const round = out.rounds[out.currentRoundIdx];
+
+      // Effect expired
+      const effect = round.activeJokerEffects.find((e) => e.type === 'cold_read');
+      expect(effect).toBeUndefined();
+      expect(round.activeJokerEffects).toHaveLength(0);
+    });
+
+    it('Effect expiry on ClaimAccepted: cold_read removed from activeJokerEffects', () => {
+      // Build session already with cold_read in activeJokerEffects
+      const session = makeRoundActiveSession({
+        roundStatus: 'response_phase',
+        activePlayer: 'ai',
+        activeJokerEffects: [{ type: 'cold_read', expiresAfter: 'next_challenge' }],
+        claimHistory: [{
+          by: 'ai',
+          count: 1,
+          claimedRank: 'Queen',
+          actualCardIds: ['King-0'],
+          truthState: 'lying',
+          timestamp: 7000,
+        }],
+      });
+
+      const out = reduce(session, { type: 'ClaimAccepted', now: 8000 });
+      const round = out.rounds[out.currentRoundIdx];
+      const effect = round.activeJokerEffects.find((e) => e.type === 'cold_read');
+      expect(effect).toBeUndefined();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Test 2: Second Wind auto-consume
+  // -------------------------------------------------------------------------
+
+  describe('Test 2: Second Wind auto-consume', () => {
+    it('player holds second_wind; RevealComplete(challengeWasCorrect=true, player lied) → strike cancelled, slot consumed', () => {
+      // Player is active (just claimed lying), AI challenged correctly → player would take a strike
+      // Player holds second_wind → strike is cancelled
+      const heldSlot: JokerSlot = {
+        joker: 'second_wind',
+        state: 'held',
+        acquiredRoundIdx: 0,
+        acquiredAt: 5000,
+      };
+      const pile = [makeCard('Queen', 0)];
+      const lastClaim: Claim = {
+        by: 'player',
+        count: 1,
+        claimedRank: 'King',       // lying: played Queen, claimed King
+        actualCardIds: ['Queen-0'],
+        truthState: 'lying',
+        timestamp: 7000,
+      };
+      // Build resolving session: player is active, AI challenged
+      const round = makeRound({
+        status: 'resolving',
+        activePlayer: 'player',
+        pile,
+        claimHistory: [lastClaim],
+        jokerTriggeredThisRound: [],
+      });
+      const session = makeSession({
+        status: 'round_active',
+        rounds: [round],
+        currentRoundIdx: 0,
+        player: makePlayer({
+          strikes: 1,
+          hand: [makeCard('Queen', 1)],
+          jokerSlots: [heldSlot],
+        }),
+        ai: makePlayer({
+          strikes: 0,
+          hand: [makeCard('King', 0)],
+          jokerSlots: [],
+        }),
+        jokerDrawPile: [],
+        discardedJokers: [],
+      });
+
+      // challengeWasCorrect=true: player (claimant) lied → player would take strike
+      const out = reduce(session, { type: 'RevealComplete', challengeWasCorrect: true, now: 8000 });
+
+      // Strike CANCELLED by Second Wind
+      expect(out.player.strikes).toBe(1); // unchanged
+
+      // Slot consumed
+      const slot = out.player.jokerSlots?.find((s) => s.joker === 'second_wind');
+      expect(slot).toBeDefined();
+      expect(slot!.state).toBe('consumed');
+
+      // jokerTriggeredThisRound has second_wind
+      const outRound = out.rounds[out.currentRoundIdx];
+      expect(outRound.jokerTriggeredThisRound).toContain('second_wind');
+
+      // Pile transferred to loser (player, the claimant)
+      expect(out.player.takenCards).toHaveLength(1);
+    });
+
+    it('contrast: player has second_wind but WINS challenge (no strike incoming) → stays held (Req 14.4)', () => {
+      // player claimed honestly, AI challenged wrongly → AI takes strike, player has no incoming strike
+      const heldSlot: JokerSlot = {
+        joker: 'second_wind',
+        state: 'held',
+        acquiredRoundIdx: 0,
+        acquiredAt: 5000,
+      };
+      const pile = [makeCard('Queen', 0)];
+      const lastClaim: Claim = {
+        by: 'player',
+        count: 1,
+        claimedRank: 'Queen',       // honest
+        actualCardIds: ['Queen-0'],
+        truthState: 'honest',
+        timestamp: 7000,
+      };
+      const round = makeRound({
+        status: 'resolving',
+        activePlayer: 'player',
+        pile,
+        claimHistory: [lastClaim],
+        jokerTriggeredThisRound: [],
+      });
+      const session = makeSession({
+        status: 'round_active',
+        rounds: [round],
+        currentRoundIdx: 0,
+        player: makePlayer({
+          strikes: 0,
+          hand: [makeCard('Queen', 1)],
+          jokerSlots: [heldSlot],
+        }),
+        ai: makePlayer({
+          strikes: 0,
+          hand: [makeCard('King', 0)],
+          jokerSlots: [],
+        }),
+        jokerDrawPile: [],
+        discardedJokers: [],
+      });
+
+      // challengeWasCorrect=false: player was honest → AI (challenger) takes strike, not player
+      const out = reduce(session, { type: 'RevealComplete', challengeWasCorrect: false, now: 8000 });
+
+      // Second Wind stays held (not the player's strike)
+      const slot = out.player.jokerSlots?.find((s) => s.joker === 'second_wind');
+      expect(slot).toBeDefined();
+      expect(slot!.state).toBe('held');
+
+      // AI took the strike
+      expect(out.ai.strikes).toBe(1);
+      expect(out.player.strikes).toBe(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Test 3: Earful auto-consume (I7)
+  // -------------------------------------------------------------------------
+
+  describe('Test 3: Earful auto-consume (I7)', () => {
+    it('Earful + AI lied + player wins challenge → autopsy set, Earful consumed, jokerTriggeredThisRound has earful', () => {
+      const heldSlot: JokerSlot = {
+        joker: 'earful',
+        state: 'held',
+        acquiredRoundIdx: 0,
+        acquiredAt: 5000,
+      };
+      // AI is active player (claimant), player is challenger
+      const pile = [makeCard('King', 0)];
+      const lastClaim: Claim = {
+        by: 'ai',
+        count: 1,
+        claimedRank: 'Queen',
+        actualCardIds: ['King-0'],
+        truthState: 'lying',
+        timestamp: 7000,
+        voicePreset: 'nervous_liar',
+      };
+      const round = makeRound({
+        status: 'resolving',
+        activePlayer: 'ai',   // AI was the claimant
+        pile,
+        claimHistory: [lastClaim],
+        jokerTriggeredThisRound: [],
+      });
+      const session = makeSession({
+        status: 'round_active',
+        rounds: [round],
+        currentRoundIdx: 0,
+        player: makePlayer({
+          strikes: 0,
+          hand: [makeCard('Queen', 0)],
+          jokerSlots: [heldSlot],
+        }),
+        ai: makePlayer({
+          strikes: 0,
+          hand: [makeCard('King', 1)],
+          jokerSlots: [],
+        }),
+        jokerDrawPile: [],
+        discardedJokers: [],
+      });
+
+      // challengeWasCorrect=true: AI lied and was caught → AI takes strike, player wins challenge
+      const out = reduce(session, { type: 'RevealComplete', challengeWasCorrect: true, now: 8000 });
+
+      // Autopsy set
+      expect(out.autopsy).toBeDefined();
+      expect(out.autopsy!.preset).toBe('nervous_liar');
+      expect(out.autopsy!.roundIdx).toBe(0);
+      expect(out.autopsy!.turnIdx).toBe(0); // index of lastClaim in claimHistory
+
+      // Earful consumed
+      const slot = out.player.jokerSlots?.find((s) => s.joker === 'earful');
+      expect(slot).toBeDefined();
+      expect(slot!.state).toBe('consumed');
+
+      // jokerTriggeredThisRound
+      const outRound = out.rounds[out.currentRoundIdx];
+      expect(outRound.jokerTriggeredThisRound).toContain('earful');
+    });
+
+    it('contrast: Earful held + voicePreset undefined → autopsy.preset === "unknown"', () => {
+      const heldSlot: JokerSlot = {
+        joker: 'earful',
+        state: 'held',
+        acquiredRoundIdx: 0,
+        acquiredAt: 5000,
+      };
+      const pile = [makeCard('King', 0)];
+      const lastClaim: Claim = {
+        by: 'ai',
+        count: 1,
+        claimedRank: 'Queen',
+        actualCardIds: ['King-0'],
+        truthState: 'lying',
+        timestamp: 7000,
+        // voicePreset deliberately omitted (fallback path)
+      };
+      const round = makeRound({
+        status: 'resolving',
+        activePlayer: 'ai',
+        pile,
+        claimHistory: [lastClaim],
+        jokerTriggeredThisRound: [],
+      });
+      const session = makeSession({
+        status: 'round_active',
+        rounds: [round],
+        currentRoundIdx: 0,
+        player: makePlayer({ strikes: 0, hand: [makeCard('Queen', 0)], jokerSlots: [heldSlot] }),
+        ai: makePlayer({ strikes: 0, hand: [makeCard('King', 1)], jokerSlots: [] }),
+        jokerDrawPile: [],
+        discardedJokers: [],
+      });
+
+      const out = reduce(session, { type: 'RevealComplete', challengeWasCorrect: true, now: 8000 });
+      expect(out.autopsy).toBeDefined();
+      expect(out.autopsy!.preset).toBe('unknown');
+    });
+
+    it('contrast: Earful held but player LOSES challenge → autopsy NOT set, Earful stays held', () => {
+      const heldSlot: JokerSlot = {
+        joker: 'earful',
+        state: 'held',
+        acquiredRoundIdx: 0,
+        acquiredAt: 5000,
+      };
+      const pile = [makeCard('King', 0)];
+      const lastClaim: Claim = {
+        by: 'ai',
+        count: 1,
+        claimedRank: 'Queen',
+        actualCardIds: ['King-0'],
+        truthState: 'lying',
+        timestamp: 7000,
+        voicePreset: 'nervous_liar',
+      };
+      const round = makeRound({
+        status: 'resolving',
+        activePlayer: 'ai',
+        pile,
+        claimHistory: [lastClaim],
+        jokerTriggeredThisRound: [],
+      });
+      const session = makeSession({
+        status: 'round_active',
+        rounds: [round],
+        currentRoundIdx: 0,
+        player: makePlayer({ strikes: 0, hand: [makeCard('Queen', 0)], jokerSlots: [heldSlot] }),
+        ai: makePlayer({ strikes: 0, hand: [makeCard('King', 1)], jokerSlots: [] }),
+        jokerDrawPile: [],
+        discardedJokers: [],
+      });
+
+      // challengeWasCorrect=false: player challenged wrongly → player takes strike, Earful inert
+      const out = reduce(session, { type: 'RevealComplete', challengeWasCorrect: false, now: 8000 });
+
+      // Autopsy NOT set
+      expect(out.autopsy).toBeUndefined();
+
+      // Earful stays held
+      const slot = out.player.jokerSlots?.find((s) => s.joker === 'earful');
+      expect(slot).toBeDefined();
+      expect(slot!.state).toBe('held');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Test 4: I10 — JokerOfferEmpty transitions directly to next round
+  // -------------------------------------------------------------------------
+
+  describe('Test 4: I10 — JokerOfferEmpty direct transition', () => {
+    it('JokerOfferEmpty: status → round_active, rounds.length+1, currentRoundIdx++, winner slots unchanged, currentOffer undefined', () => {
+      const heldSlot: JokerSlot = {
+        joker: 'cold_read',
+        state: 'held',
+        acquiredRoundIdx: 0,
+        acquiredAt: 5000,
+      };
+      const round = makeRound({ roundNumber: 1, status: 'round_over', winner: 'player' });
+      const session = makeSession({
+        status: 'joker_offer',
+        rounds: [round],
+        currentRoundIdx: 0,
+        player: makePlayer({
+          roundsWon: 1,
+          jokerSlots: [heldSlot],
+        }),
+        ai: makePlayer({ roundsWon: 0, jokerSlots: [] }),
+        jokerDrawPile: [],  // empty pile → JokerOfferEmpty
+        discardedJokers: ['earful', 'poker_face'],
+      });
+
+      const deal = makeNextRoundDeal();
+      const out = reduce(session, { type: 'JokerOfferEmpty', nextRoundDeal: deal, now: 7000 });
+
+      // Transitions to round_active
+      expect(out.status).toBe('round_active');
+
+      // New round appended
+      expect(out.rounds).toHaveLength(2);
+      expect(out.currentRoundIdx).toBe(1);
+
+      // Winner's jokerSlots unchanged (no new joker acquired)
+      const slot = out.player.jokerSlots?.find((s) => s.joker === 'cold_read');
+      expect(slot).toBeDefined();
+      expect(slot!.state).toBe('held');
+      expect(out.player.jokerSlots).toHaveLength(1);
+
+      // currentOffer stays undefined
+      expect(out.currentOffer).toBeUndefined();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Test 5: Error paths
+  // -------------------------------------------------------------------------
+
+  describe('Test 5: Error paths', () => {
+    it('UseJoker outside trigger window → throws InvalidTransitionError containing joker_trigger_mismatch', () => {
+      // cold_read requires response_phase; claim_phase is wrong window
+      const heldSlot: JokerSlot = {
+        joker: 'cold_read',
+        state: 'held',
+        acquiredRoundIdx: 0,
+        acquiredAt: 5000,
+      };
+      const session = makeRoundActiveSession({
+        roundStatus: 'claim_phase',
+        activePlayer: 'player',
+        playerSlots: [heldSlot],
+      });
+
+      expect(() =>
+        reduce(session, { type: 'UseJoker', joker: 'cold_read', by: 'player', now: 7000 })
+      ).toThrowError(/joker_trigger_mismatch/);
+    });
+
+    it('UseJoker for consumed joker → throws InvalidTransitionError containing joker_not_held', () => {
+      const consumedSlot: JokerSlot = {
+        joker: 'cold_read',
+        state: 'consumed',
+        acquiredRoundIdx: 0,
+        acquiredAt: 5000,
+        consumedRoundIdx: 0,
+      };
+      // Use valid trigger window so only the slot-state check fires
+      const session = makeRoundActiveSession({
+        roundStatus: 'response_phase',
+        activePlayer: 'ai',
+        playerSlots: [consumedSlot],
+        claimHistory: [{
+          by: 'ai',
+          count: 1,
+          claimedRank: 'Queen',
+          actualCardIds: ['King-0'],
+          truthState: 'lying',
+          timestamp: 7000,
+        }],
+      });
+
+      expect(() =>
+        reduce(session, { type: 'UseJoker', joker: 'cold_read', by: 'player', now: 7500 })
+      ).toThrowError(/joker_not_held/);
+    });
+
+    it('JokerPicked with joker not in offer → throws InvalidTransitionError containing joker_not_offered', () => {
+      // Offer has earful + poker_face; trying to pick second_wind (not offered)
+      const round = makeRound({ roundNumber: 1, status: 'round_over', winner: 'player' });
+      const session = makeSession({
+        status: 'joker_offer',
+        rounds: [round],
+        currentRoundIdx: 0,
+        player: makePlayer({ roundsWon: 1, jokerSlots: [] }),
+        ai: makePlayer({ roundsWon: 0, jokerSlots: [] }),
+        jokerDrawPile: [],
+        discardedJokers: [],
+        currentOffer: { offered: ['earful', 'poker_face'], offeredToWinner: 'player' },
+      });
+
+      expect(() =>
+        reduce(session, {
+          type: 'JokerPicked',
+          joker: 'second_wind',
+          nextRoundDeal: makeNextRoundDeal(),
+          now: 6000,
+        })
+      ).toThrowError(/joker_not_offered/);
+    });
+
+    it('Stacking same joker type in one round → throws (joker already triggered)', () => {
+      // cold_read already triggered this round; trying to use it again
+      const heldSlot: JokerSlot = {
+        joker: 'cold_read',
+        state: 'held',
+        acquiredRoundIdx: 0,
+        acquiredAt: 5000,
+      };
+      const session = makeRoundActiveSession({
+        roundStatus: 'response_phase',
+        activePlayer: 'ai',
+        playerSlots: [heldSlot],
+        jokerTriggeredThisRound: ['cold_read'], // already fired
+        claimHistory: [{
+          by: 'ai',
+          count: 1,
+          claimedRank: 'Queen',
+          actualCardIds: ['King-0'],
+          truthState: 'lying',
+          timestamp: 7000,
+        }],
+      });
+
+      expect(() =>
+        reduce(session, { type: 'UseJoker', joker: 'cold_read', by: 'player', now: 7500 })
+      ).toThrow(InvalidTransitionError);
+    });
+
+    it('UseJoker second_wind directly → throws (second_wind is auto-only)', () => {
+      const heldSlot: JokerSlot = {
+        joker: 'second_wind',
+        state: 'held',
+        acquiredRoundIdx: 0,
+        acquiredAt: 5000,
+      };
+      const session = makeRoundActiveSession({
+        roundStatus: 'claim_phase',
+        activePlayer: 'player',
+        playerSlots: [heldSlot],
+      });
+
+      expect(() =>
+        reduce(session, { type: 'UseJoker', joker: 'second_wind', by: 'player', now: 7000 })
+      ).toThrow(InvalidTransitionError);
+    });
+  });
+});
