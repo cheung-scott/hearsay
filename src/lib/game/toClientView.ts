@@ -37,24 +37,33 @@ function toClientRound(round: Round): ClientRound {
   // Strip server-only Round fields before spreading:
   //   pile              → replaced with pileSize
   //   claimHistory      → replaced with PublicClaim[]
-  //   activeProbe       → server-only; probe-phase worktree projects
-  //                       Round.activeProbe → ClientRound.currentProbe via
-  //                       the filter pipeline (pre-land: not projected yet).
+  //   activeProbe       → projected to ClientRound.currentProbe with the
+  //                       5 RevealedProbe fields; rawLlmReasoning stripped.
   //   jokerTriggeredThisRound → joker-system internal
   //   pendingJokerActivation  → joker-system internal
   const {
     pile,
     claimHistory,
-    activeProbe: _activeProbe,
+    activeProbe,
     jokerTriggeredThisRound: _jokerTriggeredThisRound,
     pendingJokerActivation: _pendingJokerActivation,
     ...rest
   } = round;
-  return {
+  const client: ClientRound = {
     ...rest,
     pileSize: pile.length,
     claimHistory: claimHistory.map(toPublicClaim),
   };
+  if (activeProbe !== undefined) {
+    client.currentProbe = {
+      whisperId: activeProbe.whisperId,
+      revealedReasoning: activeProbe.revealedReasoning,
+      filterSource: activeProbe.filterSource,
+      decayMs: activeProbe.decayMs,
+      expiresAt: activeProbe.expiresAt,
+    };
+  }
+  return client;
 }
 
 // ---------------------------------------------------------------------------
