@@ -19,7 +19,7 @@ Pre-landed in commit `29f6a34`: `src/lib/jokers/types.ts` (JokerSlot, JokerOffer
   - Do NOT modify `src/lib/game/types.ts` field declarations — they're pre-landed
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-- [ ] 2. Implement joker catalog in `src/lib/jokers/catalog.ts`
+- [x] 2. Implement joker catalog in `src/lib/jokers/catalog.ts`
   - Define `JOKER_CATALOG: Record<JokerType, Joker>` as a frozen const with all 5 entries
   - Poker Face: trigger `self_claim_phase`, duration `next_claim`, cost `none`, visible `true`, accent `--joker-poker-face: #c9bfa3`
   - Stage Whisper: trigger `pre_ai_claim`, duration `one_shot_on_use`, cost `none`, visible `true`, accent `--joker-stage-whisper: #55c6fd`
