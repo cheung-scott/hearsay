@@ -63,7 +63,7 @@ Pre-landed in commit `29f6a34`: `src/lib/jokers/types.ts` (JokerSlot, JokerOffer
   - All functions are pure — no I/O, no randomness (rng injected)
   - _Requirements: 3.2, 3.3, 4.2, 4.4, 7.1, 8.2, 8.3_
 
-- [ ] 5. Write lifecycle tests in `src/lib/jokers/lifecycle.test.ts`
+- [x] 5. Write lifecycle tests in `src/lib/jokers/lifecycle.test.ts`
   - **I9:** `seedDrawPile()` returns exactly 15 jokers with 3 of each of 5 types
   - **I1:** `canActivate` rejects Poker Face during `response_phase` (trigger mismatch)
   - **I11:** `canActivate` rejects same joker type if already in `jokerTriggeredThisRound`
