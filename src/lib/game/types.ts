@@ -136,8 +136,11 @@ export interface ActiveJokerEffect {
 // Probe (Day-5 pre-land — probe-phase spec)
 // ---------------------------------------------------------------------------
 
-/** Which internal lane produced the revealed reasoning snippet. Spec §5. */
-export type ProbeFilterSource = 'llm-layered' | 'regex-scrub' | 'static-fallback';
+/** Which internal lane produced the revealed reasoning snippet. Spec §4 + §5. */
+export type ProbeFilterSource =
+  | 'llm-heuristic-layer'  // structured LLM field (preferred — see §5.2)
+  | 'regex-scrub'          // sanitized full llmReasoning (fallback)
+  | 'fallback-static';     // filter produced empty output → static template (last-resort)
 
 /**
  * Server-side in-flight probe state. Lives on `Round.activeProbe?` (pseudo-
@@ -146,22 +149,34 @@ export type ProbeFilterSource = 'llm-layered' | 'regex-scrub' | 'static-fallback
  *
  * `rawLlmReasoning` is stripped by toClientView before projecting into
  * `ClientRound.currentProbe`.
+ *
+ * Spec: probe-phase §4 (LOCKED shape).
  */
 export interface ActiveProbe {
   whisperId: string;
-  startedAt: number;
-  expiresAt: number;
-  /** SERVER-ONLY — stripped by toClientView. */
-  rawLlmReasoning?: string;
+  targetAiId: 'ai';
+  roundIdx: number;
+  triggeredAtTurn: number;
+  /** Filtered output safe to show the player. */
+  revealedReasoning: string;
   filterSource: ProbeFilterSource;
+  /** Server timestamp from the ProbeStart event's `now`. */
+  startedAt: number;
+  /** Server-authoritative reveal duration; default 4000ms. */
+  decayMs: number;
+  /** `startedAt + decayMs`. */
+  expiresAt: number;
+  /** SERVER-ONLY — stripped by toClientView. Never crosses the wire. */
+  rawLlmReasoning: string;
 }
 
-/** Client-side filtered projection of ActiveProbe. Self-only view. */
+/** Client-side filtered projection of ActiveProbe. Self-only view. Spec: probe-phase §4. */
 export interface RevealedProbe {
   whisperId: string;
   revealedReasoning: string;
-  decayMs: number;
   filterSource: ProbeFilterSource;
+  decayMs: number;
+  expiresAt: number;
 }
 
 export interface Round {
@@ -384,10 +399,24 @@ export type GameEvent =
   // throw InvalidTransitionError with a "pending implementation" marker
   // until the corresponding worktree fills in the transition logic.
   // -------------------------------------------------------------------------
-  /** joker-system spec §7.1.1 — offer a 1-of-3 joker selection to round winner. */
-  | { type: 'JokerOffered'; offer: JokerOffer; now: number }
-  /** joker-system spec §7.1.1 — offer skipped because draw pile is empty. */
-  | { type: 'JokerOfferEmpty'; now: number }
+  /**
+   * joker-system spec §7.1.1 — offer a 1-of-3 joker selection to round winner.
+   * `offered` length 1..3 (shrinks on pile exhaustion tail). `newDrawPile` is
+   * the caller-computed updated draw pile after deduplication-by-type and
+   * offer-slice removal.
+   */
+  | {
+      type: 'JokerOffered';
+      offered: JokerType[];
+      newDrawPile: JokerType[];
+      now: number;
+    }
+  /**
+   * joker-system spec §7.1.1 — pile empty at offer time. Reducer transitions
+   * directly to next round via caller-provided `nextRoundDeal`. Distinct from
+   * `JokerOfferSkippedSessionOver` (session-over case).
+   */
+  | { type: 'JokerOfferEmpty'; nextRoundDeal: RoundDeal; now: number }
   /**
    * joker-system spec §7.1.1 — activate a held joker. `second_wind` is
    * NEVER used here — it auto-consumes on strike events. See spec §5.

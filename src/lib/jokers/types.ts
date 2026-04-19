@@ -35,11 +35,10 @@ export interface JokerSlot {
  * (spec §6.2 — dedup-by-type rule). The 2 un-picked jokers in `offered` move
  * to `Session.discardedJokers` on `JokerPicked`.
  *
- * Spec: joker-system §4 + §6.2.
+ * Spec: joker-system §4 + §6.2 + §7.1.1 (length 1..3 on exhaustion tail).
  */
 export interface JokerOffer {
-  offeredToWinner: 'player' | 'ai';
-  /** Length 1..3. Shrinks on pile exhaustion tail. No duplicate types within one offer. */
+  /** Length 1..3 per spec §7.1.1. No duplicate types within one offer. */
   offered: JokerType[];
-  offeredAt: number;
+  offeredToWinner: 'player' | 'ai';
 }
