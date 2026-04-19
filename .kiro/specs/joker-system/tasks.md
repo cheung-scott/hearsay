@@ -85,7 +85,7 @@ Pre-landed in commit `29f6a34`: `src/lib/jokers/types.ts` (JokerSlot, JokerOffer
   - Import helpers from `src/lib/jokers/lifecycle.ts`
   - _Requirements: 3.1, 3.2, 3.4, 4.1, 5.1, 5.2, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 7.2_
 
-- [ ] 8. Implement FSM reducer additions in `src/lib/game/fsm.ts` — UseJoker handler + Second Wind auto-consume
+- [x] 8. Implement FSM reducer additions in `src/lib/game/fsm.ts` — UseJoker handler + Second Wind auto-consume
   - **UseJoker handler:** validate joker held (`joker_not_held`), validate trigger window via `canActivate` (`joker_trigger_mismatch`), validate no stacking via `jokerTriggeredThisRound` (throw), call `advanceSlot` to consume, push to `jokerTriggeredThisRound`, push appropriate `ActiveJokerEffect` to `Round.activeJokerEffects` using `JOKER_CATALOG[joker].duration`. For `one_shot_on_use` jokers (Stage Whisper, Earful), push and remove in same tick. For `second_wind`, throw — it auto-consumes, never via UseJoker.
   - **Second Wind auto-consume edge in RevealComplete:** BEFORE incrementing the player's strike, check if `second_wind` is in `player.jokerSlots` with `state: 'held'`. If yes: consume it (advanceSlot), skip the strike increment, push `second_wind` to `jokerTriggeredThisRound`. If `strikes === 0` and no strike is being applied to this player, Second Wind stays `held` (inert, no error).
   - **Earful auto-consume edge in RevealComplete:** when `challengeWasCorrect === true` and `earful` is in `player.jokerSlots` with `state: 'held'`, consume it and set `Session.autopsy = { preset: claim.voicePreset ?? 'unknown', roundIdx, turnIdx }`.

@@ -17,7 +17,8 @@ import type {
   Session,
 } from './types';
 import { InvalidTransitionError } from './types';
-import { seedDrawPile } from '../jokers/lifecycle';
+import { seedDrawPile, canActivate, advanceSlot } from '../jokers/lifecycle';
+import { JOKER_CATALOG } from '../jokers/catalog';
 
 /**
  * Determine session winner if the session should end, else `null`.
@@ -174,9 +175,13 @@ function claimAccepted(
   const activeHandSize = session[activeKey].hand.length;
   const roundEndResult = checkRoundEnd(currentRound, activeKey, activeHandSize);
 
+  // Req 9.1, 9.2 — expire next_claim and next_challenge effects on ClaimAccepted boundary
+  let expiredRound = expireJokerEffects(currentRound, 'next_claim');
+  expiredRound = expireJokerEffects(expiredRound, 'next_challenge');
+
   if (roundEndResult.ended) {
     const newRound: Round = {
-      ...currentRound,
+      ...expiredRound,
       status: 'round_over',
       winner: roundEndResult.winner,
     };
@@ -191,7 +196,7 @@ function claimAccepted(
   // Swap active player and continue
   const nextActive: 'player' | 'ai' = activeKey === 'player' ? 'ai' : 'player';
   const newRound: Round = {
-    ...currentRound,
+    ...expiredRound,
     activePlayer: nextActive,
     status: 'claim_phase',
   };
@@ -217,9 +222,19 @@ function challengeCalled(
     );
   }
 
-  const newRound: Round = { ...currentRound, status: 'resolving' };
+  // Req 9.1, 9.2 — expire next_claim and next_challenge effects on ChallengeCalled boundary
+  let expiredRound = expireJokerEffects(currentRound, 'next_claim');
+  expiredRound = expireJokerEffects(expiredRound, 'next_challenge');
+
+  const newRound: Round = {
+    ...expiredRound,
+    status: 'resolving',
+  };
+
+  // §7.4.3 — clear autopsy on next ChallengeCalled
+  const { autopsy: _autopsy, ...sessionWithoutAutopsy } = session;
   return {
-    ...session,
+    ...sessionWithoutAutopsy,
     rounds: session.rounds.map((r, i) =>
       i === session.currentRoundIdx ? newRound : r,
     ),
@@ -246,25 +261,87 @@ function revealComplete(
     throw new InvalidTransitionError('resolving(no claim history)', event.type);
   }
 
-  // Step 1: determine who takes the strike
-  // challengeWasCorrect=true → claimant was caught lying → claimant loses
-  // challengeWasCorrect=false → challenger was wrong → challenger (non-claimant) loses
+  // Step 1: determine who takes the strike.
+  // challengeWasCorrect=true → claimant was caught lying → claimant (= activePlayer) loses.
+  // challengeWasCorrect=false → challenger was wrong → challenger (non-activePlayer) loses.
   const claimantKey = lastClaim.by; // 'player' | 'ai'
   const opponentKey: 'player' | 'ai' = claimantKey === 'player' ? 'ai' : 'player';
+  const challengerKey: 'player' | 'ai' = opponentKey; // challenger is always the non-claimant
   const loserKey: 'player' | 'ai' = challengeWasCorrect ? claimantKey : opponentKey;
   const winnerKey: 'player' | 'ai' = loserKey === 'player' ? 'ai' : 'player';
 
-  // Step 2: pile → loser's takenCards; clear pile
+  // Step 1b: Second Wind auto-consume (Req 14.1, 14.2, 14.4).
+  // If loserKey holds a 'held' second_wind, consume it and cancel the incoming strike.
+  let secondWindConsumed = false;
+  let playerSlotsAfterSW = session.player.jokerSlots ?? [];
+  let aiSlotsAfterSW = session.ai.jokerSlots ?? [];
+  const loserSlots = session[loserKey].jokerSlots ?? [];
+  const hasHeldSecondWind = loserSlots.some(
+    (s) => s.joker === 'second_wind' && s.state === 'held',
+  );
+  if (hasHeldSecondWind) {
+    const advancedSlots = advanceSlot(loserSlots, 'second_wind', session.currentRoundIdx);
+    if (loserKey === 'player') {
+      playerSlotsAfterSW = advancedSlots;
+    } else {
+      aiSlotsAfterSW = advancedSlots;
+    }
+    secondWindConsumed = true;
+  }
+
+  // Step 1c: Earful auto-consume (Req 12.1, 12.3).
+  // Fires when the PLAYER is the challenger and wins (challengeWasCorrect=true means
+  // claimant lied → challenger won). AI jokers never activate in v1.
+  let earfulConsumed = false;
+  let autopsy: Session['autopsy'] = session.autopsy;
+  if (challengeWasCorrect && challengerKey === 'player') {
+    // Player holds earful and just won the challenge — consume + set autopsy.
+    const challSlotsNow = playerSlotsAfterSW; // may already reflect SW consume (different joker)
+    const hasHeldEarful = challSlotsNow.some(
+      (s) => s.joker === 'earful' && s.state === 'held',
+    );
+    if (hasHeldEarful) {
+      playerSlotsAfterSW = advanceSlot(challSlotsNow, 'earful', session.currentRoundIdx);
+      const claimIdx = currentRound.claimHistory.length - 1;
+      autopsy = {
+        preset: lastClaim.voicePreset ?? 'unknown',
+        roundIdx: session.currentRoundIdx,
+        turnIdx: claimIdx,
+      };
+      earfulConsumed = true;
+    }
+  }
+
+  // Step 1d: accumulate jokerTriggeredThisRound
+  const prevTriggered = currentRound.jokerTriggeredThisRound ?? [];
+  const newTriggered: JokerType[] = [
+    ...prevTriggered,
+    ...(secondWindConsumed ? (['second_wind'] as JokerType[]) : []),
+    ...(earfulConsumed ? (['earful'] as JokerType[]) : []),
+  ];
+
+  // Step 2: pile → loser's takenCards; apply strike (cancelled if Second Wind fired).
   const loserAfterPile = {
     ...session[loserKey],
-    strikes: session[loserKey].strikes + 1,
+    strikes: secondWindConsumed
+      ? session[loserKey].strikes
+      : session[loserKey].strikes + 1,
     takenCards: [...session[loserKey].takenCards, ...currentRound.pile],
+    jokerSlots: loserKey === 'player' ? playerSlotsAfterSW : aiSlotsAfterSW,
   };
 
-  // Build intermediate session with strike+pile applied
+  // Winner gets updated slots (Earful may have been consumed from the winner's slots).
+  const winnerAfterSlots = {
+    ...session[winnerKey],
+    jokerSlots: winnerKey === 'player' ? playerSlotsAfterSW : aiSlotsAfterSW,
+  };
+
+  // Build intermediate session with strike+pile+slots applied.
   const sessionWithStrike: Session = {
     ...session,
     [loserKey]: loserAfterPile,
+    [winnerKey]: winnerAfterSlots,
+    ...(autopsy !== session.autopsy ? { autopsy } : {}),
   };
 
   const activeKey = currentRound.activePlayer;
@@ -276,6 +353,7 @@ function revealComplete(
       pile: [],
       status: 'round_over',
       winner: winnerKey,
+      jokerTriggeredThisRound: newTriggered,
     };
     return {
       ...sessionWithStrike,
@@ -295,6 +373,7 @@ function revealComplete(
       pile: [],
       status: 'round_over',
       winner: opponentOfActive,
+      jokerTriggeredThisRound: newTriggered,
     };
     return {
       ...sessionWithStrike,
@@ -311,6 +390,7 @@ function revealComplete(
       pile: [],
       status: 'round_over',
       winner: activeKey,
+      jokerTriggeredThisRound: newTriggered,
     };
     return {
       ...sessionWithStrike,
@@ -327,6 +407,7 @@ function revealComplete(
     pile: [],
     activePlayer: nextActive,
     status: 'claim_phase',
+    jokerTriggeredThisRound: newTriggered,
   };
   return {
     ...sessionWithStrike,
@@ -681,6 +762,102 @@ function timeout(
   return claimAccepted(session, { type: 'ClaimAccepted', now: event.now });
 }
 
+/** joker-system spec §7.1 — UseJoker (Req 8.1-8.5) */
+function useJoker(
+  session: Session,
+  event: Extract<GameEvent, { type: 'UseJoker' }>,
+): Session {
+  if (session.status !== 'round_active') {
+    throw new InvalidTransitionError(session.status, event.type);
+  }
+  // Req 8.5 — second_wind auto-consumes in RevealComplete, never via UseJoker.
+  if (event.joker === 'second_wind') {
+    throw new InvalidTransitionError('round_active(second_wind_auto_only)', event.type);
+  }
+  const currentRound = session.rounds[session.currentRoundIdx];
+  if (!currentRound) {
+    throw new InvalidTransitionError('round_active(no current round)', event.type);
+  }
+  const activator = session[event.by];
+  const heldMatch = (activator.jokerSlots ?? []).some(
+    (s) => s.joker === event.joker && s.state === 'held',
+  );
+  if (!heldMatch) {
+    throw new InvalidTransitionError('round_active(joker_not_held)', event.type);
+  }
+  const triggered = currentRound.jokerTriggeredThisRound ?? [];
+  // canActivate checks trigger-window AND stacking (jokerTriggeredThisRound).
+  const ok = canActivate(
+    event.joker,
+    currentRound.status,
+    currentRound.activePlayer,
+    event.by,
+    triggered,
+  );
+  if (!ok) {
+    // Distinguish stacking vs trigger-window mismatch for clearer error messages.
+    if (triggered.includes(event.joker)) {
+      throw new InvalidTransitionError(
+        'round_active(joker_already_triggered_this_round)',
+        event.type,
+      );
+    }
+    throw new InvalidTransitionError('round_active(joker_trigger_mismatch)', event.type);
+  }
+  // Consume slot.
+  const updatedSlots = advanceSlot(activator.jokerSlots ?? [], event.joker, session.currentRoundIdx);
+  // Determine effect duration from catalog and push ActiveJokerEffect.
+  // `one_shot_on_use` (Stage Whisper, Earful) — effect is instantaneous; do NOT
+  // push to activeJokerEffects (fires and completes in same tick).
+  // All other durations persist until their expiry trigger.
+  const duration = JOKER_CATALOG[event.joker].duration;
+  const effectExpiresAfter: ActiveJokerEffect['expiresAfter'] | null =
+    duration === 'one_shot_on_use' ? null :
+    duration === 'next_claim' ? 'next_claim' :
+    duration === 'next_challenge' ? 'next_challenge' :
+    'session';
+  const updatedRound: Round = {
+    ...currentRound,
+    jokerTriggeredThisRound: [...triggered, event.joker],
+    activeJokerEffects: effectExpiresAfter
+      ? [...currentRound.activeJokerEffects, { type: event.joker, expiresAfter: effectExpiresAfter }]
+      : currentRound.activeJokerEffects,
+  };
+  return {
+    ...session,
+    [event.by]: { ...activator, jokerSlots: updatedSlots },
+    rounds: session.rounds.map((r, i) =>
+      i === session.currentRoundIdx ? updatedRound : r,
+    ),
+  };
+}
+
+/** probe-phase spec — ProbeComplete (Req 16.7): clear Round.activeProbe */
+function probeComplete(
+  session: Session,
+  event: Extract<GameEvent, { type: 'ProbeComplete' }>,
+): Session {
+  if (session.status !== 'round_active') {
+    throw new InvalidTransitionError(session.status, event.type);
+  }
+  const currentRound = session.rounds[session.currentRoundIdx];
+  if (!currentRound?.activeProbe) {
+    throw new InvalidTransitionError('round_active(no_pending_probe)', event.type);
+  }
+  // Guard: whisperId must match in-flight probe.
+  if (currentRound.activeProbe.whisperId !== event.whisperId) {
+    throw new InvalidTransitionError('round_active(probe_id_mismatch)', event.type);
+  }
+  // Strip activeProbe — destructure to drop the key entirely.
+  const { activeProbe: _dropped, ...roundWithoutProbe } = currentRound;
+  return {
+    ...session,
+    rounds: session.rounds.map((r, i) =>
+      i === session.currentRoundIdx ? (roundWithoutProbe as Round) : r,
+    ),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Public reducer — spec §3.2
 // ---------------------------------------------------------------------------
@@ -728,17 +905,14 @@ export function reduce(session: Session, event: GameEvent): Session {
     case 'JokerOfferEmpty':
       return jokerOfferEmpty(session, event);
     case 'UseJoker':
-      // Task 8 fills this in.
-      throw new InvalidTransitionError(
-        `${session.status} (pending joker-system Task 8)`,
-        event.type,
-      );
+      return useJoker(session, event);
     case 'ProbeStart':
-    case 'ProbeComplete':
     case 'ProbeExpired':
       throw new InvalidTransitionError(
         `${session.status} (pending probe-phase worktree)`,
         event.type,
       );
+    case 'ProbeComplete':
+      return probeComplete(session, event);
   }
 }
