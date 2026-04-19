@@ -1,7 +1,7 @@
 'use client';
 
 import '@/styles/game-theme.css';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useGameSession } from '@/hooks/useGameSession';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { useHoldToSpeak } from '@/hooks/useHoldToSpeak';
@@ -48,6 +48,16 @@ export function GameSession({ initialSession }: GameSessionProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.lastClaimAudioUrl]);
 
+  // Auto-trigger AI's turn when it's their move. Without this, rounds where
+  // activePlayer starts as 'ai' hang in 'awaiting-ai' forever because the
+  // server chains AI judgment inside PlayerClaim but has no AI-first pathway.
+  useEffect(() => {
+    if (state.phase === 'awaiting-ai') {
+      dispatch({ type: 'AiAct' }).catch(() => { /* error surfaces via state.error */ });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.phase]);
+
   // When holdToSpeak audioBlob transitions from null to non-null, AND we're
   // in recording phase with cards selected, dispatch PlayerClaim.
   useEffect(() => {
@@ -80,9 +90,10 @@ export function GameSession({ initialSession }: GameSessionProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [holdToSpeak.audioBlob]);
 
-  // Derive persona display name.
-  const persona = state.session?.opponent.personaIfAi ?? 'Reader';
-  const _displayName = PERSONA_DISPLAY_NAMES[persona];
+  // Persona display name is threaded through Scene → Opponent via
+  // session.opponent.personaIfAi — Scene does the lookup. This import is
+  // retained for future top-bar merge (§10.5 pending).
+  void PERSONA_DISPLAY_NAMES;
 
   // -------------------------------------------------------------------------
   // Render: idle / no session → Start CTA

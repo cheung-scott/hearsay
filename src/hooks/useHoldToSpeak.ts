@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 type HoldState = 'idle' | 'requesting' | 'recording' | 'stopped';
 
@@ -42,9 +42,34 @@ export function useHoldToSpeak(): {
     rafIdRef.current = requestAnimationFrame(tick);
   }, []);
 
+  // Unmount cleanup — tear down recorder, AudioContext, stream tracks, rAF.
+  // Without this, an unmount mid-recording leaks the mic (LED stays on),
+  // the AudioContext, and the waveform rAF loop.
+  useEffect(() => {
+    return () => {
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== 'inactive') {
+        try { recorder.stop(); } catch { /* ignore */ }
+      }
+      mediaRecorderRef.current = null;
+      audioContextRef.current?.close().catch(() => { /* ignore */ });
+      audioContextRef.current = null;
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+    };
+  }, []);
+
   const start = useCallback(async () => {
     // Idempotent: no-op if already requesting or recording.
     if (state === 'requesting' || state === 'recording') return;
+
+    // Clear any prior blob so UI consumers don't see stale data during the
+    // new recording (onstop will set the fresh blob).
+    setAudioBlob(null);
 
     setState('requesting');
 

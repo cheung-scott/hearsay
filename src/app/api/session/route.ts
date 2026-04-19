@@ -69,7 +69,7 @@ export async function POST(): Promise<Response> {
 
     await store.set(id, session);
 
-    return Response.json(toClientView(session, 'player'));
+    return Response.json({ session: toClientView(session, 'player') });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return Response.json(
@@ -103,7 +103,7 @@ export async function GET(req: Request): Promise<Response> {
       );
     }
 
-    return Response.json(toClientView(session, 'player'));
+    return Response.json({ session: toClientView(session, 'player') });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return Response.json(

@@ -139,8 +139,9 @@ describe('useGameSession — dispatch issues fetch', () => {
     vi.unstubAllGlobals();
   });
 
-  it('dispatch PlayerRespond calls POST /api/turn exactly once with correct body', async () => {
-    const { result } = renderHook(() => useGameSession());
+  it('dispatch PlayerRespond calls POST /api/turn exactly once with correct body (sessionId threaded)', async () => {
+    const initial = makeClientSession();
+    const { result } = renderHook(() => useGameSession(initial));
 
     await act(async () => {
       await result.current.dispatch({ type: 'PlayerRespond', action: 'challenge' });
@@ -150,7 +151,11 @@ describe('useGameSession — dispatch issues fetch', () => {
     expect(fetch).toHaveBeenCalledWith('/api/turn', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'PlayerRespond', action: 'challenge' }),
+      body: JSON.stringify({
+        type: 'PlayerRespond',
+        sessionId: initial.id,
+        action: 'challenge',
+      }),
     });
   });
 

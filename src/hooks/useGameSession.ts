@@ -121,6 +121,19 @@ export function useGameSession(initialSession?: ClientSession): {
     new Set(),
   );
 
+  // Keep latest session id in a ref so dispatch can thread it fresh without
+  // stale closure. Every non-CreateSession event body must include sessionId —
+  // the /api/turn route 400s without it.
+  const sessionIdRef = useRef<string | null>(initialSession?.id ?? null);
+  useEffect(() => {
+    sessionIdRef.current = session?.id ?? null;
+  }, [session]);
+
+  // Monotonic sequence for in-flight dispatch deduplication. A response is
+  // only applied if its seq matches the latest dispatch — protects against
+  // rapid double-clicks racing the server.
+  const inFlightSeqRef = useRef(0);
+
   // Keep latest phase in a ref so callbacks can read it without stale closure.
   const phaseRef = useRef<GamePhase>(phase);
   useEffect(() => {
@@ -154,8 +167,12 @@ export function useGameSession(initialSession?: ClientSession): {
 
   const dispatch = useCallback(
     async (event: GameEvent) => {
+      // Stamp this dispatch; drop the response if a newer dispatch arrives first.
+      const seq = ++inFlightSeqRef.current;
+
       try {
         let url = '/api/turn';
+        const sessionId = sessionIdRef.current;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let body: Record<string, any> = { type: event.type };
 
@@ -166,12 +183,15 @@ export function useGameSession(initialSession?: ClientSession): {
           const audioBase64 = await blobToBase64(event.audio);
           body = {
             type: 'PlayerClaim',
+            sessionId,
             cards: event.cards.map(c => ({ id: c.id })),
             audioBase64,
             claimText: event.claimText,
           };
         } else if (event.type === 'PlayerRespond') {
-          body = { type: 'PlayerRespond', action: event.action };
+          body = { type: 'PlayerRespond', sessionId, action: event.action };
+        } else if (event.type === 'AiAct') {
+          body = { type: 'AiAct', sessionId };
         }
 
         const response = await fetch(url, {
@@ -179,6 +199,9 @@ export function useGameSession(initialSession?: ClientSession): {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
+
+        // Stale-response guard: a newer dispatch superseded us.
+        if (seq !== inFlightSeqRef.current) return;
 
         if (!response.ok) {
           const text = await response.text().catch(() => response.statusText);
@@ -191,6 +214,9 @@ export function useGameSession(initialSession?: ClientSession): {
           session: ClientSession;
           aiClaim?: { claimText: string; ttsAudioUrl: string };
         };
+
+        // Second stale-response guard after JSON parse (async boundary).
+        if (seq !== inFlightSeqRef.current) return;
 
         const newSession = data.session;
         const aiClaim = data.aiClaim;
@@ -208,6 +234,8 @@ export function useGameSession(initialSession?: ClientSession): {
         const derived = derivePhase(newSession, newAudioUrl);
         setPhase(derived);
       } catch (err) {
+        // Honour the stale-response guard for errors too.
+        if (seq !== inFlightSeqRef.current) return;
         const message =
           err instanceof Error ? err.message : String(err);
         setError(message);
