@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "hearsay-debug": {
+      "command": "node",
+      "args": [
+        "--import",
+        "tsx",
+        "${workspaceFolder}/powers/hearsay-debug/src/index.ts"
+      ],
+      "env": {
+        "HEARSAY_DEBUG": "${HEARSAY_DEBUG}",
+        "KV_URL": "${KV_URL}",
+        "KV_REST_API_TOKEN": "${KV_REST_API_TOKEN}"
+      }
+    }
+  }
+}
