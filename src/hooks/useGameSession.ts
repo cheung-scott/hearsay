@@ -97,15 +97,17 @@ async function blobToBase64(blob: Blob): Promise<string> {
 // Hook
 // ---------------------------------------------------------------------------
 
-export function useGameSession(): {
+export function useGameSession(initialSession?: ClientSession): {
   state: GameSessionState;
   dispatch: (event: GameEvent) => Promise<void>;
   selectedCardIds: Set<string>;
   toggleCardSelection: (id: string) => void;
   markAudioEnded: () => void;
 } {
-  const [session, setSession] = useState<ClientSession | null>(null);
-  const [phase, setPhase] = useState<GamePhase>('idle');
+  const [session, setSession] = useState<ClientSession | null>(initialSession ?? null);
+  const [phase, setPhase] = useState<GamePhase>(() =>
+    initialSession ? derivePhase(initialSession, undefined) : 'idle',
+  );
   const [lastClaimAudioUrl, setLastClaimAudioUrl] = useState<
     string | undefined
   >(undefined);

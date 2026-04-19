@@ -103,32 +103,31 @@ Phase 1 only — no jokers UI, no probe phase, no elimination beat, no tension m
 
 - [x] 8. Checkpoint: run all tests + verify component imports compile (383/383 tests passing, tsc clean, 20 component files created)
 
-- [ ] 9. GameSession root component + smoke test
-  - [ ] 9.1 Create `src/components/game/GameSession.tsx` — `"use client"` root component. Composes `<OverlayEffects/>`, `<Scene>`, `<TopBar>`, `<PlayerControls>`. Owns state via `useGameSession()`. Passes phase-derived props to children for visibility gating. Renders "Start" CTA in `idle`, "NEW TRIAL" button in `session-over`. Does NOT import FSM `reduce()` directly.
+- [x] 9. GameSession root component + smoke test
+  - [x] 9.1 Create `src/components/game/GameSession.tsx` — `"use client"` root component. Composes `<OverlayEffects/>`, `<Scene>`, `<TopBar>`, `<PlayerControls>`. Owns state via `useGameSession()`. Passes phase-derived props to children for visibility gating. Renders "Start" CTA in `idle`, "NEW TRIAL" button in `session-over`. Does NOT import FSM `reduce()` directly.
     _Requirements: 1.1, 2.1, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
 
-  - [ ] 9.2 Create `src/components/game/GameSession.test.tsx` — smoke test: render `<GameSession/>` with a mocked initial `ClientSession` in `round_active` / `claim_phase`. Assert: renders without crash, player hand cards visible, `CALL · {rank}` target tag visible.
+  - [x] 9.2 Create `src/components/game/GameSession.test.tsx` — smoke test: render `<GameSession/>` with a mocked initial `ClientSession` in `round_active` / `claim_phase`. Assert: renders without crash, player hand cards visible, `CALL · {rank}` target tag visible.
     _Requirements: 20.1_
 
-- [ ] 10. Context builders + API route helpers
-  - [ ] 10.1 Create `src/lib/session/buildContexts.ts` — export `buildDecisionContext(session, round)` and `buildOwnPlayContext(session, round)` that construct the context objects expected by `aiDecideOnClaim` and `aiDecideOwnPlay` from the `ai-opponent` spec.
+- [x] 10. Context builders + API route helpers
+  - [x] 10.1 Create `src/lib/session/buildContexts.ts` — export `buildDecisionContext(session, round)` and `buildOwnPlayContext(session, round)` that construct the context objects expected by `aiDecideOnClaim` and `aiDecideOwnPlay` from the `ai-opponent` spec.
     _Requirements: 10.3, 12.1_
 
-  - [ ] 10.2 Create `src/app/game/page.tsx` — server component shell that renders `<GameSession/>`.
+  - [x] 10.2 Create `src/app/game/page.tsx` — server component shell that renders `<GameSession/>`.
     _Requirements: 1.1, 2.1_
 
-- [ ] 11. API routes
-  - [ ] 11.1 Create `src/app/api/session/route.ts` — `POST`: create new Session (via game-engine `reduce` with `SetupComplete`), persist to Vercel KV via `store.set()`, return `ClientSession`. Default persona: `Reader`. `GET`: retrieve current session from KV.
+- [x] 11. API routes
+  - [x] 11.1 Create `src/app/api/session/route.ts` — `POST`: create new Session (via game-engine `reduce` with `SetupComplete`), persist to Vercel KV via `store.set()`, return `ClientSession`. Default persona: `Reader`. `GET`: retrieve current session from KV.
     _Requirements: 9.1, 9.2, 13.1_
 
-  - [ ] 11.2 Create `src/app/api/turn/route.ts` — `POST`: parse `TurnRequest` discriminated union. For `PlayerClaim`: validate card IDs against server session, run STT + heuristic, build Claim, fire `ClaimMade`, chain AI judgment inline (build DecisionContext → `aiDecideOnClaim` → fire `ChallengeCalled`/`ClaimAccepted`), persist updated session to KV, return `TurnResponse` with `ClientSession` + `aiDecision`. For `PlayerRespond`: fire FSM events, resolve challenge if applicable, persist, return. For `AiAct`: validate activePlayer === 'ai', build OwnPlayContext → `aiDecideOwnPlay` → TTS synthesis via `VOICE_PRESETS[persona][truthState]` → fire `ClaimMade`, persist, return with `aiClaim`. Apply `toClientView` on EVERY response.
+  - [x] 11.2 Create `src/app/api/turn/route.ts` — `POST`: parse `TurnRequest` discriminated union. For `PlayerClaim`: validate card IDs against server session, run STT + heuristic, build Claim, fire `ClaimMade`, chain AI judgment inline (build DecisionContext → `aiDecideOnClaim` → fire `ChallengeCalled`/`ClaimAccepted`), persist updated session to KV, return `TurnResponse` with `ClientSession` + `aiDecision`. For `PlayerRespond`: fire FSM events, resolve challenge if applicable, persist, return. For `AiAct`: validate activePlayer === 'ai', build OwnPlayContext → `aiDecideOwnPlay` → TTS synthesis via `VOICE_PRESETS[persona][truthState]` → fire `ClaimMade`, persist, return with `aiClaim`. Apply `toClientView` on EVERY response.
     _Requirements: 1.2, 1.3, 10.1, 10.2, 10.3, 11.1, 11.2, 12.1, 12.2, 21.1_
 
-  - [ ] 11.3 Create `src/app/api/voice/tts/route.ts` — stub returning HTTP 501 Not Implemented with body `{ error: 'tts-not-implemented-in-phase-1' }`. Accept body shape `{ text, persona, truthState }` for Day-5 consumer binding.
+  - [x] 11.3 Create `src/app/api/voice/tts/route.ts` — stub returning HTTP 501 Not Implemented with body `{ error: 'tts-not-implemented-in-phase-1' }`. Accept body shape `{ text, persona, truthState }` for Day-5 consumer binding.
     _Requirements: 12b.1, 12b.2, 12b.3_
 
-- [ ] 12. Checkpoint: run all tests
-  - Run `pnpm vitest --run`. Verify all tests pass including `GameSession.test.tsx`, `useGameSession.test.ts`, `displayNames.test.ts`. Run `pnpm tsc --noEmit`.
+- [x] 12. Checkpoint: run all tests (384/384 passing across 16 files — tsc clean)
 
 - [ ] 13. API route tests (invariants 8-11)
   - [ ] 13.1 Create `src/app/api/turn/route.test.ts` — mock game-engine, ai-opponent, voice modules, and Vercel KV store. Tests:
