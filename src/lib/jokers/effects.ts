@@ -5,9 +5,11 @@
 // src/lib/game/fsm.ts inlines Second Wind via advanceSlot; this helper
 // exports the equivalent logic for API-route-layer use + unit testing.
 //
-// Earful (§7.4.3) and Stage Whisper (§7.2) arrive in Task 14 and Task 15.
+// Earful (§7.4.3) — Task 14.
+// Stage Whisper (§7.2) — Task 15.
 
-import type { Round, JokerSlot } from '../game/types';
+import type { Round, JokerSlot, Claim, Session } from '../game/types';
+import type { ProbeRequest } from './types';
 
 // ---------------------------------------------------------------------------
 // applyPokerFace
@@ -86,4 +88,85 @@ export function applySecondWind(playerSlots: JokerSlot[]): {
   });
 
   return { shouldCancel: true, updatedSlots };
+}
+
+// ---------------------------------------------------------------------------
+// applyEarful
+// ---------------------------------------------------------------------------
+
+/**
+ * When the player WINS a challenge while holding Earful, consume the first
+ * held `earful` slot and return the autopsy data derived from the challenged
+ * claim's voicePreset.
+ *
+ * Returns `{ autopsy, updatedSlots }` when a held earful was found and
+ * consumed; `null` otherwise.
+ *
+ * Design note: The production path in `fsm.ts revealComplete` already inlines
+ * the autopsy logic. This helper is a standalone pure function for
+ * unit tests (I7) and API-route-layer use.
+ *
+ * Spec: joker-system §7.4.3, Reqs 12.1–12.5.
+ * Invariant I7: pure + deterministic.
+ */
+export function applyEarful(
+  playerSlots: JokerSlot[],
+  claim: Claim,
+  roundIdx: number,
+  turnIdx: number,
+): { autopsy: NonNullable<Session['autopsy']>; updatedSlots: JokerSlot[] } | null {
+  const heldIdx = playerSlots.findIndex(
+    (s) => s.joker === 'earful' && s.state === 'held',
+  );
+
+  if (heldIdx === -1) {
+    return null;
+  }
+
+  const updatedSlots = playerSlots.map((s, i) => {
+    if (i === heldIdx) {
+      return { ...s, state: 'consumed' as const };
+    }
+    return s;
+  });
+
+  const autopsy: NonNullable<Session['autopsy']> = {
+    preset: claim.voicePreset ?? 'unknown',
+    roundIdx,
+    turnIdx,
+  };
+
+  return { autopsy, updatedSlots };
+}
+
+// ---------------------------------------------------------------------------
+// produceProbeRequest
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a LOCKED-shape `ProbeRequest` from round state when Stage Whisper fires.
+ *
+ * `whisperIdGen` is injected so the function stays pure (no internal
+ * randomness). `now` is injected instead of reading `Date.now()`.
+ * `mathProb` is conditionally spread — the field is ABSENT (not
+ * `undefined`-valued) when not provided.
+ *
+ * Spec: joker-system §7.2, Reqs 11.1–11.4.
+ * Invariant I3: locked shape — byte-for-byte aligned with probe-phase §4.
+ */
+export function produceProbeRequest(
+  round: Round,
+  whisperIdGen: () => string,
+  now: number,
+  mathProb?: number,
+): ProbeRequest {
+  return {
+    whisperId: whisperIdGen(),
+    targetAiId: 'ai' as const,
+    // Round.roundNumber is 1-based (1|2|3); Session.currentRoundIdx is 0-based.
+    roundIdx: round.roundNumber - 1,
+    triggeredAtTurn: round.claimHistory.length,
+    now,
+    ...(mathProb !== undefined ? { mathProb } : {}),
+  };
 }

@@ -138,7 +138,7 @@ Pre-landed in commit `29f6a34`: `src/lib/jokers/types.ts` (JokerSlot, JokerOffer
 - [ ] 13. Checkpoint — run `pnpm vitest run`
   - Full test suite: catalog + lifecycle + effects + fsm + toClientView. All green before cross-spec effects.
 
-- [ ] 14. Implement Earful autopsy effect in `src/lib/jokers/effects.ts`
+- [x] 14. Implement Earful autopsy effect in `src/lib/jokers/effects.ts`
   - `applyEarful(playerSlots: JokerSlot[], claim: Claim, roundIdx: number, turnIdx: number): { autopsy: Session['autopsy']; updatedSlots: JokerSlot[] } | null` — returns autopsy data + consumed slots if earful is held and claim has voicePreset; returns null if earful not held. Falls back to `preset: 'unknown'` if `claim.voicePreset` is undefined.
   - Pure helper consumed by the RevealComplete reducer (already wired in Task 8)
   - **BLOCKING:** depends on `VoiceTellPreset` type from `src/lib/voice/presets.ts`. Currently a `string` alias (pre-landed). If voice-tell-taxonomy spec narrows the type, update the import. Escalate to Scott if the dependency spec isn't merged yet.
@@ -148,7 +148,7 @@ Pre-landed in commit `29f6a34`: `src/lib/jokers/types.ts` (JokerSlot, JokerOffer
     - Test Earful with no held earful slot → returns null
   - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
 
-- [ ] 15. Implement Stage Whisper effect in `src/lib/jokers/effects.ts`
+- [x] 15. Implement Stage Whisper effect in `src/lib/jokers/effects.ts`
   - `produceProbeRequest(round: Round, whisperIdGen: () => string, now: number, mathProb?: number): ProbeRequest` — builds the LOCKED-shape ProbeRequest from round state
   - Pure helper consumed by the API route when Stage Whisper fires
   - **BLOCKING:** probe-phase spec's `consumeStageWhisper` / `buildActiveProbe` helpers consume this `ProbeRequest`. If probe-phase spec isn't merged yet, this function can still be implemented and tested in isolation. Escalate to Scott if integration is needed before probe-phase lands.
