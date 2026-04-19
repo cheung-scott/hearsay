@@ -311,6 +311,12 @@ export interface ClientSession {
   sessionWinner?: Session['sessionWinner'];
   currentMusicUrl?: string;
   /**
+   * Day-5 (tension-music-system spec §4.3). Projected from `Session.musicTracks`
+   * — public info, not secret. Hook resolves URL by tension level client-side.
+   * Empty/missing entries surface the music-disabled path (spec §8 I5).
+   */
+  musicTracks?: MusicTrack[];
+  /**
    * Day-5 pre-land (joker-system Earful preset-reveal). Projected from
    * `Session.autopsy` for the self viewer only. Opponent view has no autopsy.
    */
