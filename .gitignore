@@ -9,6 +9,9 @@
 # Gitignoring it would auto-fail the submission.
 # ============================================================================
 
+# worktrees (Day-5 parallel dispatch)
+.worktrees/
+
 # dependencies
 /node_modules
 /.pnp
@@ -57,3 +60,6 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# worktrees (local git worktrees)
+.worktrees/
