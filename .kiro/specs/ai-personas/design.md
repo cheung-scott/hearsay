@@ -425,51 +425,40 @@ Flagged with recommended defaults. Any spec consumer that disagrees should amend
 
 ---
 
-## 12. Seed prompt for Kiro
+## 12. Seed prompt for Kiro (canonical form, paste-ready)
 
-Paste-ready. Assumes Kiro Spec mode is positioned on `.kiro/specs/ai-personas/design.md` and asked to generate `requirements.md` + `tasks.md`.
+Per `reference_kiro_spec_workflow.md` canonical template. Paste into Kiro Spec mode to generate `requirements.md` + `tasks.md`.
 
----
+```
+Generate requirements.md and tasks.md for the `ai-personas` spec.
 
-````
-You are Kiro in Spec mode. Read `.kiro/specs/ai-personas/design.md` in full. Generate
-`requirements.md` (EARS format) and `tasks.md` (numbered checklist with one-line descriptions
-and file touch-points).
+Canonical sources already in repo:
 
-The design spec covers: persona data tables (voice IDs, display names, accent colors,
-Clerk narrator binding) that extend ai-opponent's already-shipped math/dialogue layer.
-Internal Persona union stays 'Novice' | 'Reader' | 'Misdirector' | 'Silent' (locked by
-game-engine/types.ts line 17); courtroom names are display-layer only.
+- `.kiro/specs/ai-personas/design.md` — authoritative persona data tables (voice IDs, display names, accent colors, Clerk narrator binding) + 10 Vitest invariants (do NOT modify)
+- `.kiro/specs/ai-opponent/design.md` — already-shipped math/dialogue layer this spec re-affirms (do NOT re-open PERSONA_WEIGHTS, PERSONA_THRESHOLDS, PERSONA_BLUFF_BIAS, or dialogue-variant banks in `src/lib/ai/constants.ts`)
+- `.kiro/steering/product.md` / structure.md / tech.md — game mechanics + file paths + Next.js 16 / Tailwind 4 / Vitest stack
+- `.kiro/steering/voice-preset-conventions.md` — authoritative voice-ID selection convention + Clerk binding
 
-For `requirements.md`, produce one EARS-format requirement per §9 invariant (I1–I10) plus
-one per §4.2 data-model constant (PERSONA_VOICE_IDS, CLERK_VOICE_ID, PERSONA_DISPLAY_NAMES,
-PERSONA_ACCENT_COLORS). Group requirements by file touched. Do not invent requirements
-not grounded in design §§4, 5, 6, 7, 9.
+requirements.md — EARS format. Derive acceptance criteria from design.md §4 (data model), §5 (decision-weight tables — already-locked values), §6 (voice-ID bindings), §7 (integration points), §9 (invariants I1-I10). Aim ~14-18 criteria. Every design.md invariant (I1-I10) must map to at least one numbered requirement. Locked items that must NOT appear as pending:
 
-For `tasks.md`, produce a numbered checklist:
-  1. Create `src/lib/persona/accentColors.ts` with PERSONA_ACCENT_COLORS export per §7.3 hex table.
-  2. Create `src/lib/persona/accentColors.test.ts` with I6 and I7-partial assertions.
-  3. Add I2, I3, I7-partial, I10 to existing `src/lib/voice/presets.test.ts`.
-  4. Add I5 (prefix + uniqueness) to existing `src/lib/persona/displayNames.test.ts`.
-  5. Add I1 (if absent), I4, I7-partial, I8 to existing `src/lib/ai/math.test.ts`.
-  6. Add I9 variant-count assertion to existing `src/lib/ai/constants.test.ts`.
-  7. Run `pnpm test` and confirm all new assertions pass with zero mutations to
-     `PERSONA_WEIGHTS`, `PERSONA_THRESHOLDS`, `PERSONA_BLUFF_BIAS`, `PERSONA_VOICE_IDS`,
-     `CLERK_VOICE_ID`, `PERSONA_DISPLAY_NAMES`, `VOICE_PRESETS`, `PERSONA_DESCRIPTIONS`,
-     or `templateHonest` / `templateLie` internals.
+- Persona union is `{Novice, Reader, Misdirector, Silent}` (4 literals, locked by `src/lib/game/types.ts` L17 — courtroom display names are display-layer only, never in the type union)
+- PERSONA_WEIGHTS / PERSONA_THRESHOLDS / PERSONA_BLUFF_BIAS (shipped in `src/lib/ai/math.ts` — this spec enumerates values; does not re-derive)
+- PERSONA_VOICE_IDS + CLERK_VOICE_ID (shipped in `src/lib/voice/presets.ts`)
+- PERSONA_DISPLAY_NAMES (shipped in `src/lib/persona/displayNames.ts`)
+- Dialogue-variant banks (shipped in `src/lib/ai/constants.ts` — §5.4 is documentation-only; no mutation)
 
-Do NOT propose changes to any locked table. Do NOT add Clerk to the Persona union.
-Do NOT generate src/* code beyond the two new files in task 1 and task 2. Flag any
-tension with §11 open questions for the human to resolve before execution.
+Any §11 open questions MUST appear under `## Design questions for Scott` at bottom — do NOT resolve unilaterally.
 
-Design sections covered by this generation:
-  §1 Overview, §2 Persona roster, §3 Architecture, §4 Data model,
-  §5 Decision-weight tables, §6 Voice-ID bindings, §7 Integration points,
-  §8 Error handling, §9 Invariants, §10 File layout, §11 Open questions.
+tasks.md — 7-10 granular tasks, tests-first where feasible. Each task:
 
-Review mode: Claude Code Opus 4.7 review subagent will audit the generated tasks against
-this design spec before execution. Match the structure of
-`.kiro/specs/ai-opponent/requirements.md` / `tasks.md` for consistency.
-````
+- Links to specific requirement numbers via `_Requirements: X.Y, X.Z_`
+- Names exact files (per design.md §10 file layout — ONE new file `src/lib/persona/accentColors.ts` + ONE new test `src/lib/persona/accentColors.test.ts`; all other work adds drift-check assertions to existing test files `presets.test.ts` / `displayNames.test.ts` / `math.test.ts` / `constants.test.ts`)
+- Ordered by dependency: new accent-colors module + test → drift-check assertions layered on existing tests (voice presets → display names → math tables → dialogue constants) → final full-suite vitest
+- Checkpoints every 3-4 tasks for `pnpm vitest run`
+- Optional-but-skippable tasks marked with `*` (truly-nice-to-haves only)
+- This spec introduces ZERO changes to `src/lib/game/types.ts` or `src/lib/game/fsm.ts` — confirm via explicit task requirement
 
----
+Do NOT write implementation code. Do NOT modify design.md. If design.md seems wrong or contradictory, flag at bottom of requirements.md under `## Design questions for Claude Code`.
+
+Output both files in `.kiro/specs/ai-personas/`.
+```

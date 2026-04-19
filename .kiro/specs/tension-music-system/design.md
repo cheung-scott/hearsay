@@ -588,27 +588,55 @@ Total: 4 source files + 4 test files = 8 files. Single Day-5 implementation sess
 
 ---
 
-## 12. Seed prompt for Kiro (paste-ready)
+## 12. Seed prompt for Kiro (canonical form, paste-ready)
 
-Per `reference_kiro_spec_workflow.md` template. Paste into Kiro Spec mode after this design.md lands:
+Per `reference_kiro_spec_workflow.md` canonical template. Paste into Kiro Spec mode to generate `requirements.md` + `tasks.md`.
 
 ```
-You are Kiro. I have written `.kiro/specs/tension-music-system/design.md` by hand. Your job is to generate `requirements.md` and `tasks.md` from it — NOT to re-author the design. Read design.md as authoritative; surface gaps only as explicit `## Design questions for Scott` in requirements.md.
+Generate requirements.md and tasks.md for the `tension-music-system` spec.
 
-Generate requirements.md:
-- One section per numbered requirement (1, 2, 3, ...)
-- Each requirement restates the invariant from §9 in user-story form ("As a player, the music bed ducks when I hold to speak so I can hear myself") followed by acceptance criteria matching the test description
-- Include §11 open questions as `## Design questions for Scott` at the end
-- Include §4.3 stub-shape note as `## Prior constraints` (we inherit `Session.musicTracks`)
+Canonical sources already in repo:
 
-Generate tasks.md:
-- Group by file from §10 (one task = one file, or one task = one test file)
-- Each task cites the invariant(s) it must satisfy
-- Task ordering: pure lib first (tension.ts, tracks.ts, prompts.ts) → API route → hook → integration tests
-- Every task has a one-line "acceptance check" matching the Vitest assertion from §9
-- Final task: integration test that `<GameSession>` with real mocks still mounts + phase-derives correctly (I5 path)
+- `.kiro/specs/tension-music-system/design.md` — authoritative architecture, 3-track pregen pipeline, Web Audio ducking contract, 9 Vitest invariants (do NOT modify)
+- `.kiro/specs/ui-gameplay/design.md` §2, §3.2, §3.3 — component tree + `useHoldToSpeak` / `useAudioPlayer` consumed read-only; phase-gate extension
+- `.kiro/specs/voice-tell-taxonomy/design.md` — TTS playback as the output-duck trigger
+- `.kiro/steering/product.md` §1.5 — 400ms linear ramp LOCK (do NOT reduce to 150ms anywhere)
+- `.kiro/steering/tech.md` — 3 pregen tracks + Promise.all + GainNode ducking LOCK
+- `.kiro/steering/structure.md` / voice-preset-conventions.md — file paths + third-audio-surface convention
+- ElevenLabs SDK: `@elevenlabs/elevenlabs-js` — Context7-verified `client.music.compose({ prompt, musicLengthMs })` returning an async iterable of `Uint8Array` chunks (NOT a `ReadableStream`)
+- Pre-land commit `29f6a34` on main already adds `ClientSession.musicState?: { disabled: boolean; userMuted: boolean }` to `src/lib/game/types.ts` — tasks MUST import, NOT re-declare
 
-Do NOT generate src/ code. Do NOT modify design.md. If a requirement can't be traced back to a § in design.md, flag it — don't invent.
+requirements.md — EARS format. Derive acceptance criteria from design.md §2 (key concepts), §3 (architecture), §4 (data model + tension-level derivation), §5 (API surface), §6 (client hook + AudioContext priming + ducking), §7 (integration), §8 (error handling + autoplay + iOS), §9 (invariants I1-I9). Aim ~16-22 criteria. Every design.md invariant (I1-I9) must map to at least one numbered requirement. Locked items that must NOT appear as pending:
+
+- SDK call: `client.music.compose({ prompt, musicLengthMs })` with `musicLengthMs ∈ [3000, 600000]` (NOT `durationSeconds`)
+- Return type: async iterable of `Uint8Array` chunks (NOT `ReadableStream<Uint8Array>`)
+- Tension taxonomy locked at 3 levels: `calm | tense | critical`
+- `DUCK_FADE_MS = 400` for both duck + restore (steering §1.5 lock — NOT 150ms)
+- `prime()` awaits `audioContext.resume()` inside the user-gesture tick (iOS Safari requirement)
+- Tracks served via new `GET /api/music/track/[hash]` route (NOT written to `/public/sfx/music/`; Vercel prod filesystem is read-only outside build)
+- `useAudioPlayer.onEnded` re-registered on `audioPlayer.isPlaying` false→true transition (via `wasPlayingRef`) — NO modification to `useAudioPlayer.ts` (hook stays `{ play, isPlaying, onEnded }`)
+- `<audio>` elements wired via `ctx.createMediaElementSource(audioEl).connect(musicGain).connect(ctx.destination)`
+- Ramp anchoring: `cancelScheduledValues + setValueAtTime(gain.value, now) + linearRampToValueAtTime(target, now + DUCK_FADE_MS/1000)`
+- iOS Safari suspension fallback: `visibilitychange → resume()` with `document.addEventListener('pointerdown', resumeOnce, { once: true })` fallback when resume rejects
+- FSM → TensionLevel derivation is PURE (no new `Session` state)
+- `ClientSession.musicState?` already pre-landed in types.ts — tasks import, never re-declare
+
+§11 open questions (Q8 persistent-listener `useAudioPlayer.onEnded` variant, Q9 150ms-vs-400ms split ramp discussion, plus any others) MUST appear under `## Design questions for Scott` at bottom — do NOT resolve unilaterally.
+
+tasks.md — 10-14 granular tasks, tests-first where feasible. Each task:
+
+- Links to specific requirement numbers via `_Requirements: X.Y, X.Z_`
+- Names exact files (per design.md §10 file layout — `src/lib/music/{tension.ts, prompts.ts, tracks.ts, kvStore.ts}` + co-located `*.test.ts`; `src/hooks/useMusicBed.ts` + test; `src/app/api/music/pregen/route.ts`; `src/app/api/music/track/[hash]/route.ts`)
+- Ordered by dependency: pure lib first (`tension.ts` FSM→level derivation, `prompts.ts` composition prompts, `tracks.ts` URL resolver) → KV blob storage helper (`kvStore.ts`) → `POST /api/music/pregen` route → `GET /api/music/track/[hash]` serve route → `useMusicBed.ts` hook (AudioContext prime + `createMediaElementSource` wiring + anchored ramp + ducking + re-register onEnded on `isPlaying` transition) → integration into `<GameSession>` → graceful-degradation test (I5 path) → final full-suite vitest
+- Checkpoints every 3-4 tasks for `pnpm vitest run`
+- Optional-but-skippable tasks marked with `*` (truly-nice-to-haves only)
+- ElevenLabs SDK install MUST land in the scaffold task: add `@elevenlabs/elevenlabs-js` dep; env var `ELEVENLABS_API_KEY` is already present
+- Do NOT modify `src/hooks/useAudioPlayer.ts` (hook stays `{ play, isPlaying, onEnded }` per orchestrator lock)
+- Do NOT write to `/public/sfx/music/` (Vercel prod filesystem read-only outside build — use the KV-backed `/api/music/track/[hash]` route instead)
+
+Do NOT write implementation code. Do NOT modify design.md. If design.md seems wrong or contradictory, flag at bottom of requirements.md under `## Design questions for Claude Code`.
+
+Output both files in `.kiro/specs/tension-music-system/`.
 ```
 
 ---

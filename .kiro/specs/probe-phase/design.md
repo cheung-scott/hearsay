@@ -600,66 +600,52 @@ This shape is locked. Any deviation from this shape must be escalated to the orc
 
 ---
 
-## 12. Seed prompt for Kiro (paste-ready)
+## 12. Seed prompt for Kiro (canonical form, paste-ready)
 
-Per `reference_kiro_spec_workflow.md` template. Paste into Kiro Spec mode to generate `requirements.md` + `tasks.md`:
+Per `reference_kiro_spec_workflow.md` canonical template. Paste into Kiro Spec mode to generate `requirements.md` + `tasks.md`.
 
 ```
-Generate requirements.md and tasks.md for the probe-phase spec based on the
-attached design.md.
+Generate requirements.md and tasks.md for the `probe-phase` spec.
 
-Context:
-- Hackathon project "Hearsay" — voice-bluffing card game, ElevenHacks Week 4
-  (AWS Kiro partner week, deadline Apr 23 2026).
-- Probe-phase implements the Stage Whisper joker mechanic: a filtered peek at
-  the AI's internal LLM reasoning mid-round.
-- Parallel-drafted alongside the joker-system spec; ProbeRequest interface at
-  design.md §4 + §7.2 is LOCKED per orchestrator reconciliation 2026-04-19.
-  Flag the integration wiring step explicitly in tasks.md as "Task 0 — Integration wiring (confirm joker-system emits locked ProbeRequest shape)".
-- Dependencies: game-engine (FSM + types — this spec adds 0 new Round.status
-  values, 1 new Round field (`activeProbe?: ActiveProbe`), 1 new ClientRound
-  field (`currentProbe?: RevealedProbe`), 2 owned events (`ProbeStart`,
-  `ProbeExpired`), and 1 consumed event (`ProbeComplete`, owned by joker-system
-  per §7.1.1)), ai-opponent (consumes llmReasoning + proposes heuristicLayer
-  addition — see design.md §7.3), ui-gameplay (phase-gate addition, component
-  hooked up in joker-system UI slice on Day 5).
+Canonical sources already in repo:
 
-Requirements generation instructions:
-- Every requirement traceable back to an invariant (I1-I12) in design.md §9
-  or a data-model rule in §4-§5.
-- Group by theme: (a) FSM integration, (b) filter information-security,
-  (c) lifecycle + timing, (d) error handling, (e) cross-spec integration.
-- Include a `## Design questions for Scott` section listing §11 Q1-Q7 verbatim
-  as OPEN items.
-- Testable invariants section cross-references design.md §9 verbatim (I1-I12).
+- `.kiro/specs/probe-phase/design.md` — authoritative Stage Whisper mechanic, ProbeRequest LOCKED contract, 3-lane reasoning filter, 12 Vitest invariants (do NOT modify)
+- `.kiro/specs/joker-system/design.md` §4 + §7.2 — ProbeRequest shape LOCKED byte-for-byte with this spec (orchestrator reconciliation 2026-04-19); `ProbeComplete` event OWNED by joker-system and CONSUMED here
+- `.kiro/specs/ai-opponent/design.md` §2 — `AiDecision.llmReasoning?: string` is populated ONLY on LLM-success path (undefined on fallback paths); §11 Q6 proposes the optional `heuristicLayer` extension this spec requests
+- `.kiro/specs/game-engine/design.md` §1.1 — probe is a PSEUDO-state (not persisted); §2 type contracts
+- `.kiro/specs/ui-gameplay/design.md` §3.3 — phase-gate extension (`probe-reveal` kebab-case); overlay component owned by ui-gameplay Day-5
+- `.kiro/steering/llm-prompt-conventions.md` — filter must NEVER mutate the LLM prompt (pure post-hoc transformation of stored `llmReasoning`)
+- `.kiro/steering/product.md` — "Session-Jokers" Stage Whisper one-liner
+- `.kiro/steering/structure.md` / tech.md — file paths + stack conventions
+- Pre-land commit `29f6a34` on main adds to `src/lib/game/types.ts`: `Round.activeProbe?: ActiveProbe` (10-field LOCKED shape incl. `rawLlmReasoning`), `ClientRound.currentProbe?: RevealedProbe` (5-field client projection), `ProbeFilterSource = 'llm-heuristic-layer' | 'regex-scrub' | 'fallback-static'`, plus `GameEvent` variants `ProbeStart { probe, now }`, `ProbeExpired { whisperId, now }` (owned here) + `ProbeComplete` (consumed, owned by joker-system). Also pre-landed: stub reducer case-branches throwing "pending probe-phase worktree"; runtime strip of `activeProbe` from `toClientRound` in `toClientView.ts`. Tasks MUST import/extend, NOT re-declare.
 
-Tasks generation instructions:
-- Task 0: Reconciliation (blocking) — confirm ProbeRequest shape with
-  joker-system spec; confirm ai-opponent Q6 addition (heuristicLayer);
-  escalate any mismatch to Scott BEFORE any code lands.
-- Task 1: types.ts (all 6 exported types from §4).
-- Task 2: filter.ts (three lanes from §5 + invariants I1-I7).
-- Task 3: reveal.ts (buildActiveProbe helper + phase helpers).
-- Task 4: game-engine additive fields (coordinate with game-engine owner —
-  0 new status enum values, 1 round field (`activeProbe?: ActiveProbe`),
-  1 clientRound field (`currentProbe?: RevealedProbe`), 2 owned GameEvent
-  cases (`ProbeStart`, `ProbeExpired`) + reducer dispatch; `ProbeComplete`
-  case owned by joker-system).
-- Task 5: toClientView additions (project activeProbe → currentProbe).
-- Task 6: API route src/app/api/game/probe/route.ts.
-- Task 7: tests (invariants I8-I12 integration + I10 api).
-- Target: 7 tasks + 12 tests ≈ 1.5 implementation sessions (Sonnet 4.6
-  impl + Opus 4.7 review).
+requirements.md — EARS format. Derive acceptance criteria from design.md §3 (architecture + new API route justification), §4 (data model), §5 (reasoning filter — 3 lanes + information-security rules), §6 (lifecycle + timing), §7 (integration points), §8 (error handling), §9 (invariants I1-I12). Aim ~18-25 criteria. Every design.md invariant (I1-I12) must map to at least one numbered requirement. Locked items that must NOT appear as pending:
 
-Style: match the ai-opponent tasks.md tone — imperative verbs, one
-deliverable per task, test-first phrasing.
+- **Probe is a pseudo-state** per game-engine §1.1 — NO `Round.status: 'probing'` value; phase-gate derivation is `round.activeProbe !== undefined` (kebab-case phase name `'probe-reveal'`)
+- **`Round.activeProbe?: ActiveProbe`** is the ONLY persisted addition (pre-landed)
+- **ProbeRequest shape LOCKED**: `{ whisperId, targetAiId: 'ai', roundIdx, triggeredAtTurn, now, mathProb? }` — byte-for-byte aligned with joker-system §7.2
+- **`ProbeComplete` is OWNED by joker-system** (§7.1.1); probe-phase only CONSUMES it in the reveal-completion reducer slice. Probe-phase OWNS `ProbeStart` + `ProbeExpired`.
+- **Filter invariants**: output is non-empty, ≤120 chars, scrubbed of digits (`[0-9%]`) and canonical persona literals (`Novice|Reader|Misdirector|Silent`) across ALL 3 lanes (including the heuristic-layer lane)
+- **`rawLlmReasoning` NEVER crosses the wire** — `toClientView` runtime-strips it before projecting `Round.activeProbe → ClientRound.currentProbe` (pre-landed strip already in place)
+- **Filter is pure** — no I/O, no `Math.random()`, no `Date.now()`; all time + randomness injected via events (game-engine §3.2)
+- **NO mutation of the AI's LLM prompt** — filter runs post-hoc on stored `llmReasoning`, never during LLM call
+- **Fallback path** (`llmReasoning === undefined` on AI deterministic-fallback branches) degrades to `fallback-static` lane cleanly
 
-Honor these architectural constraints:
-- Additive only. No existing FSM event changes semantics.
-- Filter is pure; no I/O; no Math.random; no Date.now.
-- All randomness + time injected via events (matching game-engine §3.2).
-- rawLlmReasoning NEVER crosses the wire — toClientView must strip.
-- Filter must emit non-empty, ≤120 chars, no digits, no persona names.
+§11 open questions Q1-Q4, Q7 (architectural) + Q5 (joker-system reconciliation — RESOLVED 2026-04-19, annotate as such) + Q6 (ai-opponent `heuristicLayer` extension — STILL PENDING) + Q8 (display-name table future addition) MUST appear under `## Design questions for Scott` at bottom — do NOT resolve unilaterally, but annotate Q5 as RESOLVED.
+
+tasks.md — 10-14 granular tasks, tests-first where feasible. Each task:
+
+- Links to specific requirement numbers via `_Requirements: X.Y, X.Z_`
+- Names exact files (per design.md §10 file layout — `src/lib/probe/{types.ts (extend pre-landed), filter.ts, filter.test.ts, reveal.ts, reveal.test.ts}` + `src/app/api/game/probe/route.ts` + `src/app/api/game/probe/route.test.ts`; reducer additions land INLINE in `src/lib/game/fsm.ts`)
+- Ordered by dependency: **Task 0 Reconciliation (blocking)** — confirm ProbeRequest shape matches joker-system §7.2 (pre-landed byte-aligned; annotate), confirm ai-opponent §11 Q6 `heuristicLayer` status, escalate any mismatch to Scott → `probe/types.ts` (extend pre-landed `ActiveProbe` / `RevealedProbe` usage, add `ProbeRequest` + `ProbeResponse` + `ProbeFilter` signature types) → `filter.ts` (3 lanes: llm-heuristic-layer → regex-scrub → fallback-static; all 7 information-security invariants) + test → `reveal.ts` (`buildActiveProbe` helper + phase helpers) + test → `fsm.ts` reducer additions (`ProbeStart` sets `activeProbe`; `ProbeComplete` + `ProbeExpired` clear `activeProbe`; NO `round.status` mutation anywhere) → extend `toClientView.ts` (populate `ClientRound.currentProbe` from filtered `Round.activeProbe`; verify `rawLlmReasoning` strip already works) → `POST /api/game/probe` route + test → integration + full-suite vitest
+- Checkpoints every 3-4 tasks for `pnpm vitest run`
+- Optional-but-skippable tasks marked with `*` (truly-nice-to-haves only)
+- Do NOT modify `src/lib/game/types.ts` field declarations — they're pre-landed in commit `29f6a34`; this spec populates them at runtime
+- Do NOT touch `src/lib/ai/` unless Q6 `heuristicLayer` extension is approved (escalate first)
+
+Do NOT write implementation code. Do NOT modify design.md. If design.md seems wrong or contradictory, flag at bottom of requirements.md under `## Design questions for Claude Code`.
+
+Output both files in `.kiro/specs/probe-phase/`.
 ```
 
 ---

@@ -791,53 +791,54 @@ src/lib/jokers/
 
 ---
 
-## 12. Seed prompt for Kiro (paste-ready, per `reference_kiro_spec_workflow.md`)
+## 12. Seed prompt for Kiro (canonical form, paste-ready)
+
+Per `reference_kiro_spec_workflow.md` canonical template. Paste into Kiro Spec mode to generate `requirements.md` + `tasks.md`.
 
 ```
-You are Kiro in Spec mode. Read .kiro/specs/joker-system/design.md in full.
-Generate requirements.md and tasks.md for the joker-system feature.
+Generate requirements.md and tasks.md for the `joker-system` spec.
 
-Context:
-- Cross-cutting spec — extends game-engine FSM (new events: JokerOffered,
-  JokerOfferEmpty, UseJoker, ProbeComplete); extends Session/Round/Player
-  types; extends toClientView projection. Produces ProbeRequest handoff
-  consumed by probe-phase spec.
-- 5 jokers total: Poker Face, Stage Whisper, Earful, Cold Read, Second Wind.
-  Full catalog in design.md §5.
-- Tests: 12-13 invariants enumerated in §9. Every invariant must map to
-  exactly one task.
-- File layout: design.md §10 final — 7 files under src/lib/jokers/ plus
-  reducer additions in src/lib/game/fsm.ts (inlined, not separate module).
-- Integration: §7.1 is the load-bearing section — every shared-state
-  addition listed there becomes a requirement with a test. §7.2/7.3/7.4 are
-  cross-spec interfaces — each becomes an integration requirement.
-- Open questions in §11 are NOT requirements — surface them under a
-  "## Design questions for Scott" section at the end of requirements.md.
+Canonical sources already in repo:
 
-Task sizing:
-- Day-5 slice: catalog + types + lifecycle + draw-pile mechanics + Cold Read
-  + Poker Face + Second Wind (simplest 3 effects, no LLM plumbing).
-- Day-5 follow-up: Earful (requires ClientSession.autopsy + Claim.voicePreset +
-  VoiceTellPreset type from voice-tell-taxonomy) + Stage Whisper (requires
-  ProbeRequest handoff — depends on probe-phase spec being drafted).
-- Each task should be 1-3 hours for a Sonnet 4.6 implementation subagent;
-  any task >3h should be split.
+- `.kiro/specs/joker-system/design.md` — authoritative architecture, 5-joker catalog, cross-spec handoff contracts, 12-13 Vitest invariants (do NOT modify)
+- `.kiro/specs/game-engine/design.md` §1-3 — FSM contract this spec extends additively (new events: JokerOffered, JokerOfferEmpty, UseJoker; ProbeComplete owned here, consumed by probe-phase)
+- `.kiro/specs/ai-opponent/design.md` §2 (DecisionContext read by Cold Read / Poker Face) + §11 (locked — persona tables, prompt templates, fallback branches stay untouched)
+- `.kiro/specs/ui-gameplay/design.md` §3.3 (phase-gate extension for `joker_offer` phase) + §10.2 (Cold Read gates lie-score HUD, LOCKED 2026-04-19)
+- `.kiro/specs/probe-phase/design.md` §4 + §7.2 — ProbeRequest LOCKED byte-for-byte with this spec (orchestrator reconciliation 2026-04-19); Stage Whisper in-flight state delegates to probe-phase's `Round.activeProbe` (NOT `pendingJokerActivation`)
+- `.kiro/specs/voice-tell-taxonomy/design.md` — `VoiceTellPreset` type consumed for Earful autopsy
+- `.kiro/steering/product.md` — source-of-truth for joker one-liners ("Session-Jokers (5 in MVP)")
+- `.kiro/steering/structure.md` / tech.md — `src/lib/jokers/` subtree path convention + stack
+- Pre-land commit `29f6a34` on main adds to `src/lib/game/types.ts`: `Session.jokerDrawPile?`, `Session.discardedJokers?`, `Session.currentOffer?`, `Session.autopsy?`, `Round.jokerTriggeredThisRound?`, `Round.pendingJokerActivation?`, `PlayerState.jokerSlots?`, `Claim.voicePreset?`, `ClientSession.autopsy?`, plus `GameEvent` variants `JokerOffered { offered, newDrawPile, now }`, `JokerOfferEmpty { nextRoundDeal, now }`, `UseJoker { joker, by, now }`, `ProbeComplete { whisperId, now }`. Also pre-landed: `src/lib/jokers/types.ts` with `JokerSlot` + `JokerOffer`; stub reducer case-branches throwing "pending joker-system worktree"; projection gates in `toClientView.ts`. Tasks MUST import/extend, NOT re-declare.
 
-Execution order:
-1. types.ts + catalog.ts (foundation, no deps)
-2. Extend src/lib/game/types.ts (new fields, new event union entries)
-3. lifecycle.ts + lifecycle.test.ts (pure, no FSM coupling)
-4. Extend src/lib/game/fsm.ts with JokerOffered, JokerOfferEmpty, UseJoker
-   handlers; extend applyJokerEffect signature
-5. effects.ts (Cold Read, Poker Face, Second Wind first)
-6. Extend src/lib/game/toClientView.ts projection
-7. effects.ts (Earful autopsy — blocks on Claim.voicePreset + VoiceTellPreset type from voice-tell-taxonomy)
-8. effects.ts (Stage Whisper — blocks on probe-phase spec)
-9. Final: ProbeComplete handler
+requirements.md — EARS format. Derive acceptance criteria from design.md §3 (architecture), §4 (data model), §5 (5-joker catalog), §6 (lifecycle + offer mechanics), §7 (integration points — §7.1 is load-bearing), §8 (error handling), §9 (invariants I1-I13). Aim ~28-35 criteria. Every design.md invariant (I1-I13) must map to at least one numbered requirement. Locked items that must NOT appear as pending:
 
-Do not modify existing .kiro/specs/**/design.md files. Do not write source
-code — only requirements.md + tasks.md. Flag any ambiguity in requirements.md
-under "## Design questions for Scott".
+- 5 jokers locked: Poker Face, Stage Whisper, Earful, Cold Read, Second Wind
+- **Earful = preset-reveal** via `ClientSession.autopsy` on `ChallengeWon` (Option A orchestrator lock 2026-04-19, per product.md) — NOT TTS-padding; NO `PromptModifier` / `EXTENDED_TEMPLATES` / `OwnPlayContext.promptModifiers` anywhere
+- **Second Wind = AUTO-CONSUMES** on a would-strike event; NO `UseJoker({ joker: 'second_wind' })` path, NO `strike_pending` Round.status value
+- **Poker Face** `next_claim` expiry fires on `ChallengeCalled` OR `ClaimAccepted` (POST-AI-judgment), NOT on `ClaimMade` — guarantees AI reads `DecisionContext` before the mask lifts
+- **Cold Read** gates the lie-score HUD in ui-gameplay (ui-gameplay §10.2 LOCK, not default-on)
+- **ProbeRequest shape LOCKED**: `{ whisperId, targetAiId: 'ai', roundIdx, triggeredAtTurn, now, mathProb? }` — byte-for-byte aligned with probe-phase §4
+- **Probe is a pseudo-state** per game-engine §1.1 — NO `Round.status: 'probing'` anywhere; Stage Whisper delegates in-flight state to probe-phase's `Round.activeProbe`
+- **Joker offer = uniform-without-replacement over DISTINCT TYPES** still present in pile — never two of the same joker type in one offer (dedup-by-type BEFORE sampling)
+- **discardedJokers projection** gated on `Session.status !== 'round_active'` (only visible post-round)
+- **SetupComplete.initialJokerDrawPile** is OPTIONAL (pre-landed); reducer default-seeds via `seedDrawPile()` helper when absent
+- **Pile composition**: 5 types × 3 copies = 15 jokers (v1)
+
+§11 open questions Q11 (autopsy overlay visual treatment — ui-gameplay Day-5 owns) and Q12 (Second Wind agency post-hackathon option) MUST appear under `## Design questions for Scott` at bottom — do NOT resolve unilaterally. Any other §11 items stay there too.
+
+tasks.md — 14-18 granular tasks, tests-first where feasible. Each task:
+
+- Links to specific requirement numbers via `_Requirements: X.Y, X.Z_`
+- Names exact files (per design.md §10 REVISED file layout — `src/lib/jokers/{types.ts (extend pre-landed), catalog.ts, catalog.test.ts, effects.ts, effects.test.ts, lifecycle.ts, lifecycle.test.ts}` = 4 source + 3 test = 7 files; reducer additions land INLINE in `src/lib/game/fsm.ts`, NOT as a separate module)
+- Ordered by dependency: `catalog.ts` + extended `jokers/types.ts` → `lifecycle.ts` (pure, no FSM coupling) + test → `fsm.ts` reducer additions (JokerOffered, JokerOfferEmpty, UseJoker, ProbeComplete handlers + applyJokerEffect signature extension + JokerPicked post-conditions [push to jokerSlots, push unpicked to discardedJokers, clear currentOffer] + Second Wind auto-consume edge in RevealComplete) → `effects.ts` simplest-3 first (Cold Read, Poker Face, Second Wind — no LLM plumbing) + test → extend `toClientView.ts` projections (gates for autopsy / discardedJokers / currentOffer / jokerSlots beyond pre-land baseline) → `effects.ts` Earful autopsy (blocks on voice-tell-taxonomy's `VoiceTellPreset` narrowing) → `effects.ts` Stage Whisper (blocks on probe-phase spec's `produceProbeRequest` helper) → integration + full-suite vitest
+- Checkpoints every 3-4 tasks for `pnpm vitest run`
+- Optional-but-skippable tasks marked with `*` (truly-nice-to-haves only)
+- Cross-spec coordination tasks (Earful needs voice-tell-taxonomy preset narrowing; Stage Whisper needs probe-phase `produceProbeRequest`) MUST be flagged BLOCKING in task description — escalate to Scott if the dependency spec isn't merged yet
+- Do NOT modify `src/lib/game/types.ts` field declarations — they're pre-landed in commit `29f6a34`; this spec populates them at runtime
+
+Do NOT write implementation code. Do NOT modify design.md. If design.md seems wrong or contradictory, flag at bottom of requirements.md under `## Design questions for Claude Code`.
+
+Output both files in `.kiro/specs/joker-system/`.
 ```
 
 ---

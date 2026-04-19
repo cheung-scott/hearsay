@@ -586,56 +586,49 @@ Flag these in `requirements.md` under `## Design questions for Scott` so they su
 
 ---
 
-## 12. Seed prompt for Kiro (paste-ready)
+## 12. Seed prompt for Kiro (canonical form, paste-ready)
 
-Per `reference_kiro_spec_workflow.md` — paste this into Kiro Spec mode to generate `requirements.md` + `tasks.md`.
+Per `reference_kiro_spec_workflow.md` canonical template. Paste into Kiro Spec mode to generate `requirements.md` + `tasks.md`.
 
 ```
-You are generating requirements.md + tasks.md for the hearsay game-debug spec.
-The locked design.md is at .kiro/specs/game-debug/design.md — treat it as the
-source of truth. Do NOT re-open architecture decisions.
+Generate requirements.md and tasks.md for the `game-debug` spec.
 
-Context primer (read these first, in order):
-  1. .kiro/specs/game-debug/design.md (this design — authoritative)
-  2. .kiro/specs/game-engine/design.md §§1-3 (FSM events + reducer contract)
-  3. .kiro/specs/ai-opponent/design.md §§2-5 (AiDecision shape)
-  4. .kiro/specs/ui-gameplay/design.md §4.4 (Vercel KV session store)
-  5. .kiro/steering/tech.md (stack conventions — pnpm, Vitest, TS 5.x)
+Canonical sources already in repo:
 
-Generate:
+- `.kiro/specs/game-debug/design.md` — authoritative MCP server architecture, 7-tool catalog, ethical line, Kiro Power packaging contract + 9 Vitest invariants (do NOT modify)
+- `.kiro/specs/game-engine/design.md` — FSM reducer + GameEvent union consumed read-only by `forceTransition` tool
+- `.kiro/specs/ai-opponent/design.md` §§2-5 — AiDecision shape consumed read-only by `inspectAIDecision` tool
+- `.kiro/specs/ui-gameplay/design.md` §4.4 — Vercel KV session store that `listSessions` scans
+- `.kiro/steering/product.md` / structure.md / tech.md — stack conventions (pnpm, Vitest, TS 5.x, Zod 3.x)
+- MCP TypeScript SDK: `@modelcontextprotocol/sdk` — Context7-verified current API is `server.registerTool(name, { title, description, inputSchema, outputSchema? }, handler)` (NOT the legacy `server.tool()` form)
 
-requirements.md
-  - EARS-style requirements for each of the 7 tools in §5 of the design.
-  - Each tool requirement must cite its permission level (safe / dev-only).
-  - Separate section: "Design questions for Scott" enumerating the 7 open
-    questions from §11. Do NOT resolve them — flag only.
-  - Separate section: "Principled debugging line" explicitly listing the
-    forbidden tools from §1.4 / §5.7 so future PR reviewers have a rubric.
+requirements.md — EARS format. Derive acceptance criteria from design.md §4 (schemas + permissions), §5 (7 tool contracts), §6 (transport + lifecycle), §7 (integration points), §8 (error handling), §9 (invariants I1-I9). Aim ~22-28 criteria. Every design.md invariant (I1-I9) must map to at least one numbered requirement. Locked items that must NOT appear as pending:
 
-tasks.md
-  - Day-6 implementation sequence. Each task ≤ 90 min of implementation time.
-  - Order: scaffold package (pnpm init + tsconfig + vitest config)
-       → schemas.ts (Zod input + error + permissions)
-       → fsmEvents.ts (hand-curated GameEvent catalog)
-       → each of the 7 tools as a standalone task with its invariant test(s)
-       → index.ts (transport + registration)
-       → POWER.md + mcp.json + README.md
-       → I5 stdio smoke test (last — requires compiled output)
-       → manual install + smoke-test in Kiro (non-automated acceptance gate)
-  - Reference invariants by ID (I1-I9) from design §9.
-  - Out-of-scope guardrail: every task starts with "read-only toward
-    src/lib/**" — if a task would touch Hearsay source, flag and stop.
+- 7 tools locked: `readGameState`, `listSessions`, `inspectAIDecision`, `forceTransition`, `replayRound`, `listFSMEvents`, `dumpTranscript`
+- MCP SDK API: `server.registerTool(name, config, handler)` — NOT `server.tool()`
+- HTTP transport MUST bind to `127.0.0.1` / `::1` / `localhost` only (throws at startup on non-loopback host; no silent fallback to `0.0.0.0`)
+- `forceTransition` + `inspectAIDecision` gated by `HEARSAY_DEBUG=1` env flag (strict `=== '1'`)
+- Zero modifications to `src/lib/**` — the 5 imported surfaces (fsm, types, toClientView, session/store, ai/types) stay read-only
+- Ethical line (§1.4 / §5.7): NO cheat tools — forbidden list includes `revealActualCardIds`, `setOpponentToAlwaysLose`, `muteLLMSoAiIsDeterministic`, `clientInjectAiDecision`, force-accept, setStrikes, auto-lose
+- `listSessions` bypasses `src/lib/session/store.ts` public surface and imports `kv` directly from `@vercel/kv` for a `kv.keys('hearsay:session:*')` scan
+- Kiro Power packaging convention: `powers/hearsay-debug/` subtree (NEW top-level sibling to `src/`) with `POWER.md` + `mcp.json` + `package.json` + `src/`
 
-Constraints:
-  - Use TypeScript 5.x, Zod 3.x, @modelcontextprotocol/sdk@latest.
-  - Do NOT introduce any dep that the Hearsay app doesn't already use,
-    EXCEPT @modelcontextprotocol/sdk and tsx (for dev).
-  - MIT license; matches the hackathon submission requirement.
-  - Kiro Power convention: POWER.md in repo root; mcp.json if using MCP tools.
-  - No new src/app/api/** endpoints.
+§11 open questions (Q1 POWER.md frontmatter format, Q2-Q7 open items, Q8 steering/structure.md drift from old `.kiro/mcp-servers/` placement) MUST appear under `## Design questions for Scott` at bottom — do NOT resolve unilaterally.
 
-Write both files to .kiro/specs/game-debug/requirements.md and
-.kiro/specs/game-debug/tasks.md.
+tasks.md — 12-16 granular tasks, tests-first where feasible. Each task:
+
+- Links to specific requirement numbers via `_Requirements: X.Y, X.Z_`
+- Names exact files (per design.md §10 file layout — `powers/hearsay-debug/{src/index.ts, src/schemas.ts, src/fsmEvents.ts, src/tools/*.ts, POWER.md, mcp.json, package.json, tsconfig.json, vitest.config.ts}` + co-located `*.test.ts`)
+- Ordered by dependency: scaffold package (pnpm init + tsconfig + vitest config) → `schemas.ts` (Zod input + error + permissions) → `fsmEvents.ts` (hand-curated GameEvent catalog) → each of the 7 tools as a standalone task with its invariant test(s) → `index.ts` (stdio transport + `registerTool` registration) → `POWER.md` + `mcp.json` + `README.md` → I5 stdio smoke test (last — requires compiled output) → manual install + smoke-test in Kiro (non-automated acceptance gate)
+- Checkpoints every 3-4 tasks for `pnpm vitest run`
+- Optional-but-skippable tasks marked with `*` (truly-nice-to-haves only)
+- Every task MUST state "read-only toward `src/lib/**`" — if a task would touch Hearsay source, flag and stop
+- Do NOT introduce any dep that the Hearsay app doesn't already use, EXCEPT `@modelcontextprotocol/sdk` + `tsx` (dev)
+- MIT license; matches hackathon submission requirement
+
+Do NOT write implementation code. Do NOT modify design.md. If design.md seems wrong or contradictory, flag at bottom of requirements.md under `## Design questions for Claude Code`.
+
+Output both files in `.kiro/specs/game-debug/`.
 ```
 
 ---
