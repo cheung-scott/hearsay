@@ -44,65 +44,64 @@ Phase 1 only — no jokers UI, no probe phase, no elimination beat, no tension m
 - [x] 4. Checkpoint: run all tests (383/383 passing across 15 test files)
   - Run `pnpm vitest --run`. Verify `displayNames.test.ts` and `useGameSession.test.ts` pass. Fix any failures before proceeding.
 
-- [ ] 5. Presentational components — Scene layer
-  - [ ] 5.1 Create `src/components/game/Scene/OverlayEffects.tsx` — CRT scanlines (~13% opacity `repeating-linear-gradient`) + vignette (radial gradient). Top of z-stack.
+- [x] 5. Presentational components — Scene layer
+  - [x] 5.1 Create `src/components/game/Scene/OverlayEffects.tsx` — CRT scanlines (~13% opacity `repeating-linear-gradient`) + vignette (radial gradient). Top of z-stack.
     _Requirements: 16.1, 16.2_
 
-  - [ ] 5.2 Create `src/components/game/Scene/Room.tsx` — wall + paneling + hanging bulb backdrop. Uses `.room` class from variant-d.
+  - [x] 5.2 Create `src/components/game/Scene/Room.tsx` — wall + paneling + hanging bulb backdrop. Uses `.room` class from variant-d.
     _Requirements: 17.1_
 
-  - [ ] 5.3 Create `src/components/game/Scene/RoundTable.tsx` — ellipse with `rotateX(58deg)`. Uses `.table-wrap` / `.round-table` classes.
+  - [x] 5.3 Create `src/components/game/Scene/RoundTable.tsx` — ellipse with `rotateX(58deg)`. Uses `.table-wrap` / `.round-table` classes.
     _Requirements: 17.1_
 
-  - [ ] 5.4 Create `src/components/game/Scene/Opponent.tsx`, `Silhouette.tsx`, `OpponentHand.tsx` — silhouette with `breathe` + `blink` animations, opponent hand rendering `handSize` card-backs. Uses `.opponent-area`, `.silhouette-block`, `.silhouette`, `.eyes`, `.eye`, `.opponent-hand`, `.opp-card` classes. Includes `.opponent-label` with persona display name (phase 1: separate label, not merged into TopBar per §10.5 pending).
+  - [x] 5.4 Create `src/components/game/Scene/Opponent.tsx`, `Silhouette.tsx`, `OpponentHand.tsx` — silhouette with `breathe` + `blink` animations, opponent hand rendering `handSize` card-backs. Uses `.opponent-area`, `.silhouette-block`, `.silhouette`, `.eyes`, `.eye`, `.opponent-hand`, `.opp-card` classes. Includes `.opponent-label` with persona display name (phase 1: separate label, not merged into TopBar per §10.5 pending).
     _Requirements: 17.1_
 
-  - [ ] 5.5 Create `src/components/game/Scene/ClaimBubble.tsx` — typewriter text display with `char-pop` animation per character, `blink-cursor`, and `dot-pulse` speech-trail dots. Visible during `playing-ai-audio` and `awaiting-player-response` phases. Uses `.claim-bubble`, `.cursor`, `.speech-trail` classes.
+  - [x] 5.5 Create `src/components/game/Scene/ClaimBubble.tsx` — typewriter text display with `char-pop` animation per character, `blink-cursor`, and `dot-pulse` speech-trail dots. Visible during `playing-ai-audio` and `awaiting-player-response` phases. Uses `.claim-bubble`, `.cursor`, `.speech-trail` classes.
     _Requirements: 17.2_
 
-  - [ ] 5.6 Create `src/components/game/Scene/Pile.tsx` — tilted pile cards + `PILE · N` label from `round.pileSize`. Uses `.pile-area`, `.pile-cards-tilted`, `.pile-card`, `.pile-label` classes.
+  - [x] 5.6 Create `src/components/game/Scene/Pile.tsx` — tilted pile cards + `PILE · N` label from `round.pileSize`. Uses `.pile-area`, `.pile-cards-tilted`, `.pile-card`, `.pile-label` classes.
     _Requirements: 17.3_
 
-  - [ ] 5.7 Create `src/components/game/Scene/Scene.tsx` — perspective container composing `<Room/>`, `<RoundTable/>`, `<Opponent/>`, `<ClaimBubble/>`, `<Pile/>`.
+  - [x] 5.7 Create `src/components/game/Scene/Scene.tsx` — perspective container composing `<Room/>`, `<RoundTable/>`, `<Opponent/>`, `<ClaimBubble/>`, `<Pile/>`.
     _Requirements: 2.1_
 
-- [ ] 6. Presentational components — HUD layer
-  - [ ] 6.1 Create `src/components/game/Hud/TargetTag.tsx` — displays `CALL · {rank}` using `font-display`. Uses `.target-tag` class.
+- [x] 6. Presentational components — HUD layer
+  - [x] 6.1 Create `src/components/game/Hud/TargetTag.tsx` — displays `CALL · {rank}` using `font-display`. Uses `.target-tag` class.
     _Requirements: 18.1_
 
-  - [ ] 6.2 Create `src/components/game/Hud/RoundPill.tsx` — displays `ROUND N · BEST OF 3`. Uses `.round-pill` class.
+  - [x] 6.2 Create `src/components/game/Hud/RoundPill.tsx` — displays `ROUND N · BEST OF 3`. Uses `.round-pill` class.
     _Requirements: 18.2_
 
-  - [ ] 6.3 Create `src/components/game/Hud/StrikeCounter.tsx` — 3 Balatro-style blocks; lit blocks get `.strike.lit` class with `flicker` animation. Uses `.strikes`, `.strike`, `.strikes-label` classes.
+  - [x] 6.3 Create `src/components/game/Hud/StrikeCounter.tsx` — 3 Balatro-style blocks; lit blocks get `.strike.lit` class with `flicker` animation. Uses `.strikes`, `.strike`, `.strikes-label` classes.
     _Requirements: 18.3_
 
-  - [ ] 6.4 Create `src/components/game/Hud/RoundsWonGavels.tsx` — 3 mini-gavel slots: empty (not played) / gold-filled (won) / red-X (lost). Reads `self.roundsWon` and `opponent.roundsWon` from ClientSession.
+  - [x] 6.4 Create `src/components/game/Hud/RoundsWonGavels.tsx` — 3 mini-gavel slots: empty (not played) / gold-filled (won) / red-X (lost). Reads `self.roundsWon` and `opponent.roundsWon` from ClientSession.
     _Requirements: 18.4_
 
-  - [ ] 6.5 Create `src/components/game/Hud/TopBar.tsx` — layout container composing `<TargetTag/>`, `<RoundPill/>`, `<StrikeCounter/>`, `<RoundsWonGavels/>`. z-index: 20.
+  - [x] 6.5 Create `src/components/game/Hud/TopBar.tsx` — layout container composing `<TargetTag/>`, `<RoundPill/>`, `<StrikeCounter/>`, `<RoundsWonGavels/>`. z-index: 20.
     _Requirements: 2.1, 18.1, 18.2, 18.3, 18.4_
 
-- [ ] 7. Presentational components — PlayerControls layer
-  - [ ] 7.1 Create `src/components/game/PlayerControls/Card.tsx` — shared card component for face-up player cards and face-down pile/opponent variants. Renders rank in top-left, center, bottom-right (`.card-rank-tl`, `.card-rank-mid`, `.card-rank-br`). Selection state via amber border glow. Hover lift via 0.2s ease `translateY(-18px)`.
+- [x] 7. Presentational components — PlayerControls layer
+  - [x] 7.1 Create `src/components/game/PlayerControls/Card.tsx` — shared card component for face-up player cards and face-down pile/opponent variants. Renders rank in top-left, center, bottom-right (`.card-rank-tl`, `.card-rank-mid`, `.card-rank-br`). Selection state via amber border glow. Hover lift via 0.2s ease `translateY(-18px)`.
     _Requirements: 19.1_
 
-  - [ ] 7.2 Create `src/components/game/PlayerControls/PlayerHand.tsx` — renders up to 5 `<Card/>` components from `self.hand`. Passes selection state from `useCardSelection`. Uses `.your-hand` class.
+  - [x] 7.2 Create `src/components/game/PlayerControls/PlayerHand.tsx` — renders up to 5 `<Card/>` components from `self.hand`. Passes selection state from `useCardSelection`. Uses `.your-hand` class.
     _Requirements: 19.1_
 
-  - [ ] 7.3 Create `src/components/game/PlayerControls/Waveform.tsx` — canvas renderer for live mic waveform data from `useHoldToSpeak`.
+  - [x] 7.3 Create `src/components/game/PlayerControls/Waveform.tsx` — canvas renderer for live mic waveform data from `useHoldToSpeak`.
     _Requirements: 19.2_
 
-  - [ ] 7.4 Create `src/components/game/PlayerControls/HoldToSpeak.tsx` — button with mic pulse indicator + `<Waveform/>` canvas. Wires to `useHoldToSpeak` hook. Active only during `recording` phase.
+  - [x] 7.4 Create `src/components/game/PlayerControls/HoldToSpeak.tsx` — button with mic pulse indicator + `<Waveform/>` canvas. Wires to `useHoldToSpeak` hook. Active only during `recording` phase.
     _Requirements: 19.2_
 
-  - [ ] 7.5 Create `src/components/game/PlayerControls/AcceptLiarButtons.tsx` — `Accept` and `Liar!` buttons. Visible ONLY during `awaiting-player-response` phase. Uses `.actions`, `.btn`, `.btn-challenge` classes. Phase 1 default: `bottom: 8%` per §10.4.
+  - [x] 7.5 Create `src/components/game/PlayerControls/AcceptLiarButtons.tsx` — `Accept` and `Liar!` buttons. Visible ONLY during `awaiting-player-response` phase. Uses `.actions`, `.btn`, `.btn-challenge` classes. Phase 1 default: `bottom: 8%` per §10.4.
     _Requirements: 19.3_
 
-  - [ ] 7.6 Create `src/components/game/PlayerControls/PlayerControls.tsx` — layout container composing `<PlayerHand/>`, `<HoldToSpeak/>`, `<AcceptLiarButtons/>`. z-index: 30.
+  - [x] 7.6 Create `src/components/game/PlayerControls/PlayerControls.tsx` — layout container composing `<PlayerHand/>`, `<HoldToSpeak/>`, `<AcceptLiarButtons/>`. z-index: 30.
     _Requirements: 2.1_
 
-- [ ] 8. Checkpoint: run all tests + verify component imports compile
-  - Run `pnpm vitest --run`. Verify all existing tests still pass. Run `pnpm tsc --noEmit` to catch any import/type errors in new components.
+- [x] 8. Checkpoint: run all tests + verify component imports compile (383/383 tests passing, tsc clean, 20 component files created)
 
 - [ ] 9. GameSession root component + smoke test
   - [ ] 9.1 Create `src/components/game/GameSession.tsx` — `"use client"` root component. Composes `<OverlayEffects/>`, `<Scene>`, `<TopBar>`, `<PlayerControls>`. Owns state via `useGameSession()`. Passes phase-derived props to children for visibility gating. Renders "Start" CTA in `idle`, "NEW TRIAL" button in `session-over`. Does NOT import FSM `reduce()` directly.
