@@ -1076,6 +1076,20 @@ function makeJokerOfferSession({
   playerTakenCards = [] as Card[],
   aiTakenCards = [] as Card[],
   roundPile = [] as Card[],
+  /**
+   * Day-5 joker-system — `currentOffer` is required by the new `JokerPicked`
+   * validation (throws `no_current_offer` otherwise). Default offer contains
+   * all 5 joker types so any joker the test picks is always a valid choice.
+   * Tests that specifically assert the `joker_not_offered` path should
+   * override this with a restricted subset.
+   */
+  offered = [
+    'poker_face',
+    'stage_whisper',
+    'earful',
+    'cold_read',
+    'second_wind',
+  ] as import('./types').JokerType[],
 } = {}): Session {
   const round = makeRound({
     roundNumber: 1,
@@ -1099,6 +1113,7 @@ function makeJokerOfferSession({
       jokers: aiJokers,
       takenCards: aiTakenCards,
     }),
+    currentOffer: { offered, offeredToWinner: roundWinner },
   });
 }
 
@@ -1930,6 +1945,23 @@ describe('Integration: 2-round session walkthrough', () => {
     expect(s13.status).toBe('joker_offer');
     expect(s13.player.roundsWon).toBe(1);
 
+    // ----- JokerOffered → currentOffer set, pile updated -----
+    // Day-5 joker-system: JokerPicked now requires a prior JokerOffered to
+    // establish currentOffer. Caller picks 3 uniformly-without-replacement.
+    const s13a = reduce(s13, {
+      type: 'JokerOffered',
+      offered: ['poker_face', 'stage_whisper', 'earful'],
+      newDrawPile: (s13.jokerDrawPile ?? []).filter(
+        (j) => !['poker_face', 'stage_whisper', 'earful'].includes(j),
+      ),
+      now: 12500,
+    });
+    expect(s13a.currentOffer?.offered).toEqual([
+      'poker_face',
+      'stage_whisper',
+      'earful',
+    ]);
+
     // Round 2 deal: caller reshuffles all 20 cards (aces + jacks now in play)
     // Player gets aces, AI gets jacks, deck gets queens+kings
     const round2DealClean = {
@@ -1940,7 +1972,7 @@ describe('Integration: 2-round session walkthrough', () => {
       activePlayer: 'player' as const,
     };
 
-    const s14 = reduce(s13, {
+    const s14 = reduce(s13a, {
       type: 'JokerPicked',
       joker: 'poker_face',
       nextRoundDeal: round2DealClean,
