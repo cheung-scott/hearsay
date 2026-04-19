@@ -8,14 +8,14 @@ Phase 1 only — no jokers UI, no probe phase, no elimination beat, no tension m
 
 ## Tasks
 
-- [ ] 1. CSS theme + persona display names (foundation layer)
-  - [ ] 1.1 Create `src/styles/game-theme.css` with all CSS custom properties from design §6.1 (scene colors, persona accents, shared accents, `--accent: var(--persona-prosecutor)`), Google Fonts imports (`Press Start 2P`, `VT323`), `font-display` / `font-ambient` family definitions, and all §6.4 keyframe animations (`breathe`, `blink`, `char-pop`, `blink-cursor`, `dot-pulse`, `flicker`). Derive all values from `variant-d-across-table.html`.
+- [x] 1. CSS theme + persona display names (foundation layer)
+  - [x] 1.1 Create `src/styles/game-theme.css` with all CSS custom properties from design §6.1 (scene colors, persona accents, shared accents, `--accent: var(--persona-prosecutor)`), Google Fonts imports (`Press Start 2P`, `VT323`), `font-display` / `font-ambient` family definitions, and all §6.4 keyframe animations (`breathe`, `blink`, `char-pop`, `blink-cursor`, `dot-pulse`, `flicker`). Derive all values from `variant-d-across-table.html`.
     _Requirements: 15.1, 15.2, 15.3_
 
-  - [ ] 1.2 Create `src/lib/persona/displayNames.ts` — export `PERSONA_DISPLAY_NAMES: Record<Persona, string>` mapping `Novice → 'The Defendant'`, `Reader → 'The Prosecutor'`, `Misdirector → 'The Attorney'`, `Silent → 'The Judge'`.
+  - [x] 1.2 Create `src/lib/persona/displayNames.ts` — export `PERSONA_DISPLAY_NAMES: Record<Persona, string>` mapping `Novice → 'The Defendant'`, `Reader → 'The Prosecutor'`, `Misdirector → 'The Attorney'`, `Silent → 'The Judge'`.
     _Requirements: 14.1_
 
-  - [ ] 1.3 Create `src/lib/persona/displayNames.test.ts` — assert all four keys present, sorted equals `['Misdirector','Novice','Reader','Silent']`, and each value is a non-empty string.
+  - [x] 1.3 Create `src/lib/persona/displayNames.test.ts` — assert all four keys present, sorted equals `['Misdirector','Novice','Reader','Silent']`, and each value is a non-empty string.
     _Requirements: 14.2_
 
 - [ ] 2. Vercel KV session store

@@ -1,0 +1,84 @@
+/*
+ * Hearsay gameplay theme — codifies DESIGN-DECISIONS.md §§1-8 for the /game route.
+ * Imported by src/app/game/page.tsx (see ui-gameplay task 10.2).
+ * Keyframes are copy-pasted from design-previews/variant-d-across-table.html
+ * (iter-5 locked) — if you change an animation here, update the preview too.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
+:root {
+  /* Scene palette (DESIGN-DECISIONS.md §2 — core) */
+  --wall: #1a100a;
+  --wall-lit: #3a2015;
+  --wood: #3a1f10;
+  --wood-lit: #6b3a1c;
+  --wood-hi: #8f5528;
+  --wood-rim: #1f0e05;
+  --felt: #1e3a2f;
+  --felt-dark: #0d1f17;
+  --felt-far: #081610;
+  --shadow: #050302;
+  --navy: #1a2130;
+  --bone: #f4ecd8;
+  --bone-dim: #c9bfa3;
+
+  /* Persona accents (DESIGN-DECISIONS.md §2 — locked) */
+  --persona-defendant: #55c6fd;
+  --persona-prosecutor: #fda200;
+  --persona-attorney: #d94a84;
+  --persona-judge: #e8e8e8;
+
+  /* Shared accents */
+  --coral: #fd5f55;
+  --blood: #8b1a1a;
+  --amber-hi: #ffc760;
+  --amber-dim: #8b5a0f;
+
+  /*
+   * Convenience alias — phase 1 defaults Reader/Prosecutor as the sole opponent.
+   * When Day-5 ai-personas lands, a parent element will override --accent
+   * to the current persona's accent.
+   */
+  --accent: var(--persona-prosecutor);
+}
+
+@theme inline {
+  --font-display: 'Press Start 2P', monospace;
+  --font-ambient: VT323, monospace;
+}
+
+/*
+ * Keyframes — DESIGN-DECISIONS.md §8 animation catalog.
+ * Durations are applied by individual components via `animation:` declarations,
+ * not here — keeping keyframes pure so timing can be tuned per-usage.
+ */
+
+@keyframes breathe {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50%      { transform: translateX(-50%) translateY(-3px); }
+}
+
+@keyframes blink {
+  0%, 96%, 100% { opacity: 1; }
+  98%           { opacity: 0; }
+}
+
+@keyframes char-pop {
+  from { opacity: 0; transform: translateY(-4px) scale(0.6); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+@keyframes blink-cursor {
+  50% { opacity: 0; }
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 0.2; transform: scale(0.8); }
+  50%      { opacity: 0.8; transform: scale(1.1); }
+}
+
+@keyframes flicker {
+  from { opacity: 0.75; transform: translateX(-50%) scaleY(0.9); }
+  to   { opacity: 1;    transform: translateX(-50%) scaleY(1.1); }
+}
