@@ -55,7 +55,7 @@ Pre-landed in commit `29f6a34`: `src/lib/jokers/types.ts` (JokerSlot, JokerOffer
   - Assert all v1 jokers have `visibleOnActivate: true` and `cost.kind === 'none'`
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 4. Implement lifecycle helpers in `src/lib/jokers/lifecycle.ts`
+- [x] 4. Implement lifecycle helpers in `src/lib/jokers/lifecycle.ts`
   - `seedDrawPile(): JokerType[]` — returns stable ordered array of 15 jokers (3× each type in canonical order: poker_face, stage_whisper, earful, cold_read, second_wind)
   - `pickOffer(drawPile: JokerType[], rng: () => number): { offered: JokerType[], remaining: JokerType[] }` — dedup by type before sampling, offer length = min(3, distinct types remaining), remaining = drawPile minus offered copies
   - `canActivate(joker: JokerType, roundStatus: Round['status'], activePlayer: 'player' | 'ai', by: 'player' | 'ai', jokerTriggeredThisRound: JokerType[]): boolean` — validates trigger window + no-stacking
