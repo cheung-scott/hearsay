@@ -96,7 +96,7 @@ Pre-landed in commit `29f6a34`: `src/lib/jokers/types.ts` (JokerSlot, JokerOffer
 - [ ] 9. Checkpoint — run `pnpm vitest run src/lib/game/fsm.test.ts`
   - Ensure existing game-engine tests still pass after reducer additions (no regressions)
 
-- [ ] 10. Implement simplest-3 effects in `src/lib/jokers/effects.ts` — Cold Read, Poker Face, Second Wind
+- [x] 10. Implement simplest-3 effects in `src/lib/jokers/effects.ts` — Cold Read, Poker Face, Second Wind
   - `applyPokerFace(lieScore: number): number` — returns exactly `0.5` (deterministic override, ignores input). The API route layer calls this to mutate `DecisionContext.claim.voiceMeta.lieScore` before passing to `aiDecideOnClaim`.
   - `applyColdRead(round: Round): boolean` — returns `true` if `cold_read` is in `Round.activeJokerEffects`, signaling `toClientView` to retain `lieScore` in the PublicClaim projection
   - `applySecondWind(playerSlots: JokerSlot[]): { shouldCancel: boolean; updatedSlots: JokerSlot[] }` — checks for held `second_wind`, returns whether to cancel the strike and the updated slots with consumed state. Pure helper consumed by the RevealComplete reducer.
