@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Hearsay — Variant E: The Operating Theatre (Buckshot + 2.5D perspective)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void:     #0a0d0a;
+    --iron:     #181a17;
+    --iron-lit: #2c2e28;
+    --steel:    #3a3a36;
+    --steel-lit:#4e4d45;
+    --concrete: #252622;
+    --concrete-lit: #3a3b35;
+    --rust:     #8a7a5a;
+    --sickly:   #a8b090;
+    --sickly-dim:#5a6050;
+    --bone:     #d8d4c8;
+    --bone-dim: #7a7a70;
+    --blood:    #8b1a1a;
+    --warn:     #c04838;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    background: var(--void);
+    color: var(--bone);
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+    position: relative;
+  }
+
+  /* =========================================================
+     THE ROOM — concrete back wall + fluorescent light
+     ========================================================= */
+  .room {
+    position: absolute; inset: 0;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse 50% 25% at 50% 20%, rgba(216, 220, 200, 0.12) 0%, transparent 70%),
+      linear-gradient(180deg, #1a1b18 0%, var(--concrete) 35%, #1a1b18 75%, #0a0b09 100%);
+  }
+  /* Concrete seams on back wall */
+  .room::before {
+    content: ""; position: absolute; inset: 0;
+    background-image:
+      repeating-linear-gradient(0deg, transparent 0px, transparent 150px, rgba(0,0,0,0.25) 151px, rgba(0,0,0,0.25) 152px),
+      repeating-linear-gradient(90deg, transparent 0px, transparent 200px, rgba(0,0,0,0.18) 201px, rgba(0,0,0,0.18) 202px);
+    pointer-events: none;
+  }
+  /* Fluorescent tube (hanging above table) */
+  .fluorescent {
+    position: absolute;
+    top: 60px; left: 50%; transform: translateX(-50%);
+    width: 340px; height: 14px;
+    background: linear-gradient(180deg, #c8d4b8 0%, #e0e6d0 50%, #a8b090 100%);
+    border-top: 1px solid rgba(255,255,255,0.4);
+    border-bottom: 1px solid rgba(0,0,0,0.4);
+    box-shadow:
+      0 0 40px rgba(168, 176, 144, 0.7),
+      0 0 120px 20px rgba(168, 176, 144, 0.35),
+      inset 0 0 8px rgba(255,255,255,0.3);
+    z-index: 2;
+  }
+  /* Chain / stem holding fluorescent */
+  .fluorescent::before, .fluorescent::after {
+    content: ""; position: absolute;
+    top: -60px;
+    width: 2px; height: 60px;
+    background: linear-gradient(180deg, #2a2b28 0%, #1a1b18 100%);
+  }
+  .fluorescent::before { left: 60px; }
+  .fluorescent::after  { right: 60px; }
+
+  /* =========================================================
+     BAYER DITHER overlay — Buckshot's signature
+     ========================================================= */
+  .dither {
+    position: absolute; inset: 0; pointer-events: none; z-index: 28;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect x='0' y='0' width='1' height='1' fill='%23000'/%3E%3Crect x='2' y='2' width='1' height='1' fill='%23000'/%3E%3Crect x='2' y='0' width='1' height='1' fill='%23fff'/%3E%3Crect x='0' y='2' width='1' height='1' fill='%23fff'/%3E%3C/svg%3E");
+    background-size: 4px 4px;
+    mix-blend-mode: overlay;
+    opacity: 0.1;
+  }
+  .vignette {
+    position: absolute; inset: 0; pointer-events: none; z-index: 29;
+    background: radial-gradient(ellipse 105% 105% at 50% 50%, transparent 45%, rgba(0,0,0,0.8) 100%);
+  }
+
+  /* =========================================================
+     THE TABLE — industrial steel slab with riveted rim
+     ========================================================= */
+  .table {
+    position: absolute;
+    bottom: 0; left: -10%; right: -10%;
+    height: 60%;
+    perspective: 1200px;
+    perspective-origin: 50% 0%;
+    z-index: 5;
+  }
+  .table-surface {
+    position: absolute;
+    bottom: 28px; left: 0; right: 0;
+    height: 100%;
+    background:
+      radial-gradient(ellipse 26% 18% at 50% 24%, rgba(216, 220, 200, 0.08) 0%, transparent 70%),
+      linear-gradient(180deg, #14150f 0%, var(--iron) 40%, #0c0d0a 100%);
+    transform: rotateX(68deg);
+    transform-origin: center bottom;
+    box-shadow:
+      inset 0 0 140px rgba(0, 0, 0, 0.85),
+      inset 0 40px 80px rgba(0, 0, 0, 0.6);
+  }
+  /* Brushed-steel directional lines */
+  .table-surface::before {
+    content: ""; position: absolute; inset: 0;
+    background-image:
+      repeating-linear-gradient(90deg, transparent 0px, transparent 2px, rgba(255,255,255,0.015) 3px, transparent 4px);
+    pointer-events: none;
+  }
+  /* Table rim — steel with rivets */
+  .table-rim {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 36px;
+    background:
+      linear-gradient(180deg, var(--steel-lit) 0%, var(--steel) 30%, #181915 70%, #0a0b09 100%);
+    border-top: 1px solid var(--steel-lit);
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.7), inset 0 -4px 8px rgba(0,0,0,0.8);
+    z-index: 6;
+  }
+  /* Rivets on rim */
+  .table-rim::before {
+    content: ""; position: absolute;
+    top: 50%; left: 0; right: 0; height: 6px;
+    transform: translateY(-50%);
+    background-image:
+      radial-gradient(circle at 60px 50%, #2a2b26 0 3px, transparent 4px),
+      radial-gradient(circle at 160px 50%, #2a2b26 0 3px, transparent 4px),
+      radial-gradient(circle at 260px 50%, #2a2b26 0 3px, transparent 4px),
+      radial-gradient(circle at 360px 50%, #2a2b26 0 3px, transparent 4px),
+      radial-gradient(circle at 460px 50%, #2a2b26 0 3px, transparent 4px),
+      radial-gradient(circle at 560px 50%, #2a2b26 0 3px, transparent 4px),
+      radial-gradient(circle at 660px 50%, #2a2b26 0 3px, transparent 4px),
+      radial-gradient(circle at 760px 50%, #2a2b26 0 3px, transparent 4px),
+      radial-gradient(circle at 860px 50%, #2a2b26 0 3px, transparent 4px),
+      radial-gradient(circle at 960px 50%, #2a2b26 0 3px, transparent 4px),
+      radial-gradient(circle at 1060px 50%, #2a2b26 0 3px, transparent 4px),
+      radial-gradient(circle at 1160px 50%, #2a2b26 0 3px, transparent 4px),
+      radial-gradient(circle at 1260px 50%, #2a2b26 0 3px, transparent 4px),
+      radial-gradient(circle at 1360px 50%, #2a2b26 0 3px, transparent 4px),
+      radial-gradient(circle at 1460px 50%, #2a2b26 0 3px, transparent 4px);
+    box-shadow: inset 0 1px 2px rgba(255,255,255,0.08);
+  }
+
+  /* =========================================================
+     OPPONENT
+     ========================================================= */
+  .opponent {
+    position: absolute;
+    top: 14%; left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex; flex-direction: column; align-items: center;
+    animation: shiver 7s ease-in-out infinite;
+  }
+  @keyframes shiver {
+    0%, 90%, 100% { transform: translateX(-50%) translateY(0); }
+    92% { transform: translateX(calc(-50% - 2px)) translateY(0); }
+    94% { transform: translateX(-50%) translateY(0); }
+  }
+  .silhouette {
+    position: relative;
+    width: 130px; height: 170px;
+    filter: drop-shadow(0 20px 40px rgba(0,0,0,0.95));
+  }
+  .silhouette::before {
+    content: ""; position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: 68px; height: 72px;
+    background: linear-gradient(170deg, #0a0b08 0%, #020302 100%);
+    border: 2px solid #2a2b26;
+    box-shadow: inset 8px -8px 0 rgba(0,0,0,0.5);
+  }
+  .silhouette::after {
+    content: ""; position: absolute;
+    top: 64px; left: 50%; transform: translateX(-50%);
+    width: 122px; height: 106px;
+    background: linear-gradient(170deg, #0a0b08 0%, #020302 100%);
+    border: 2px solid #2a2b26;
+    border-bottom: none;
+    box-shadow: inset 10px -8px 0 rgba(0,0,0,0.5);
+  }
+  .eyes {
+    position: absolute;
+    top: 26px; left: 50%; transform: translateX(-50%);
+    width: 44px; display: flex; justify-content: space-between;
+    z-index: 3;
+  }
+  .eye {
+    width: 5px; height: 5px;
+    background: var(--sickly);
+    box-shadow: 0 0 10px var(--sickly), 0 0 18px rgba(168, 176, 144, 0.6);
+    animation: blink 6s infinite;
+  }
+  @keyframes blink { 0%, 95%, 100% { opacity: 1; } 97% { opacity: 0; } }
+  .opponent-hand {
+    position: absolute;
+    bottom: -18px; left: 50%;
+    transform: translateX(-50%) rotateX(20deg);
+    transform-origin: center bottom;
+    display: flex;
+    z-index: 4;
+  }
+  .opp-card {
+    width: 40px; height: 58px;
+    background:
+      repeating-linear-gradient(45deg, #1a1a17 0px, #1a1a17 3px, #0a0b09 3px, #0a0b09 6px),
+      #141512;
+    border: 2px solid var(--rust);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.8);
+  }
+  .opp-card:not(:first-child) { margin-left: -14px; }
+  .opp-card:nth-child(1) { transform: rotate(-14deg) translateY(5px); }
+  .opp-card:nth-child(2) { transform: rotate(-7deg) translateY(2px); }
+  .opp-card:nth-child(3) { transform: rotate(0deg); }
+  .opp-card:nth-child(4) { transform: rotate(7deg) translateY(2px); }
+  .opp-card:nth-child(5) { transform: rotate(14deg) translateY(5px); }
+
+  .opponent-label {
+    margin-top: 22px;
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--sickly);
+  }
+  .opponent-state {
+    margin-top: 4px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--bone-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* =========================================================
+     PILE — left side of table
+     ========================================================= */
+  .pile {
+    position: absolute;
+    bottom: 42%; left: 22%;
+    transform: rotateX(28deg);
+    transform-origin: center center;
+    z-index: 7;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .pile-cards {
+    position: relative; width: 64px; height: 92px;
+  }
+  .pile-card {
+    position: absolute; inset: 0;
+    background: var(--bone);
+    border: 1px solid #1a1b18;
+    box-shadow: 2px 4px 8px rgba(0,0,0,0.8);
+  }
+  .pile-card:nth-child(1) { transform: rotate(-6deg) translate(-3px, -2px); }
+  .pile-card:nth-child(2) { transform: rotate(2deg); }
+  .pile-card:nth-child(3) { transform: rotate(-1deg) translate(3px, 2px); }
+  .pile-meta {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 10px; letter-spacing: 3px; color: var(--bone-dim);
+  }
+  .pile-meta b {
+    display: block; color: var(--bone);
+    font-size: 22px; letter-spacing: 1px; margin-top: 2px;
+  }
+
+  /* =========================================================
+     CLAIM BUBBLE
+     ========================================================= */
+  .claim-bubble {
+    position: absolute;
+    bottom: 34%; left: 50%;
+    transform: translateX(-50%);
+    z-index: 8;
+    background: var(--iron);
+    border: 1px solid var(--rust);
+    border-left: 3px solid var(--rust);
+    padding: 14px 26px;
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 14px;
+    letter-spacing: 3px;
+    color: var(--bone);
+    text-transform: uppercase;
+    box-shadow: 0 0 40px rgba(138, 122, 90, 0.3), 4px 4px 0 0 rgba(0,0,0,0.5);
+  }
+  .claim-bubble::before {
+    content: ""; position: absolute;
+    top: -1px; left: -1px; width: 6px; height: 6px;
+    background: var(--rust);
+  }
+  .claim-bubble::after {
+    content: ""; position: absolute;
+    bottom: -1px; right: -1px; width: 6px; height: 6px;
+    background: var(--rust);
+  }
+  .claim-telemetry {
+    position: absolute;
+    top: calc(100% + 8px); left: 0; right: 0;
+    display: flex; justify-content: center; gap: 18px;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--bone-dim);
+    text-transform: uppercase;
+  }
+  .claim-telemetry b { color: var(--warn); font-weight: normal; }
+
+  /* =========================================================
+     YOUR HAND
+     ========================================================= */
+  .your-hand {
+    position: absolute;
+    bottom: -32px; left: 50%;
+    transform: translateX(-50%) rotateX(-22deg);
+    transform-origin: center bottom;
+    z-index: 11;
+    display: flex;
+  }
+  .card {
+    width: 100px; height: 146px;
+    background: var(--bone);
+    border: 2px solid #2a2b26;
+    display: flex; flex-direction: column;
+    padding: 10px;
+    color: #1a1a1a;
+    position: relative;
+    transition: transform 0.2s;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.85);
+  }
+  .card:not(:first-child) { margin-left: -14px; }
+  .card:nth-child(1) { transform: rotate(-8deg) translateY(12px); }
+  .card:nth-child(2) { transform: rotate(-3deg) translateY(1px); }
+  .card:nth-child(3) { transform: rotate(3deg) translateY(-2px); }
+  .card:nth-child(4) { transform: rotate(8deg) translateY(12px); }
+  .card:hover { transform: translateY(-18px); z-index: 10; }
+  .card-rank-tl, .card-rank-br {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 18px; line-height: 1; letter-spacing: 2px;
+  }
+  .card-rank-br {
+    text-align: right;
+    transform: rotate(180deg);
+  }
+  .card-rank-mid {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 40px; letter-spacing: 2px;
+  }
+
+  /* =========================================================
+     HUD
+     ========================================================= */
+  .top-bar {
+    position: absolute; top: 16px; left: 16px; right: 16px;
+    z-index: 25;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 20px; align-items: center;
+  }
+  .monitor {
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 10px; letter-spacing: 3px; color: var(--sickly);
+    background: rgba(24, 26, 23, 0.9);
+    padding: 8px 14px; border: 1px solid var(--sickly-dim);
+  }
+  .monitor-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--sickly);
+    box-shadow: 0 0 8px var(--sickly);
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: 0.4; } }
+  .round-tag {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 11px; letter-spacing: 4px; color: var(--bone-dim);
+    text-align: center;
+  }
+  .round-tag span { color: var(--rust); }
+  .strikes {
+    display: flex; gap: 6px; justify-content: flex-end; align-items: center;
+    background: rgba(24, 26, 23, 0.9);
+    padding: 8px 14px; border: 1px solid var(--sickly-dim);
+  }
+  .strikes-label {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 10px; letter-spacing: 3px; color: var(--bone-dim); margin-right: 6px;
+  }
+  .strike {
+    width: 18px; height: 22px;
+    background: var(--void);
+    border: 1px solid var(--steel);
+  }
+  .strike.lit {
+    background: var(--warn);
+    border-color: var(--warn);
+    box-shadow: 0 0 12px rgba(192, 72, 56, 0.6);
+  }
+  .actions {
+    position: absolute; bottom: 14px; left: 28px; right: 28px;
+    z-index: 26;
+    display: flex; justify-content: space-between; align-items: flex-end;
+  }
+  .btn {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 11px; letter-spacing: 4px;
+    background: var(--iron);
+    color: var(--sickly);
+    border: 1px solid var(--sickly);
+    padding: 14px 34px;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  .btn:hover { background: rgba(168, 176, 144, 0.08); }
+  .btn-challenge { color: var(--warn); border-color: var(--warn); }
+  .btn-challenge:hover { background: rgba(192, 72, 56, 0.08); }
+  .lie-score-mini { text-align: center; }
+  .lie-score-mini-label {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 9px; color: var(--bone-dim); letter-spacing: 3px; margin-bottom: 6px;
+  }
+  .lie-score-bar {
+    width: 160px; height: 12px;
+    background: var(--iron);
+    border: 1px solid var(--steel);
+    position: relative;
+  }
+  .lie-score-fill {
+    position: absolute; left: 0; top: 0; height: 100%;
+    width: 62%;
+    background: repeating-linear-gradient(
+      90deg, var(--warn) 0px, var(--warn) 4px, #a03828 4px, #a03828 8px
+    );
+  }
+  .lie-score-mini-val {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 12px; color: var(--warn); margin-top: 4px;
+  }
+  .variant-label {
+    position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 30;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px; color: var(--bone-dim);
+    letter-spacing: 3px; opacity: 0.55;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div class="room">
+  <div class="fluorescent"></div>
+</div>
+
+<div class="table">
+  <div class="table-surface"></div>
+  <div class="table-rim"></div>
+</div>
+
+<div class="opponent">
+  <div class="silhouette"><div class="eyes"><div class="eye"></div><div class="eye"></div></div></div>
+  <div class="opponent-hand">
+    <div class="opp-card"></div><div class="opp-card"></div><div class="opp-card"></div><div class="opp-card"></div><div class="opp-card"></div>
+  </div>
+  <div class="opponent-label">THE READER</div>
+  <div class="opponent-state">signal locked</div>
+</div>
+
+<div class="pile">
+  <div class="pile-cards">
+    <div class="pile-card"></div><div class="pile-card"></div><div class="pile-card"></div>
+  </div>
+  <div class="pile-meta">PILE<b>3</b></div>
+</div>
+
+<div class="claim-bubble">
+  "TWO QUEENS"
+  <div class="claim-telemetry">
+    <span>LAT <b>2.4s</b></span>
+    <span>FILLERS <b>1</b></span>
+    <span>WPM <b>184</b></span>
+  </div>
+</div>
+
+<div class="your-hand">
+  <div class="card"><div class="card-rank-tl">Q</div><div class="card-rank-mid">Q</div><div class="card-rank-br">Q</div></div>
+  <div class="card"><div class="card-rank-tl">K</div><div class="card-rank-mid">K</div><div class="card-rank-br">K</div></div>
+  <div class="card"><div class="card-rank-tl">A</div><div class="card-rank-mid">A</div><div class="card-rank-br">A</div></div>
+  <div class="card"><div class="card-rank-tl">J</div><div class="card-rank-mid">J</div><div class="card-rank-br">J</div></div>
+</div>
+
+<div class="top-bar">
+  <div class="monitor"><div class="monitor-dot"></div>SIGNAL · LOCKED</div>
+  <div class="round-tag">ROUND <span>01</span> · BEST OF 3</div>
+  <div class="strikes">
+    <span class="strikes-label">STRIKES</span>
+    <div class="strike lit"></div>
+    <div class="strike"></div>
+    <div class="strike"></div>
+  </div>
+</div>
+
+<div class="actions">
+  <button class="btn">ACCEPT</button>
+  <div class="lie-score-mini">
+    <div class="lie-score-mini-label">LIE SCORE</div>
+    <div class="lie-score-bar"><div class="lie-score-fill"></div></div>
+    <div class="lie-score-mini-val">0.62</div>
+  </div>
+  <button class="btn btn-challenge">CALL LIAR</button>
+</div>
+
+<div class="dither"></div>
+<div class="vignette"></div>
+<div class="variant-label">VARIANT E · OPERATING THEATRE · BUCKSHOT × 2.5D</div>
+</body>
+</html>

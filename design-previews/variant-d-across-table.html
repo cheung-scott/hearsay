@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Hearsay — Variant D: Across the Table (iter 5)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --felt:       #1e3a2f;
+    --felt-dark:  #0d1f17;
+    --felt-far:   #081610;
+    --wood:       #3a1f10;
+    --wood-lit:   #6b3a1c;
+    --wood-hi:    #8f5528;
+    --wood-rim:   #1f0e05;
+    --wall:       #1a100a;
+    --wall-lit:   #3a2015;
+    --amber:      #fda200;
+    --amber-hi:   #ffc760;
+    --amber-dim:  #8b5a0f;
+    --coral:      #fd5f55;
+    --bone:       #f4ecd8;
+    --bone-dim:   #c9bfa3;
+    --navy:       #1a2130;
+    --shadow:     #050302;
+    --blood:      #8b1a1a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    background: var(--shadow);
+    color: var(--bone);
+    font-family: 'VT323', monospace;
+    font-size: 20px;
+    position: relative;
+    image-rendering: pixelated;
+  }
+
+  /* =========================================================
+     THE ROOM
+     ========================================================= */
+  .room {
+    position: absolute; inset: 0;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse 55% 45% at 50% 12%, rgba(253, 162, 0, 0.22) 0%, transparent 60%),
+      linear-gradient(180deg, var(--wall) 0%, var(--wall-lit) 30%, var(--wall) 65%, #0a0604 100%);
+  }
+  .room::before {
+    /* Wood paneling seams */
+    content: ""; position: absolute; inset: 0;
+    background-image: repeating-linear-gradient(
+      90deg,
+      transparent 0px, transparent 120px,
+      rgba(0,0,0,0.15) 121px, rgba(0,0,0,0.15) 123px,
+      transparent 124px, transparent 244px,
+      rgba(0,0,0,0.08) 245px, rgba(0,0,0,0.08) 247px
+    );
+    pointer-events: none;
+  }
+  .room::after {
+    /* Hanging bulb + stem */
+    content: ""; position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: 4px; height: 70px;
+    background: linear-gradient(180deg, #2a1a0f 0%, #1a0f08 100%);
+    box-shadow: 0 62px 0 0 var(--amber), 0 62px 50px 14px rgba(253, 162, 0, 0.6);
+    z-index: 2;
+  }
+
+  /* =========================================================
+     THE ROUND TABLE — now INSIDE the viewport (player behind it)
+     Near rim visible near bottom, far rim near middle of screen.
+     ========================================================= */
+  .table-wrap {
+    position: absolute;
+    bottom: 12%;          /* near rim visible above player's hand */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 130%;
+    height: 74%;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .round-table {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: linear-gradient(180deg, var(--wood-hi) 0%, var(--wood-lit) 28%, var(--wood) 60%, var(--wood-rim) 100%);
+    transform: rotateX(60deg);
+    transform-origin: center bottom;
+    box-shadow:
+      0 40px 80px rgba(0,0,0,0.85),
+      inset 0 -40px 60px rgba(0,0,0,0.6);
+  }
+  .round-table::before {
+    /* Wood-grain rim */
+    content: ""; position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background-image:
+      repeating-radial-gradient(circle at 50% 100%, transparent 0px, transparent 24px, rgba(0,0,0,0.22) 25px, rgba(0,0,0,0.22) 26px);
+    pointer-events: none;
+  }
+  .round-table::after {
+    /* Felt inset */
+    content: ""; position: absolute;
+    inset: 56px;
+    border-radius: 50%;
+    background:
+      radial-gradient(ellipse 48% 38% at 50% 32%, rgba(253, 162, 0, 0.24) 0%, transparent 75%),
+      radial-gradient(ellipse 80% 80% at 50% 50%, var(--felt) 0%, var(--felt-dark) 65%, var(--felt-far) 100%);
+    box-shadow: inset 0 0 80px rgba(0,0,0,0.7);
+  }
+
+  /* =========================================================
+     OVERLAYS
+     ========================================================= */
+  .overlay {
+    position: absolute; inset: 0; pointer-events: none; z-index: 30;
+  }
+  .overlay::before {
+    content: ""; position: absolute; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent 0px, transparent 2px, rgba(0,0,0,0.13) 3px, rgba(0,0,0,0.13) 3px);
+  }
+  .overlay::after {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(ellipse 110% 110% at 50% 50%, transparent 50%, rgba(0,0,0,0.75) 100%);
+  }
+
+  /* =========================================================
+     OPPONENT — seated at far rim. Silhouette base aligns with
+     the table's back edge; z-index: 4 puts it BEHIND the table
+     (z:5) so lower torso is occluded naturally by wood rim.
+     ========================================================= */
+  .opponent-area {
+    position: absolute;
+    top: 14%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 620px;
+    height: 280px;
+    z-index: 4;           /* BEHIND the table at z:5 */
+  }
+  .silhouette-block {
+    position: absolute;
+    left: 50%; top: 0;
+    transform: translateX(-50%);
+    width: 160px;
+    animation: breathe 4.5s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50%      { transform: translateX(-50%) translateY(-3px); }
+  }
+  .silhouette {
+    position: relative;
+    width: 160px; height: 240px;
+    filter: drop-shadow(0 18px 32px rgba(0,0,0,0.9));
+  }
+  .silhouette::before {
+    /* Head */
+    content: ""; position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: 72px; height: 76px;
+    background: linear-gradient(160deg, #140a06 0%, #050302 100%);
+    border: 3px solid var(--amber-dim);
+    box-shadow: inset 8px -8px 0 rgba(0,0,0,0.5);
+  }
+  .silhouette::after {
+    /* Torso (extends down — table naturally occludes) */
+    content: ""; position: absolute;
+    top: 68px; left: 50%; transform: translateX(-50%);
+    width: 150px; height: 180px;
+    background: linear-gradient(160deg, #140a06 0%, #050302 100%);
+    border: 3px solid var(--amber-dim);
+    border-bottom: none;
+    box-shadow: inset 12px -8px 0 rgba(0,0,0,0.5);
+  }
+  .eyes {
+    position: absolute;
+    top: 30px; left: 50%; transform: translateX(-50%);
+    width: 44px; display: flex; justify-content: space-between;
+    z-index: 3;
+  }
+  .eye {
+    width: 5px; height: 5px;
+    background: var(--amber);
+    box-shadow: 0 0 10px var(--amber), 0 0 18px var(--amber);
+    animation: blink 5.2s infinite;
+  }
+  @keyframes blink { 0%, 96%, 100% { opacity: 1; } 98% { opacity: 0; } }
+  /* Opponent's cards — raise them ABOVE table (z:6 > table z:5) so
+     hand is visible even though body is occluded by table rim */
+  .opponent-hand {
+    position: absolute;
+    top: 132px; left: 50%;
+    transform: translateX(-50%) rotateX(16deg);
+    transform-origin: center bottom;
+    display: flex;
+    z-index: 6;
+  }
+  .opp-card {
+    width: 42px; height: 60px;
+    background:
+      repeating-linear-gradient(45deg, var(--navy) 0px, var(--navy) 3px, #0f1420 3px, #0f1420 6px),
+      var(--navy);
+    border: 2px solid var(--amber-dim);
+    border-radius: 3px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.7);
+  }
+  .opp-card:not(:first-child) { margin-left: -14px; }
+  .opp-card:nth-child(1) { transform: rotate(-14deg) translateY(5px); }
+  .opp-card:nth-child(2) { transform: rotate(-7deg) translateY(2px); }
+  .opp-card:nth-child(3) { transform: rotate(0deg); }
+  .opp-card:nth-child(4) { transform: rotate(7deg) translateY(2px); }
+  .opp-card:nth-child(5) { transform: rotate(14deg) translateY(5px); }
+
+  .opponent-label {
+    position: absolute;
+    top: 280px; left: 50%; transform: translateX(-50%);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--amber);
+    text-shadow: 0 0 12px rgba(253, 162, 0, 0.6);
+    white-space: nowrap;
+    z-index: 12;
+  }
+
+  /* =========================================================
+     CLAIM BUBBLE — center-anchored symmetric expansion.
+     z-index: 12 so it floats ABOVE the table.
+     ========================================================= */
+  .claim-bubble {
+    position: absolute;
+    top: 50px;
+    left: 78%;
+    transform: translateX(-50%);
+    z-index: 12;
+    background: var(--navy);
+    border: 3px solid var(--amber);
+    padding: 14px 22px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 15px;
+    letter-spacing: 2px;
+    color: var(--amber);
+    box-shadow: 4px 4px 0 0 var(--shadow), 0 0 36px rgba(253, 162, 0, 0.5);
+    white-space: nowrap;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+  }
+  .claim-char {
+    display: inline-block;
+    animation: char-pop 0.15s ease-out;
+  }
+  @keyframes char-pop {
+    from { opacity: 0; transform: translateY(-4px) scale(0.6); }
+    to   { opacity: 1; transform: translateY(0)    scale(1); }
+  }
+  .cursor {
+    display: inline-block;
+    width: 10px; height: 18px;
+    background: var(--amber);
+    margin-left: 4px;
+    vertical-align: middle;
+    animation: blink-cursor 0.9s infinite;
+  }
+  @keyframes blink-cursor { 50% { opacity: 0; } }
+  .speech-trail {
+    position: absolute;
+    top: 68px;
+    left: 52%;
+    width: 120px;
+    height: 20px;
+    pointer-events: none;
+    z-index: 11;
+  }
+  .speech-trail::before, .speech-trail::after {
+    content: ""; position: absolute;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--amber);
+    box-shadow: 0 0 8px var(--amber);
+    opacity: 0.6;
+  }
+  .speech-trail::before { left: 18px; top: 2px;  animation: dot-pulse 1.3s infinite; }
+  .speech-trail::after  { left: 54px; top: 10px; animation: dot-pulse 1.3s infinite 0.4s; }
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 0.2; transform: scale(0.8); }
+    50%      { opacity: 0.8; transform: scale(1.1); }
+  }
+
+  /* =========================================================
+     PILE — cards lie FLAT on felt (tilted with table),
+     label stays FLAT in screen space (outside the rotation)
+     ========================================================= */
+  .pile-area {
+    position: absolute;
+    bottom: 32%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 7;
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+  }
+  .pile-cards-tilted {
+    position: relative;
+    width: 80px; height: 110px;
+    transform: rotateX(60deg);   /* matches table tilt — cards lie on felt */
+    transform-origin: center center;
+  }
+  .pile-card {
+    position: absolute; inset: 0;
+    background: var(--bone);
+    border: 2px solid var(--navy);
+    border-radius: 3px;
+    box-shadow: 2px 4px 10px rgba(0,0,0,0.8);
+  }
+  .pile-card:nth-child(1) { transform: rotate(-8deg) translate(-5px, -2px); }
+  .pile-card:nth-child(2) { transform: rotate(3deg); }
+  .pile-card:nth-child(3) { transform: rotate(-1deg) translate(5px, 3px); }
+  .pile-label {
+    /* Flat in screen space — NOT rotated with the cards */
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; color: var(--bone-dim); letter-spacing: 2px;
+    white-space: nowrap;
+  }
+
+  /* =========================================================
+     YOUR HAND — near viewer, tilted forward
+     ========================================================= */
+  .your-hand {
+    position: absolute;
+    bottom: -20px; left: 50%;
+    transform: translateX(-50%) rotateX(-22deg);
+    transform-origin: center bottom;
+    z-index: 11;
+    display: flex;
+  }
+  .card {
+    width: 104px; height: 150px;
+    background: var(--bone);
+    border: 3px solid var(--navy);
+    border-radius: 6px;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.85);
+    display: flex; flex-direction: column;
+    padding: 10px;
+    color: var(--navy);
+    position: relative;
+    transition: transform 0.2s;
+  }
+  .card:not(:first-child) { margin-left: -16px; }
+  .card:nth-child(1) { transform: rotate(-9deg) translateY(14px); }
+  .card:nth-child(2) { transform: rotate(-3deg) translateY(2px); }
+  .card:nth-child(3) { transform: rotate(3deg) translateY(-2px); }
+  .card:nth-child(4) { transform: rotate(9deg) translateY(14px); }
+  .card:hover { transform: translateY(-18px); z-index: 10; }
+  .card-rank-tl, .card-rank-br, .card-rank-mid {
+    font-family: 'Press Start 2P', monospace;
+  }
+  .card-rank-tl { font-size: 18px; line-height: 1; }
+  .card-rank-mid {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    font-size: 40px;
+  }
+  .card-rank-br {
+    font-size: 18px; line-height: 1; text-align: right; transform: rotate(180deg);
+  }
+
+  /* =========================================================
+     HUD
+     ========================================================= */
+  .top-bar {
+    position: absolute; top: 16px; left: 16px; right: 16px;
+    z-index: 25;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 20px; align-items: center;
+  }
+  .target-tag {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    padding: 10px 16px;
+    border: 3px solid var(--amber);
+    background: rgba(26, 33, 48, 0.92);
+    color: var(--amber);
+    letter-spacing: 3px;
+    box-shadow: 4px 4px 0 0 var(--shadow);
+  }
+  .target-tag b { color: var(--bone); }
+  .round-pill {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    color: var(--bone-dim);
+    letter-spacing: 4px;
+    text-align: center;
+  }
+  .round-pill b { color: var(--amber); }
+  .strikes {
+    display: flex; gap: 10px; align-items: center;
+  }
+  .strikes-label {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px; color: var(--bone-dim); letter-spacing: 3px; margin-right: 6px;
+  }
+  .strike {
+    position: relative;
+    width: 36px; height: 44px;
+    background: #1a1f1a;
+    border: 3px solid #2a3b2f;
+    box-shadow: 3px 3px 0 0 var(--shadow), inset 0 -4px 0 rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 16px;
+    color: transparent;
+  }
+  .strike.lit {
+    background: linear-gradient(180deg, var(--coral) 0%, var(--blood) 100%);
+    border-color: var(--coral);
+    color: var(--bone);
+    text-shadow: 0 2px 0 rgba(0,0,0,0.5);
+    box-shadow:
+      0 0 18px rgba(253, 95, 85, 0.8),
+      3px 3px 0 0 var(--shadow),
+      inset 0 -4px 0 rgba(0,0,0,0.3),
+      inset 0 2px 0 rgba(255,255,255,0.2);
+  }
+  .strike.lit::after { content: "X"; }
+  .strike.lit::before {
+    content: "";
+    position: absolute; top: -8px; left: 50%;
+    width: 4px; height: 10px;
+    background: var(--amber-hi);
+    transform: translateX(-50%);
+    border-radius: 50% 50% 40% 40%;
+    box-shadow: 0 0 8px var(--amber-hi), 0 0 14px var(--amber);
+    animation: flicker 1.2s ease-in-out infinite alternate;
+  }
+  @keyframes flicker {
+    from { opacity: 0.75; transform: translateX(-50%) scaleY(0.9); }
+    to   { opacity: 1;    transform: translateX(-50%) scaleY(1.1); }
+  }
+  .actions {
+    position: absolute; bottom: 14px; left: 28px; right: 28px;
+    z-index: 26;
+    display: flex; justify-content: space-between; align-items: flex-end;
+  }
+  .btn {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px; letter-spacing: 2px;
+    background: rgba(13, 31, 23, 0.92);
+    color: var(--amber);
+    border: 3px solid var(--amber);
+    padding: 14px 26px;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 0 var(--shadow);
+    text-transform: uppercase;
+  }
+  .btn:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 0 var(--shadow); }
+  .btn-challenge { color: var(--coral); border-color: var(--coral); }
+  .lie-score-mini { text-align: center; }
+  .lie-score-mini-label {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px; color: var(--bone-dim); letter-spacing: 3px; margin-bottom: 6px;
+  }
+  .lie-score-bar {
+    width: 160px; height: 12px;
+    background: rgba(13, 31, 23, 0.9);
+    border: 2px solid var(--navy);
+    position: relative;
+    box-shadow: 2px 2px 0 0 var(--shadow);
+  }
+  .lie-score-fill {
+    position: absolute; left: 0; top: 0; height: 100%;
+    width: 62%;
+    background: linear-gradient(90deg, #009cfd 0%, var(--amber) 55%, var(--coral) 100%);
+  }
+  .lie-score-mini-val {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px; color: var(--amber); margin-top: 4px;
+  }
+  .variant-label {
+    position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 30;
+    font-family: 'VT323', monospace;
+    font-size: 13px; color: var(--bone-dim);
+    letter-spacing: 2px; opacity: 0.55;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div class="room"></div>
+
+<!-- Opponent goes FIRST in DOM and gets z-index: 4 so the table (z:5) occludes the lower torso naturally -->
+<div class="opponent-area">
+  <div class="silhouette-block">
+    <div class="silhouette">
+      <div class="eyes"><div class="eye"></div><div class="eye"></div></div>
+    </div>
+    <div class="opponent-hand">
+      <div class="opp-card"></div><div class="opp-card"></div><div class="opp-card"></div><div class="opp-card"></div><div class="opp-card"></div>
+    </div>
+  </div>
+  <div class="speech-trail"></div>
+  <div class="claim-bubble">
+    <span id="claim"></span><span class="cursor"></span>
+  </div>
+  <div class="opponent-label">THE PROSECUTOR</div>
+</div>
+
+<div class="table-wrap">
+  <div class="round-table"></div>
+</div>
+
+<!-- Pile on felt. Cards tilt with table; label stays flat in screen space. -->
+<div class="pile-area">
+  <div class="pile-cards-tilted">
+    <div class="pile-card"></div>
+    <div class="pile-card"></div>
+    <div class="pile-card"></div>
+  </div>
+  <div class="pile-label">PILE · 3</div>
+</div>
+
+<!-- Your hand -->
+<div class="your-hand">
+  <div class="card"><div class="card-rank-tl">Q</div><div class="card-rank-mid">Q</div><div class="card-rank-br">Q</div></div>
+  <div class="card"><div class="card-rank-tl">K</div><div class="card-rank-mid">K</div><div class="card-rank-br">K</div></div>
+  <div class="card"><div class="card-rank-tl">A</div><div class="card-rank-mid">A</div><div class="card-rank-br">A</div></div>
+  <div class="card"><div class="card-rank-tl">J</div><div class="card-rank-mid">J</div><div class="card-rank-br">J</div></div>
+</div>
+
+<div class="top-bar">
+  <div class="target-tag">TARGET · <b>QUEEN</b></div>
+  <div class="round-pill">ROUND <b>01</b> · BEST OF 3</div>
+  <div class="strikes">
+    <span class="strikes-label">STRIKES</span>
+    <div class="strike lit"></div>
+    <div class="strike"></div>
+    <div class="strike"></div>
+  </div>
+</div>
+
+<div class="actions">
+  <button class="btn">ACCEPT</button>
+  <div class="lie-score-mini">
+    <div class="lie-score-mini-label">LIE SCORE</div>
+    <div class="lie-score-bar"><div class="lie-score-fill"></div></div>
+    <div class="lie-score-mini-val">0.62</div>
+  </div>
+  <button class="btn btn-challenge">LIAR!</button>
+</div>
+
+<div class="overlay"></div>
+<div class="variant-label">VARIANT D · ACROSS THE TABLE · ITER 5</div>
+
+<script>
+  const TEXT = '"TWO QUEENS."';
+  const CHAR_DELAY = 110;
+  const HOLD = 1800;
+  const claim = document.getElementById('claim');
+  function type(i = 0) {
+    if (i > TEXT.length) {
+      setTimeout(() => { claim.innerHTML = ''; type(0); }, HOLD);
+      return;
+    }
+    const ch = TEXT[i];
+    if (ch !== undefined) {
+      const span = document.createElement('span');
+      span.className = 'claim-char';
+      span.textContent = ch === ' ' ? '\u00A0' : ch;
+      claim.appendChild(span);
+    }
+    setTimeout(() => type(i + 1), CHAR_DELAY);
+  }
+  type(0);
+</script>
+</body>
+</html>

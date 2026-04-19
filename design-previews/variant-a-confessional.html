@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Hearsay — Variant A: The Confessional (Liar's Bar-forward)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --mahogany: #2b1810;
+    --deep:     #0f0805;
+    --tungsten: #d89b4a;
+    --tungsten-dim: #8c6128;
+    --bone:     #e8dcc4;
+    --bone-dim: #9a8b6c;
+    --blood:    #8b1a1a;
+    --smoke:    #1f2a2a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    background: var(--deep);
+    color: var(--bone);
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 18px;
+    position: relative;
+  }
+  /* Single tungsten pool of light — radial from above the table */
+  .scene {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 65% 55% at 50% 40%, rgba(216, 155, 74, 0.22), rgba(216, 155, 74, 0.06) 45%, rgba(0,0,0,0.8) 80%),
+      linear-gradient(180deg, #1a0e07 0%, var(--mahogany) 35%, var(--deep) 100%);
+  }
+  /* Grain overlay */
+  .scene::before {
+    content: ""; position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+    opacity: 0.07; pointer-events: none; z-index: 2;
+  }
+  /* Vignette */
+  .scene::after {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(ellipse 100% 100% at 50% 50%, transparent 40%, rgba(0,0,0,0.6) 100%);
+    pointer-events: none; z-index: 3;
+  }
+  .content {
+    position: relative; z-index: 10;
+    width: 100%; height: 100%;
+    display: grid;
+    grid-template-rows: 1fr auto 1fr;
+    align-items: center;
+  }
+  /* Opponent area — top */
+  .opponent {
+    display: flex; justify-content: center; align-items: center;
+    flex-direction: column;
+    padding: 32px 0;
+  }
+  .portrait {
+    width: 180px; height: 220px;
+    background: linear-gradient(160deg, #3b2418 0%, #1a0e07 100%);
+    border: 2px solid rgba(216, 155, 74, 0.3);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 80px rgba(216, 155, 74, 0.25), inset 0 0 40px rgba(0,0,0,0.6);
+    position: relative;
+  }
+  .portrait-label {
+    position: absolute; bottom: -28px;
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 700; letter-spacing: 4px;
+    font-size: 14px; text-transform: uppercase;
+    color: var(--tungsten);
+    text-shadow: 0 0 20px rgba(216, 155, 74, 0.6);
+  }
+  .portrait-initial {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 96px; font-weight: 500;
+    color: var(--tungsten-dim);
+    opacity: 0.6;
+  }
+  .status {
+    margin-top: 52px;
+    font-style: italic;
+    color: var(--bone-dim);
+    font-size: 15px;
+    letter-spacing: 1px;
+  }
+  /* Center — pile + claim + strikes */
+  .table {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 48px;
+    padding: 0 48px;
+  }
+  .strikes {
+    display: flex; gap: 12px;
+    justify-content: flex-end;
+  }
+  .strike {
+    width: 24px; height: 36px;
+    background: linear-gradient(180deg, #1a0e07 0%, #0a0402 100%);
+    border: 1px solid rgba(216, 155, 74, 0.15);
+    border-radius: 2px;
+    position: relative;
+  }
+  .strike.lit {
+    background: linear-gradient(180deg, #3a1a10 0%, var(--blood) 60%, #5a0f0f 100%);
+    border-color: var(--blood);
+    box-shadow: 0 0 16px rgba(139, 26, 26, 0.8);
+  }
+  .strike.lit::after {
+    content: "";
+    position: absolute; top: -6px; left: 50%;
+    width: 3px; height: 8px;
+    background: #ffb060;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    box-shadow: 0 0 8px #ffb060, 0 0 16px #ffb060;
+    animation: flicker 1.3s ease-in-out infinite alternate;
+  }
+  @keyframes flicker { from { opacity: 0.7; } to { opacity: 1; } }
+  .pile {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 12px;
+  }
+  .pile-cards {
+    position: relative;
+    width: 90px; height: 128px;
+  }
+  .pile-card {
+    position: absolute; inset: 0;
+    background: var(--bone);
+    border: 1px solid var(--bone-dim);
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+  }
+  .pile-card:nth-child(1) { transform: rotate(-4deg) translateX(-4px); }
+  .pile-card:nth-child(2) { transform: rotate(2deg); }
+  .pile-card:nth-child(3) { transform: rotate(-1deg) translateX(3px); }
+  .pile-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--bone-dim);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+  .claim-region {
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .claim-bubble {
+    background: rgba(216, 155, 74, 0.08);
+    border: 1px solid rgba(216, 155, 74, 0.4);
+    border-radius: 2px;
+    padding: 18px 24px;
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    color: var(--bone);
+    font-size: 22px;
+    box-shadow: 0 0 24px rgba(216, 155, 74, 0.1);
+  }
+  .claim-bubble::before { content: "\201C"; margin-right: 4px; }
+  .claim-bubble::after  { content: "\201D"; margin-left: 4px; }
+  .claim-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--tungsten-dim);
+    text-transform: uppercase;
+  }
+  /* Hand — bottom */
+  .hand {
+    display: flex; justify-content: center; align-items: flex-end;
+    gap: -12px;
+    padding-bottom: 32px;
+    perspective: 800px;
+  }
+  .card {
+    width: 110px; height: 160px;
+    background: var(--bone);
+    border-radius: 6px;
+    border: 2px solid var(--bone-dim);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+    display: flex; flex-direction: column;
+    padding: 10px;
+    font-family: 'Cormorant Garamond', serif;
+    color: var(--mahogany);
+    position: relative;
+    transition: transform 0.2s;
+  }
+  .card:not(:first-child) { margin-left: -18px; }
+  .card:nth-child(1) { transform: rotate(-8deg) translateY(12px); }
+  .card:nth-child(2) { transform: rotate(-2deg) translateY(4px); }
+  .card:nth-child(3) { transform: rotate(4deg) translateY(-2px); }
+  .card:nth-child(4) { transform: rotate(8deg) translateY(10px); }
+  .card-rank-tl {
+    font-size: 28px; font-weight: 700;
+    line-height: 1; text-align: left;
+  }
+  .card-rank-mid {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    font-size: 48px; font-weight: 500; font-style: italic;
+  }
+  .card-rank-br {
+    font-size: 28px; font-weight: 700;
+    line-height: 1; text-align: right;
+    transform: rotate(180deg);
+  }
+  /* Action bar */
+  .actions {
+    position: absolute; bottom: 24px; left: 24px; right: 24px;
+    z-index: 11;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .btn {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 700; letter-spacing: 3px; text-transform: uppercase;
+    font-size: 14px;
+    background: transparent;
+    color: var(--tungsten);
+    border: 1px solid var(--tungsten);
+    padding: 12px 28px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn:hover {
+    background: rgba(216, 155, 74, 0.1);
+    box-shadow: 0 0 24px rgba(216, 155, 74, 0.4);
+  }
+  .btn-challenge {
+    color: var(--blood); border-color: var(--blood);
+  }
+  .btn-challenge:hover {
+    background: rgba(139, 26, 26, 0.12);
+    box-shadow: 0 0 24px rgba(139, 26, 26, 0.4);
+  }
+  .variant-label {
+    position: absolute; top: 16px; left: 16px; z-index: 20;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--bone-dim);
+    letter-spacing: 2px;
+    opacity: 0.6;
+  }
+</style>
+</head>
+<body>
+<div class="variant-label">VARIANT A · THE CONFESSIONAL · LIAR'S BAR-FORWARD</div>
+<div class="scene">
+  <div class="content">
+    <div class="opponent">
+      <div class="portrait">
+        <div class="portrait-initial">R</div>
+        <div class="portrait-label">The Reader</div>
+      </div>
+      <div class="status">...listens, waiting for your answer.</div>
+    </div>
+    <div class="table">
+      <div class="strikes">
+        <div class="strike lit"></div>
+        <div class="strike"></div>
+        <div class="strike"></div>
+      </div>
+      <div class="pile">
+        <div class="pile-cards">
+          <div class="pile-card"></div>
+          <div class="pile-card"></div>
+          <div class="pile-card"></div>
+        </div>
+        <div class="pile-label">pile · 3</div>
+      </div>
+      <div class="claim-region">
+        <div class="claim-bubble">Two queens.</div>
+        <div class="claim-meta">target rank: queen</div>
+      </div>
+    </div>
+    <div class="hand">
+      <div class="card">
+        <div class="card-rank-tl">Q</div>
+        <div class="card-rank-mid">Q</div>
+        <div class="card-rank-br">Q</div>
+      </div>
+      <div class="card">
+        <div class="card-rank-tl">K</div>
+        <div class="card-rank-mid">K</div>
+        <div class="card-rank-br">K</div>
+      </div>
+      <div class="card">
+        <div class="card-rank-tl">A</div>
+        <div class="card-rank-mid">A</div>
+        <div class="card-rank-br">A</div>
+      </div>
+      <div class="card">
+        <div class="card-rank-tl">J</div>
+        <div class="card-rank-mid">J</div>
+        <div class="card-rank-br">J</div>
+      </div>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn">Accept</button>
+    <button class="btn btn-challenge">Liar!</button>
+  </div>
+</div>
+</body>
+</html>

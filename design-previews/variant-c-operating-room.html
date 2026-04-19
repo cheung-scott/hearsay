@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Hearsay — Variant C: The Operating Room (Buckshot-forward)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void:    #0a0d0a;
+    --iron:    #1a1a1a;
+    --steel:   #3a3a3a;
+    --rust:    #8a7a5a;
+    --sickly:  #a8b090;   /* Buckshot green-tint */
+    --bone:    #d8d4c8;
+    --bone-dim:#7a7a70;
+    --blood:   #8b1a1a;
+    --warn:    #c04838;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body {
+    background: var(--void);
+    color: var(--bone);
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+    position: relative;
+  }
+  .scene {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 45% 40% at 50% 35%, rgba(216, 220, 200, 0.08), transparent 70%),
+      linear-gradient(180deg, #0c120c 0%, var(--void) 60%, #050705 100%);
+  }
+  /* Bayer dither via SVG — Buckshot signature */
+  .scene::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect x='0' y='0' width='1' height='1' fill='%23000'/%3E%3Crect x='2' y='2' width='1' height='1' fill='%23000'/%3E%3Crect x='2' y='0' width='1' height='1' fill='%23fff'/%3E%3Crect x='0' y='2' width='1' height='1' fill='%23fff'/%3E%3C/svg%3E");
+    background-size: 4px 4px;
+    mix-blend-mode: overlay;
+    opacity: 0.08;
+    z-index: 3;
+  }
+  /* Chromatic aberration overlay — subtle */
+  .scene::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 100% 100% at 50% 50%, transparent 40%, rgba(0,0,0,0.75) 100%);
+    z-index: 4;
+  }
+  .content {
+    position: relative; z-index: 10;
+    width: 100%; height: 100%;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    padding: 24px 32px 0 32px;
+  }
+  /* Top — clinical HUD */
+  .top {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 24px; align-items: center;
+    border-bottom: 1px solid var(--steel);
+    padding-bottom: 16px;
+  }
+  .monitor {
+    display: flex; align-items: center; gap: 12px;
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--sickly);
+  }
+  .monitor-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--sickly);
+    box-shadow: 0 0 8px var(--sickly);
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: 0.4; } }
+  .round-tag {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: var(--bone-dim);
+    text-align: center;
+  }
+  .round-tag span { color: var(--rust); }
+  .strikes {
+    display: flex; gap: 8px; justify-content: flex-end;
+    align-items: center;
+  }
+  .strikes-label {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 10px; letter-spacing: 3px;
+    color: var(--bone-dim); margin-right: 8px;
+  }
+  .strike {
+    width: 18px; height: 28px;
+    background: var(--iron);
+    border: 1px solid var(--steel);
+  }
+  .strike.lit {
+    background: var(--warn);
+    border-color: var(--warn);
+    box-shadow: 0 0 12px rgba(192, 72, 56, 0.6);
+  }
+  /* Center — opponent + claim */
+  .table {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 24px;
+    position: relative;
+  }
+  .opponent-block {
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    padding-top: 24px;
+  }
+  .portrait {
+    width: 140px; height: 180px;
+    background: linear-gradient(170deg, var(--iron) 0%, #050505 100%);
+    border: 1px solid var(--steel);
+    position: relative;
+    box-shadow: 0 0 40px rgba(168, 176, 144, 0.15), inset 0 0 40px rgba(0,0,0,0.8);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .portrait-initial {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 72px;
+    color: var(--rust);
+    opacity: 0.5;
+  }
+  .portrait-tag {
+    position: absolute; bottom: -1px; left: -1px; right: -1px;
+    background: var(--iron);
+    border-top: 1px solid var(--steel);
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 9px; letter-spacing: 3px;
+    color: var(--sickly);
+    padding: 5px 8px;
+    text-align: center;
+  }
+  .claim-container {
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+  .claim-bubble {
+    background: var(--iron);
+    border: 1px solid var(--rust);
+    border-left: 3px solid var(--rust);
+    padding: 14px 22px;
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 16px;
+    letter-spacing: 3px;
+    color: var(--bone);
+    text-transform: uppercase;
+  }
+  .claim-telemetry {
+    display: flex; gap: 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--bone-dim);
+  }
+  .claim-telemetry span {
+    display: inline-flex; gap: 6px;
+  }
+  .claim-telemetry b {
+    color: var(--warn); font-weight: normal;
+  }
+  /* Center column — pile + lie score stacked */
+  .center-hud {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 48px; align-items: center;
+    width: 100%;
+    margin-top: 20px;
+    padding: 18px 0;
+    border-top: 1px solid var(--steel);
+    border-bottom: 1px solid var(--steel);
+  }
+  .pile {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .pile-cards {
+    position: relative; width: 60px; height: 84px;
+  }
+  .pile-card {
+    position: absolute; inset: 0;
+    background: var(--bone);
+    border: 1px solid var(--bone-dim);
+  }
+  .pile-card:nth-child(1) { transform: rotate(-3deg); }
+  .pile-card:nth-child(2) { transform: rotate(2deg); }
+  .pile-card:nth-child(3) { transform: rotate(0deg); }
+  .pile-meta {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 10px; letter-spacing: 3px;
+    color: var(--bone-dim);
+  }
+  .pile-meta b {
+    display: block; color: var(--bone);
+    font-size: 24px; margin-top: 2px; letter-spacing: 1px;
+  }
+  .lie-score-row {
+    display: flex; align-items: center; gap: 14px;
+  }
+  .lie-score-label {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 10px; letter-spacing: 3px;
+    color: var(--bone-dim);
+  }
+  .lie-score-bar {
+    flex: 1; height: 14px;
+    background: var(--iron);
+    border: 1px solid var(--steel);
+    position: relative;
+  }
+  .lie-score-fill {
+    position: absolute; left: 0; top: 0; height: 100%;
+    width: 62%;
+    background: repeating-linear-gradient(
+      90deg,
+      var(--warn) 0px,
+      var(--warn) 4px,
+      #a03828 4px,
+      #a03828 8px
+    );
+  }
+  .lie-score-value {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 20px;
+    color: var(--warn);
+    min-width: 60px; text-align: right;
+  }
+  .target-tag {
+    display: flex; flex-direction: column; align-items: center;
+    font-family: 'Archivo Black', sans-serif;
+    padding: 6px 14px;
+    border: 1px solid var(--sickly);
+    background: var(--iron);
+  }
+  .target-tag-label {
+    font-size: 8px; letter-spacing: 3px;
+    color: var(--bone-dim);
+  }
+  .target-tag-value {
+    font-size: 16px; letter-spacing: 3px;
+    color: var(--sickly);
+    margin-top: 2px;
+  }
+  /* Hand */
+  .hand {
+    display: flex; justify-content: center; align-items: flex-end;
+    padding: 20px 0 24px 0;
+  }
+  .card {
+    width: 100px; height: 146px;
+    background: var(--bone);
+    border: 2px solid #2a2a28;
+    display: flex; flex-direction: column;
+    padding: 10px;
+    color: #1a1a1a;
+    position: relative;
+    transition: transform 0.2s;
+  }
+  .card:not(:first-child) { margin-left: -12px; }
+  .card:nth-child(1) { transform: rotate(-4deg) translateY(6px); }
+  .card:nth-child(2) { transform: rotate(-1deg) translateY(0); }
+  .card:nth-child(3) { transform: rotate(2deg) translateY(-2px); }
+  .card:nth-child(4) { transform: rotate(5deg) translateY(5px); }
+  .card:hover { transform: translateY(-10px); z-index: 5; }
+  .card-rank-tl, .card-rank-br {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 18px; line-height: 1;
+    letter-spacing: 2px;
+  }
+  .card-rank-br {
+    text-align: right;
+    transform: rotate(180deg);
+  }
+  .card-rank-mid {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 40px; letter-spacing: 2px;
+    color: #1a1a1a;
+  }
+  /* Actions */
+  .actions {
+    position: absolute; bottom: 24px; left: 32px; right: 32px;
+    z-index: 11;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .btn {
+    font-family: 'Archivo Black', sans-serif;
+    font-size: 11px; letter-spacing: 4px;
+    background: var(--iron);
+    color: var(--sickly);
+    border: 1px solid var(--sickly);
+    padding: 14px 36px;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+  .btn:hover { background: rgba(168, 176, 144, 0.1); }
+  .btn-challenge {
+    color: var(--warn); border-color: var(--warn);
+  }
+  .btn-challenge:hover { background: rgba(192, 72, 56, 0.1); }
+  .variant-label {
+    position: absolute; top: 12px; right: 16px; z-index: 20;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px; color: var(--bone-dim);
+    letter-spacing: 2px; opacity: 0.6;
+  }
+</style>
+</head>
+<body>
+<div class="variant-label">VARIANT C · THE OPERATING ROOM · BUCKSHOT-FORWARD</div>
+<div class="scene">
+  <div class="content">
+    <div class="top">
+      <div class="monitor">
+        <div class="monitor-dot"></div>
+        <span>SIGNAL · LOCKED</span>
+      </div>
+      <div class="round-tag">ROUND <span>01</span> · BEST OF 3</div>
+      <div class="strikes">
+        <span class="strikes-label">STRIKES</span>
+        <div class="strike lit"></div>
+        <div class="strike"></div>
+        <div class="strike"></div>
+      </div>
+    </div>
+    <div class="table">
+      <div class="opponent-block">
+        <div class="portrait">
+          <div class="portrait-initial">R</div>
+          <div class="portrait-tag">THE READER</div>
+        </div>
+        <div class="claim-container">
+          <div class="claim-bubble">"TWO QUEENS"</div>
+          <div class="claim-telemetry">
+            <span>LAT <b>2.4s</b></span>
+            <span>FILLERS <b>1</b></span>
+            <span>WPM <b>184</b></span>
+          </div>
+        </div>
+      </div>
+      <div class="center-hud">
+        <div class="pile">
+          <div class="pile-cards">
+            <div class="pile-card"></div>
+            <div class="pile-card"></div>
+            <div class="pile-card"></div>
+          </div>
+          <div class="pile-meta">PILE<b>3</b></div>
+        </div>
+        <div class="lie-score-row">
+          <span class="lie-score-label">LIE SCORE</span>
+          <div class="lie-score-bar"><div class="lie-score-fill"></div></div>
+          <span class="lie-score-value">0.62</span>
+        </div>
+        <div class="target-tag">
+          <span class="target-tag-label">TARGET</span>
+          <span class="target-tag-value">QUEEN</span>
+        </div>
+      </div>
+    </div>
+    <div class="hand">
+      <div class="card">
+        <div class="card-rank-tl">Q</div>
+        <div class="card-rank-mid">Q</div>
+        <div class="card-rank-br">Q</div>
+      </div>
+      <div class="card">
+        <div class="card-rank-tl">K</div>
+        <div class="card-rank-mid">K</div>
+        <div class="card-rank-br">K</div>
+      </div>
+      <div class="card">
+        <div class="card-rank-tl">A</div>
+        <div class="card-rank-mid">A</div>
+        <div class="card-rank-br">A</div>
+      </div>
+      <div class="card">
+        <div class="card-rank-tl">J</div>
+        <div class="card-rank-mid">J</div>
+        <div class="card-rank-br">J</div>
+      </div>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn">ACCEPT</button>
+    <button class="btn btn-challenge">CALL LIAR</button>
+  </div>
+</div>
+</body>
+</html>
