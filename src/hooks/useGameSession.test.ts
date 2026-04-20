@@ -77,9 +77,9 @@ describe('derivePhase — phase gate table', () => {
       expected: 'session-over',
     },
     {
-      label: 'joker_offer → round-over',
+      label: 'joker_offer → joker-offer',
       session: makeClientSession({ status: 'joker_offer' }),
-      expected: 'round-over',
+      expected: 'joker-offer',
     },
     {
       label: 'round_active + claim_phase + activePlayer=player → recording',

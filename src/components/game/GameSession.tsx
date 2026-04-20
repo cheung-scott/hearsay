@@ -15,6 +15,13 @@ import { Scene } from './Scene/Scene';
 import { TopBar } from './Hud/TopBar';
 import { PlayerControls } from './PlayerControls/PlayerControls';
 import { OverlayEffects } from './Scene/OverlayEffects';
+// Day-5 Wave-2 UI stubs — scaffold-first / parallel-fill pattern.
+// Each returns null until its parallel-fill agent implements. Props contracts
+// are frozen below; agents MUST NOT modify the stub interfaces.
+import { JokerTray } from './PlayerControls/JokerTray';
+import { JokerPicker } from './Scene/JokerPicker';
+import { ProbeReveal } from './Scene/ProbeReveal';
+import { AutopsyOverlay } from './Scene/AutopsyOverlay';
 
 // ---------------------------------------------------------------------------
 // §1.5 Elimination-Beat constants
@@ -504,6 +511,43 @@ export function GameSession({ initialSession }: GameSessionProps) {
         onAccept={() => { dispatch({ type: 'PlayerRespond', action: 'accept' }).catch(() => {}); }}
         onLiar={handleLiar}
       />
+
+      {/* Day-5 Wave-2 joker / probe / autopsy UI — all stubs until agents fill. */}
+
+      {/* JokerTray — always-visible bottom-bar tray of held jokers. */}
+      {state.session?.self.jokerSlots && state.session.self.jokerSlots.length > 0 && (
+        <JokerTray
+          jokerSlots={state.session.self.jokerSlots}
+          activeEffects={
+            state.session.rounds[state.session.currentRoundIdx]?.activeJokerEffects ?? []
+          }
+          onActivate={(joker) => {
+            void dispatch({ type: 'UseJoker', joker }).catch(() => {});
+          }}
+        />
+      )}
+
+      {/* JokerPicker — modal on joker-offer phase (round winner picks 1-of-3). */}
+      {state.phase === 'joker-offer' && state.session?.currentOffer && (
+        <JokerPicker
+          offer={state.session.currentOffer}
+          onPick={(joker) => {
+            void dispatch({ type: 'PickJoker', joker }).catch(() => {});
+          }}
+        />
+      )}
+
+      {/* ProbeReveal — overlay when the current round has an active probe. */}
+      {state.session?.rounds[state.session.currentRoundIdx]?.currentProbe && (
+        <ProbeReveal
+          probe={state.session.rounds[state.session.currentRoundIdx]!.currentProbe!}
+        />
+      )}
+
+      {/* AutopsyOverlay — overlay when Earful has populated autopsy. */}
+      {state.session?.autopsy && (
+        <AutopsyOverlay autopsy={state.session.autopsy} />
+      )}
     </div>
   );
 }

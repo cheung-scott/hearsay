@@ -11,6 +11,7 @@ export type GameEvent =
   | { type: 'PlayerRespond'; action: 'accept' | 'challenge' }
   | { type: 'AiAct' }
   | { type: 'PickJoker'; joker: string }
+  | { type: 'UseJoker'; joker: string }
   | { type: 'TimeoutActive' }
   | { type: 'TimeoutResponder' };
 
@@ -20,6 +21,7 @@ export type GamePhase =
   | 'awaiting-ai'
   | 'playing-ai-audio'
   | 'awaiting-player-response'
+  | 'joker-offer'
   | 'round-over'
   | 'session-over';
 
@@ -50,7 +52,7 @@ export function derivePhase(
   if (session === null) return 'idle';
 
   if (session.status === 'session_over') return 'session-over';
-  if (session.status === 'joker_offer') return 'round-over';
+  if (session.status === 'joker_offer') return 'joker-offer';
 
   if (session.status === 'round_active') {
     const round = session.rounds[session.currentRoundIdx];
@@ -207,6 +209,10 @@ export function useGameSession(initialSession?: ClientSession): {
           body = { type: 'PlayerRespond', sessionId, action: event.action };
         } else if (event.type === 'AiAct') {
           body = { type: 'AiAct', sessionId };
+        } else if (event.type === 'PickJoker') {
+          body = { type: 'PickJoker', sessionId, joker: event.joker };
+        } else if (event.type === 'UseJoker') {
+          body = { type: 'UseJoker', sessionId, joker: event.joker, by: 'player' };
         }
 
         const response = await fetch(url, {

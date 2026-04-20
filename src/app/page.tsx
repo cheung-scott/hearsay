@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 type PlayState = "idle" | "loading" | "playing" | "error";
 
@@ -59,18 +60,26 @@ export default function Home() {
             You lie with your voice. It lies back.
           </p>
           <p className="text-xs uppercase tracking-[0.2em] text-zinc-600">
-            Day&nbsp;1&nbsp;·&nbsp;voice smoke test
+            A voice-bluffing trial. Best of 3. 3 strikes = eliminated.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={playTestVoice}
-          disabled={state === "loading" || state === "playing"}
-          className="rounded-full border border-zinc-700 bg-zinc-950 px-8 py-4 text-sm font-medium uppercase tracking-[0.15em] text-zinc-100 transition-colors hover:border-zinc-500 hover:bg-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {buttonLabel}
-        </button>
+        <div className="flex flex-col items-center gap-4">
+          <Link
+            href="/game"
+            className="rounded-full border-2 border-amber-500 bg-amber-500/10 px-10 py-4 text-base font-semibold uppercase tracking-[0.2em] text-amber-200 transition-colors hover:bg-amber-500/20"
+          >
+            Start Trial
+          </Link>
+          <button
+            type="button"
+            onClick={playTestVoice}
+            disabled={state === "loading" || state === "playing"}
+            className="rounded-full border border-zinc-700 bg-zinc-950 px-6 py-2 text-xs font-medium uppercase tracking-[0.15em] text-zinc-500 transition-colors hover:border-zinc-500 hover:bg-zinc-900 hover:text-zinc-400 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {buttonLabel}
+          </button>
+        </div>
 
         {state === "error" && errorMessage ? (
           <p
