@@ -254,34 +254,40 @@ function challengeCalled(
   };
 }
 
-/** spec §1.3 row 5 + §1.4 rules 1-8 — RevealComplete */
-function revealComplete(
+// ---------------------------------------------------------------------------
+// revealComplete private helpers (spec §1.4 steps 1-6)
+// ---------------------------------------------------------------------------
+
+/**
+ * §1.4 steps 1–2: Determine the loser/winner, auto-consume jokers (Second Wind,
+ * Earful), accumulate jokerTriggeredThisRound, move pile → loser's takenCards,
+ * and apply (or cancel) the strike.
+ *
+ * Returns the intermediate session with strike+pile+slots applied, plus derived
+ * keys and the newTriggered list needed by the subsequent step helpers.
+ */
+function resolveStrikeAndPile(
   session: Session,
-  event: Extract<GameEvent, { type: 'RevealComplete' }>,
-): Session {
-  const currentRound = session.rounds[session.currentRoundIdx];
-
-  if (!currentRound || currentRound.status !== 'resolving') {
-    throw new InvalidTransitionError(
-      `round_active(round.status=${currentRound?.status ?? 'none'})`,
-      event.type,
-    );
-  }
-
-  const { challengeWasCorrect } = event;
-  const lastClaim = currentRound.claimHistory[currentRound.claimHistory.length - 1];
-  if (!lastClaim) {
-    throw new InvalidTransitionError('resolving(no claim history)', event.type);
-  }
-
+  currentRound: Round,
+  lastClaim: Round['claimHistory'][number],
+  challengeWasCorrect: boolean,
+): {
+  sessionWithStrike: Session;
+  loserKey: 'player' | 'ai';
+  winnerKey: 'player' | 'ai';
+  activeKey: 'player' | 'ai';
+  newTriggered: JokerType[];
+  loserStrikesAfter: number;
+} {
   // Step 1: determine who takes the strike.
   // challengeWasCorrect=true → claimant was caught lying → claimant (= activePlayer) loses.
-  // challengeWasCorrect=false → challenger was wrong → challenger (non-activePlayer) loses.
+  // challengeWasCorrect=false → challenger was wrong → challenger (non-claimant) loses.
   const claimantKey = lastClaim.by; // 'player' | 'ai'
   const opponentKey: 'player' | 'ai' = claimantKey === 'player' ? 'ai' : 'player';
   const challengerKey: 'player' | 'ai' = opponentKey; // challenger is always the non-claimant
   const loserKey: 'player' | 'ai' = challengeWasCorrect ? claimantKey : opponentKey;
   const winnerKey: 'player' | 'ai' = loserKey === 'player' ? 'ai' : 'player';
+  const activeKey = currentRound.activePlayer;
 
   // Step 1b: Second Wind auto-consume (Req 14.1, 14.2, 14.4).
   // If loserKey holds a 'held' second_wind, consume it and cancel the incoming strike.
@@ -334,11 +340,13 @@ function revealComplete(
   ];
 
   // Step 2: pile → loser's takenCards; apply strike (cancelled if Second Wind fired).
+  const loserStrikesAfter = secondWindConsumed
+    ? session[loserKey].strikes
+    : session[loserKey].strikes + 1;
+
   const loserAfterPile = {
     ...session[loserKey],
-    strikes: secondWindConsumed
-      ? session[loserKey].strikes
-      : session[loserKey].strikes + 1,
+    strikes: loserStrikesAfter,
     takenCards: [...session[loserKey].takenCards, ...currentRound.pile],
     jokerSlots: loserKey === 'player' ? playerSlotsAfterSW : aiSlotsAfterSW,
   };
@@ -357,29 +365,63 @@ function revealComplete(
     ...(autopsy !== session.autopsy ? { autopsy } : {}),
   };
 
-  const activeKey = currentRound.activePlayer;
+  return { sessionWithStrike, loserKey, winnerKey, activeKey, newTriggered, loserStrikesAfter };
+}
 
-  // Step 3: session-end check (strikes===3) — FIRST
-  if (loserAfterPile.strikes >= 3) {
-    const finalRound: Round = {
-      ...currentRound,
-      pile: [],
-      status: 'round_over',
-      winner: winnerKey,
-      jokerTriggeredThisRound: newTriggered,
-    };
-    return {
-      ...sessionWithStrike,
-      status: 'session_over',
-      sessionWinner: winnerKey,
-      rounds: session.rounds.map((r, i) =>
-        i === session.currentRoundIdx ? finalRound : r,
-      ),
-    };
-  }
+/**
+ * §1.4 step 3: If the loser has reached 3 strikes, end the session immediately.
+ * Returns the terminal Session, or null to continue to round-end checks.
+ */
+function checkSessionEndAfterStrike(
+  sessionWithStrike: Session,
+  session: Session,
+  currentRound: Round,
+  winnerKey: 'player' | 'ai',
+  loserStrikesAfter: number,
+  newTriggered: JokerType[],
+): Session | null {
+  if (loserStrikesAfter < 3) return null;
+
+  const finalRound: Round = {
+    ...currentRound,
+    pile: [],
+    status: 'round_over',
+    winner: winnerKey,
+    jokerTriggeredThisRound: newTriggered,
+  };
+  return {
+    ...sessionWithStrike,
+    status: 'session_over',
+    sessionWinner: winnerKey,
+    rounds: session.rounds.map((r, i) =>
+      i === session.currentRoundIdx ? finalRound : r,
+    ),
+  };
+}
+
+/**
+ * §1.4 steps 4–5: Check the two final-card round-end branches.
+ *
+ * Step 4 — caught-on-final-card-lie (§1.4 rule 5):
+ *   active's hand now empty AND challenge was correct → opponent wins the round.
+ *
+ * Step 5 — honest-final-wrongly-challenged (§1.4 rule 6):
+ *   active's hand now empty AND challenge was wrong → active wins the round.
+ *
+ * Returns the ended Session, or null if neither branch applies (round continues).
+ */
+function checkRoundEndAfterReveal(
+  sessionWithStrike: Session,
+  session: Session,
+  currentRound: Round,
+  activeKey: 'player' | 'ai',
+  challengeWasCorrect: boolean,
+  newTriggered: JokerType[],
+): Session | null {
+  if (sessionWithStrike[activeKey].hand.length !== 0) return null;
 
   // Step 4: caught-on-final-card-lie → opponent wins round
-  if (sessionWithStrike[activeKey].hand.length === 0 && challengeWasCorrect === true) {
+  if (challengeWasCorrect === true) {
     const opponentOfActive: 'player' | 'ai' = activeKey === 'player' ? 'ai' : 'player';
     const finalRound: Round = {
       ...currentRound,
@@ -397,23 +439,32 @@ function revealComplete(
   }
 
   // Step 5: honest-final-wrongly-challenged → active wins round
-  if (sessionWithStrike[activeKey].hand.length === 0 && challengeWasCorrect === false) {
-    const finalRound: Round = {
-      ...currentRound,
-      pile: [],
-      status: 'round_over',
-      winner: activeKey,
-      jokerTriggeredThisRound: newTriggered,
-    };
-    return {
-      ...sessionWithStrike,
-      rounds: session.rounds.map((r, i) =>
-        i === session.currentRoundIdx ? finalRound : r,
-      ),
-    };
-  }
+  const finalRound: Round = {
+    ...currentRound,
+    pile: [],
+    status: 'round_over',
+    winner: activeKey,
+    jokerTriggeredThisRound: newTriggered,
+  };
+  return {
+    ...sessionWithStrike,
+    rounds: session.rounds.map((r, i) =>
+      i === session.currentRoundIdx ? finalRound : r,
+    ),
+  };
+}
 
-  // Step 6: swap active player, back to claim_phase
+/**
+ * §1.4 step 6: Neither session-end nor round-end fired — swap active player and
+ * return to claim_phase to continue the round.
+ */
+function continueRoundWithSwappedActive(
+  sessionWithStrike: Session,
+  session: Session,
+  currentRound: Round,
+  activeKey: 'player' | 'ai',
+  newTriggered: JokerType[],
+): Session {
   const nextActive: 'player' | 'ai' = activeKey === 'player' ? 'ai' : 'player';
   const continuedRound: Round = {
     ...currentRound,
@@ -428,6 +479,49 @@ function revealComplete(
       i === session.currentRoundIdx ? continuedRound : r,
     ),
   };
+}
+
+/** spec §1.3 row 5 + §1.4 rules 1-8 — RevealComplete (orchestrator) */
+function revealComplete(
+  session: Session,
+  event: Extract<GameEvent, { type: 'RevealComplete' }>,
+): Session {
+  const currentRound = session.rounds[session.currentRoundIdx];
+
+  // Guard — must be in resolving status (stays at top per spec)
+  if (!currentRound || currentRound.status !== 'resolving') {
+    throw new InvalidTransitionError(
+      `round_active(round.status=${currentRound?.status ?? 'none'})`,
+      event.type,
+    );
+  }
+
+  const { challengeWasCorrect } = event;
+  const lastClaim = currentRound.claimHistory[currentRound.claimHistory.length - 1];
+  if (!lastClaim) {
+    throw new InvalidTransitionError('resolving(no claim history)', event.type);
+  }
+
+  // Steps 1–2: joker auto-consume, strike, pile transfer
+  const { sessionWithStrike, winnerKey, activeKey, newTriggered, loserStrikesAfter } =
+    resolveStrikeAndPile(session, currentRound, lastClaim, challengeWasCorrect);
+
+  // Step 3: session-end check (strikes===3) — FIRST
+  const sessionEndResult = checkSessionEndAfterStrike(
+    sessionWithStrike, session, currentRound, winnerKey, loserStrikesAfter, newTriggered,
+  );
+  if (sessionEndResult !== null) return sessionEndResult;
+
+  // Steps 4–5: final-card round-end branches
+  const roundEndResult = checkRoundEndAfterReveal(
+    sessionWithStrike, session, currentRound, activeKey, challengeWasCorrect, newTriggered,
+  );
+  if (roundEndResult !== null) return roundEndResult;
+
+  // Step 6: swap active player, back to claim_phase
+  return continueRoundWithSwappedActive(
+    sessionWithStrike, session, currentRound, activeKey, newTriggered,
+  );
 }
 
 /** spec §1.3 row 7 — RoundSettled */
