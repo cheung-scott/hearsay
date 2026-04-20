@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import type { DecisionContext, OwnPlayContext } from './types';
-import type { Card, Rank, PublicClaim } from '../game/types';
+import type { Card, Rank, PublicClaim, Persona } from '../game/types';
 import {
   PERSONA_WEIGHTS,
+  PERSONA_THRESHOLDS,
+  PERSONA_BLUFF_BIAS,
   claimMathProbability,
   aiDecideOnClaimFallback,
   aiDecideOwnPlayFallback,
@@ -383,6 +385,89 @@ describe('invariant 10: voice lie-score absence = neutral 0.5', () => {
 // ---------------------------------------------------------------------------
 // Invariant 12 — alreadyClaimed includes current claim
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// ai-personas spec invariants (design.md §9 — I4, I7 partial, I8, I10 partial)
+// ---------------------------------------------------------------------------
+
+const PERSONAS_CANONICAL: Persona[] = ['Novice', 'Reader', 'Misdirector', 'Silent'];
+
+describe('ai-personas I4 — persona difficulty monotone ordering (design.md §5)', () => {
+  it('bluff-bias: Novice < Reader < Silent ≤ Misdirector', () => {
+    expect(PERSONA_BLUFF_BIAS.Novice).toBeLessThan(PERSONA_BLUFF_BIAS.Reader);
+    expect(PERSONA_BLUFF_BIAS.Reader).toBeLessThan(PERSONA_BLUFF_BIAS.Silent);
+    expect(PERSONA_BLUFF_BIAS.Silent).toBeLessThanOrEqual(PERSONA_BLUFF_BIAS.Misdirector);
+  });
+
+  it('threshold: Silent < Misdirector ≤ Reader < Novice', () => {
+    expect(PERSONA_THRESHOLDS.Silent).toBeLessThan(PERSONA_THRESHOLDS.Misdirector);
+    expect(PERSONA_THRESHOLDS.Misdirector).toBeLessThanOrEqual(PERSONA_THRESHOLDS.Reader);
+    expect(PERSONA_THRESHOLDS.Reader).toBeLessThan(PERSONA_THRESHOLDS.Novice);
+  });
+});
+
+describe('ai-personas I7 partial — exhaustive persona coverage (math tables)', () => {
+  it.each([
+    ['PERSONA_WEIGHTS', PERSONA_WEIGHTS],
+    ['PERSONA_THRESHOLDS', PERSONA_THRESHOLDS],
+    ['PERSONA_BLUFF_BIAS', PERSONA_BLUFF_BIAS],
+  ] as const)('%s has exactly the four canonical Persona keys', (_name, table) => {
+    expect(Object.keys(table).sort()).toEqual(['Misdirector', 'Novice', 'Reader', 'Silent']);
+  });
+});
+
+describe('ai-personas — exact locked values (design.md §5.1, §5.2, §5.3)', () => {
+  it('PERSONA_WEIGHTS matches locked table', () => {
+    expect(PERSONA_WEIGHTS.Novice).toEqual({ math: 0.7, voice: 0.3 });
+    expect(PERSONA_WEIGHTS.Reader).toEqual({ math: 0.4, voice: 0.6 });
+    expect(PERSONA_WEIGHTS.Misdirector).toEqual({ math: 0.5, voice: 0.5 });
+    expect(PERSONA_WEIGHTS.Silent).toEqual({ math: 0.3, voice: 0.7 });
+  });
+
+  it('PERSONA_THRESHOLDS matches locked table', () => {
+    expect(PERSONA_THRESHOLDS.Novice).toBe(0.70);
+    expect(PERSONA_THRESHOLDS.Reader).toBe(0.55);
+    expect(PERSONA_THRESHOLDS.Misdirector).toBe(0.50);
+    expect(PERSONA_THRESHOLDS.Silent).toBe(0.45);
+  });
+
+  it('PERSONA_BLUFF_BIAS matches locked table', () => {
+    expect(PERSONA_BLUFF_BIAS.Novice).toBe(0.10);
+    expect(PERSONA_BLUFF_BIAS.Reader).toBe(0.35);
+    expect(PERSONA_BLUFF_BIAS.Misdirector).toBe(0.60);
+    expect(PERSONA_BLUFF_BIAS.Silent).toBe(0.55);
+  });
+});
+
+describe('ai-personas I8 — neutral-signal challenge distribution (design.md §9)', () => {
+  it('with mathProb=0.5 and voiceLie=0.5, combined score is 0.5 for all personas', () => {
+    for (const p of PERSONAS_CANONICAL) {
+      const { math: wm, voice: wv } = PERSONA_WEIGHTS[p];
+      const combined = wm * 0.5 + wv * 0.5;
+      expect(combined).toBe(0.5);
+    }
+  });
+
+  it('exactly Misdirector and Silent challenge on neutral signal (2 of 4)', () => {
+    const challengers: Persona[] = [];
+    for (const p of PERSONAS_CANONICAL) {
+      const { math: wm, voice: wv } = PERSONA_WEIGHTS[p];
+      const combined = wm * 0.5 + wv * 0.5;
+      if (combined >= PERSONA_THRESHOLDS[p]) challengers.push(p);
+    }
+    expect(challengers.sort()).toEqual(['Misdirector', 'Silent']);
+  });
+});
+
+describe('ai-personas I10 partial — Clerk non-membership in math tables', () => {
+  it.each([
+    ['PERSONA_WEIGHTS', PERSONA_WEIGHTS],
+    ['PERSONA_THRESHOLDS', PERSONA_THRESHOLDS],
+    ['PERSONA_BLUFF_BIAS', PERSONA_BLUFF_BIAS],
+  ] as const)('"Clerk" is not a key in %s', (_name, table) => {
+    expect('Clerk' in (table as Record<string, unknown>)).toBe(false);
+  });
+});
 
 describe('invariant 12: alreadyClaimed includes current claim', () => {
   it('current claim in roundHistory shifts result from 0.15 to mid-range or 0.95', () => {
