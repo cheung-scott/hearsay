@@ -119,7 +119,7 @@ describe('invariant 2: math probability bounds', () => {
       for (const count of counts) {
         for (const rank of ranks) {
           for (const roundHistory of histories) {
-            const claim: PublicClaim = { by: 'player', count, claimedRank: rank, timestamp: 0 };
+            const claim: DecisionContext['claim'] = { by: 'player', count, claimedRank: rank, timestamp: 0 };
             const ctx = makeDecisionCtx({ myHand: hand, claim, roundHistory });
             const prob = claimMathProbability(ctx);
             expect(prob).toBeGreaterThanOrEqual(0.15);
@@ -144,7 +144,7 @@ describe('invariant 3: math probability key cases', () => {
       makeCard('Queen', 'q0'), makeCard('Queen', 'q1'), makeCard('Queen', 'q2'),
       makeCard('Queen', 'q3'), makeCard('Queen', 'q4'),
     ];
-    const claim: PublicClaim = { by: 'player', count: 1, claimedRank: 'Queen', timestamp: 0 };
+    const claim: DecisionContext['claim'] = { by: 'player', count: 1, claimedRank: 'Queen', timestamp: 0 };
     const ctx = makeDecisionCtx({ myHand: hand, claim, roundHistory: [claim] });
     expect(claimMathProbability(ctx)).toBe(0.95);
   });
@@ -158,7 +158,7 @@ describe('invariant 3: math probability key cases', () => {
       makeCard('King', 'k0'), makeCard('King', 'k1'), makeCard('Ace', 'a0'),
       makeCard('Jack', 'j0'), makeCard('Jack', 'j1'),
     ];
-    const claim: PublicClaim = { by: 'player', count: 1, claimedRank: 'Queen', timestamp: 0 };
+    const claim: DecisionContext['claim'] = { by: 'player', count: 1, claimedRank: 'Queen', timestamp: 0 };
     const ctx = makeDecisionCtx({ myHand: hand, claim, roundHistory: [] });
     expect(claimMathProbability(ctx)).toBe(0.15);
   });
@@ -180,7 +180,7 @@ describe('invariant 3: math probability key cases', () => {
       makeCard('King', 'k0'), makeCard('King', 'k1'), makeCard('Ace', 'a0'),
       makeCard('Jack', 'j0'), makeCard('Jack', 'j1'),
     ];
-    const claim: PublicClaim = { by: 'player', count: 1, claimedRank: 'Queen', timestamp: 100 };
+    const claim: DecisionContext['claim'] = { by: 'player', count: 1, claimedRank: 'Queen', timestamp: 100 };
 
     // rs=2 case: prior history has 2 Queen claims (total), current adds 1 → alreadyClaimed=3, rs=2
     const priorClaims2: PublicClaim[] = [
@@ -216,7 +216,7 @@ describe('invariant 3: math probability key cases', () => {
 
 describe('invariant 4: fallback judgment is deterministic', () => {
   it('identical DecisionContext produces the same action on every call', () => {
-    const claim: PublicClaim = { by: 'player', count: 1, claimedRank: 'Queen', timestamp: 0 };
+    const claim: DecisionContext['claim'] = { by: 'player', count: 1, claimedRank: 'Queen', timestamp: 0 };
     const ctx = makeDecisionCtx({ claim, roundHistory: [claim] });
 
     const result1 = aiDecideOnClaimFallback(ctx);
@@ -494,7 +494,7 @@ describe('invariant 12: alreadyClaimed includes current claim', () => {
       makeCard('Jack', 'j0'), makeCard('Jack', 'j1'),
     ];
 
-    const currentClaim: PublicClaim = { by: 'player', count: 1, claimedRank: 'Queen', timestamp: 100 };
+    const currentClaim: DecisionContext['claim'] = { by: 'player', count: 1, claimedRank: 'Queen', timestamp: 100 };
     const priorClaims: PublicClaim[] = [
       { by: 'ai', count: 1, claimedRank: 'Queen', timestamp: 10 },
       { by: 'ai', count: 1, claimedRank: 'Queen', timestamp: 20 },

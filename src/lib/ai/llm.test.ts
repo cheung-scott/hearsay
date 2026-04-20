@@ -54,7 +54,11 @@ function makeCard(rank: Rank, id: string): Card {
 }
 
 function makeDecisionCtx(overrides: Partial<DecisionContext> = {}): DecisionContext {
-  const defaultClaim: PublicClaim = {
+  // Typed as DecisionContext['claim'] so the fixture is assignable to the
+  // intersection (PublicClaim & { voiceMeta?: VoiceMeta }) without needing to
+  // construct a full VoiceMeta — tests that exercise voice fields populate
+  // the full VoiceMeta shape inline (see 'voiceLie from voiceMeta.lieScore').
+  const defaultClaim: DecisionContext['claim'] = {
     by: 'player',
     count: 1,
     claimedRank: 'Queen',

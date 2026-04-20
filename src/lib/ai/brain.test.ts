@@ -44,7 +44,11 @@ function makeCard(rank: Rank, id: string): Card {
 }
 
 function makeDecisionCtx(overrides: Partial<DecisionContext> = {}): DecisionContext {
-  const defaultClaim: PublicClaim = {
+  // Typed as DecisionContext['claim'] (PublicClaim & { voiceMeta?: VoiceMeta })
+  // so test fixtures flow through the intersection without needing to construct
+  // a full VoiceMeta. voiceMeta is omitted here; tests that exercise voice-lie
+  // logic populate the full VoiceMeta shape inline (see math.test.ts invariant 10).
+  const defaultClaim: DecisionContext['claim'] = {
     by: 'player',
     count: 1,
     claimedRank: 'Queen',
@@ -327,7 +331,7 @@ describe('invariant 12 (via brain): alreadyClaimed includes current claim', () =
       makeCard('Jack', 'J-0'),
       makeCard('Jack', 'J-1'),
     ];
-    const currentClaim: PublicClaim = {
+    const currentClaim: DecisionContext['claim'] = {
       by: 'player',
       count: 2,
       claimedRank: 'Queen',
