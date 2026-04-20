@@ -1,23 +1,19 @@
 'use client';
 
 /**
- * Day-5 Wave-2 SCAFFOLD STUB — implement in parallel-fill agent.
+ * Day-5 Wave-2 — Earful preset-reveal card.
  *
  * Overlay shown after a player-won challenge while Earful joker is active.
  * Reveals which VoiceTellPreset the AI was using for that turn — teaches the
- * voice-tell taxonomy through play.
+ * voice-tell taxonomy through play (joker-system spec §7.4.3).
  *
- * Visual contract (for implementer):
- * - Autopsy card overlay (~3-5s display), dismissible on click or auto-fade
- * - Large preset name + a short "here's what that sounds like" caption
- * - Optionally play a 1s clip at the preset's cadence (SKIP for Day-5 MVP —
- *   wire later if capacity allows)
- * - Auto-clears when session.autopsy is undefined (cleared by ChallengeCalled
- *   or RoundSettled reducers)
+ * Auto-clears when session.autopsy is cleared by the server (ChallengeCalled
+ * or RoundSettled reducers). No client dispatch needed.
  *
  * Props are frozen.
  */
 
+import { useEffect, useRef, useState } from 'react';
 import type { VoiceTellPreset } from '@/lib/game/types';
 
 export interface AutopsyOverlayProps {
@@ -27,7 +23,190 @@ export interface AutopsyOverlayProps {
   onDismiss?: () => void;
 }
 
-export function AutopsyOverlay(_props: AutopsyOverlayProps) {
-  // STUB: returns null. Agent-fill will render the preset-reveal card.
-  return null;
+// ---------------------------------------------------------------------------
+// Preset caption data
+// ---------------------------------------------------------------------------
+
+type PresetInfo = { label: string; caption: string };
+
+const PRESET_INFO: Record<string, PresetInfo> = {
+  CONFIDENT: {
+    label: 'CONFIDENT',
+    caption: 'measured, over-articulated \u2014 the salesman',
+  },
+  HESITANT: {
+    label: 'HESITANT',
+    caption: 'breathy pauses, filler words \u2014 buying time',
+  },
+  RAMBLE: {
+    label: 'RAMBLE',
+    caption: 'too many words, evading commitment',
+  },
+  CLIPPED: {
+    label: 'CLIPPED',
+    caption: 'terse, minimal affect \u2014 stonewalling',
+  },
+  PROBE: {
+    label: 'PROBE',
+    caption: 'leading questions, shifting blame',
+  },
+};
+
+function getPresetInfo(preset: VoiceTellPreset): PresetInfo & { known: boolean } {
+  const key = preset?.toUpperCase?.() ?? '';
+  if (Object.prototype.hasOwnProperty.call(PRESET_INFO, key)) {
+    return { ...PRESET_INFO[key], known: true };
+  }
+  return { label: '[unknown preset]', caption: '', known: false };
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export function AutopsyOverlay({ autopsy, onDismiss }: AutopsyOverlayProps) {
+  const [visible, setVisible] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const dismissedRef = useRef(false);
+
+  // Fade-in on mount
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  function handleDismiss() {
+    if (dismissedRef.current) return;
+    dismissedRef.current = true;
+    setLeaving(true);
+    setTimeout(() => {
+      onDismiss?.();
+    }, 200);
+  }
+
+  const { label, caption, known } = getPresetInfo(autopsy.preset);
+
+  const containerStyle: React.CSSProperties = {
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    paddingTop: '14%',
+    zIndex: 20,
+    // Container does NOT block gameplay inputs
+    pointerEvents: 'none',
+    opacity: leaving ? 0 : visible ? 1 : 0,
+    transition: leaving
+      ? 'opacity 200ms ease-out'
+      : 'opacity 300ms ease-in',
+  };
+
+  const cardStyle: React.CSSProperties = {
+    // Re-enable pointer events only on the card itself
+    pointerEvents: 'auto',
+    width: 360,
+    minHeight: 200,
+    background: 'linear-gradient(160deg, #1a1006 0%, #0d0a04 100%)',
+    border: '1px solid var(--amber-dim)',
+    boxShadow:
+      '0 0 24px rgba(139, 90, 15, 0.4), inset 0 0 12px rgba(0,0,0,0.6)',
+    borderRadius: 4,
+    padding: '20px 24px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    cursor: onDismiss ? 'pointer' : 'default',
+    userSelect: 'none',
+  };
+
+  const headerStyle: React.CSSProperties = {
+    fontFamily: "'Press Start 2P', monospace",
+    fontSize: 10,
+    color: 'var(--amber-hi)',
+    letterSpacing: '0.15em',
+    margin: 0,
+  };
+
+  const labelSmallStyle: React.CSSProperties = {
+    fontFamily: "'Press Start 2P', monospace",
+    fontSize: 8,
+    color: 'var(--bone-dim)',
+    letterSpacing: '0.1em',
+    margin: 0,
+  };
+
+  const presetNameStyle: React.CSSProperties = {
+    fontFamily: "'Press Start 2P', monospace",
+    fontSize: known ? 28 : 16,
+    color: known ? 'var(--amber-hi)' : 'var(--bone-dim)',
+    letterSpacing: '0.05em',
+    lineHeight: 1.1,
+    margin: 0,
+    filter: known ? 'drop-shadow(0 0 8px var(--amber-hi))' : 'none',
+  };
+
+  const captionStyle: React.CSSProperties = {
+    fontFamily: 'VT323, monospace',
+    fontSize: 18,
+    color: known ? 'var(--bone-dim)' : 'var(--bone-dim)',
+    letterSpacing: '0.04em',
+    margin: 0,
+    opacity: 0.85,
+  };
+
+  const dividerStyle: React.CSSProperties = {
+    height: 1,
+    background: 'var(--amber-dim)',
+    opacity: 0.4,
+  };
+
+  const hintStyle: React.CSSProperties = {
+    fontFamily: 'VT323, monospace',
+    fontSize: 14,
+    color: 'var(--amber-dim)',
+    textAlign: 'center' as const,
+    margin: 0,
+    opacity: 0.7,
+  };
+
+  return (
+    <div
+      style={containerStyle}
+      // data-testid for test selectors
+      data-testid="autopsy-overlay-container"
+    >
+      <div
+        style={cardStyle}
+        onClick={handleDismiss}
+        data-testid="autopsy-overlay-card"
+      >
+        <p style={headerStyle}>AUTOPSY</p>
+
+        <div style={dividerStyle} />
+
+        <p style={labelSmallStyle}>AI WAS USING:</p>
+
+        <p
+          style={presetNameStyle}
+          data-testid="autopsy-preset-name"
+        >
+          {label}
+        </p>
+
+        {caption ? (
+          <p style={captionStyle} data-testid="autopsy-preset-caption">
+            {caption}
+          </p>
+        ) : null}
+
+        {onDismiss && (
+          <>
+            <div style={dividerStyle} />
+            <p style={hintStyle}>[ click to dismiss ]</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
