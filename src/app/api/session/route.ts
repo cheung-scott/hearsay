@@ -17,8 +17,27 @@ import * as store from '@/lib/session/store';
 // POST /api/session — create
 // ---------------------------------------------------------------------------
 
-export async function POST(): Promise<Response> {
+const VALID_PERSONAS = ['Novice', 'Reader', 'Misdirector', 'Silent'] as const;
+type ValidPersona = (typeof VALID_PERSONAS)[number];
+
+function isValidPersona(p: unknown): p is ValidPersona {
+  return typeof p === 'string' && (VALID_PERSONAS as readonly string[]).includes(p);
+}
+
+export async function POST(req: Request): Promise<Response> {
   try {
+    // Optional preferredPersona body param (Day-5 gauntlet — Option B).
+    // Defaults to 'Reader' for backward-compat if missing / invalid.
+    let preferredPersona: ValidPersona = 'Reader';
+    try {
+      const body = await req.json().catch(() => null);
+      if (body && isValidPersona(body.preferredPersona)) {
+        preferredPersona = body.preferredPersona;
+      }
+    } catch {
+      // Body parse failure is non-fatal — use default.
+    }
+
     const id = crypto.randomUUID();
 
     // Build the initial (bare) Session in 'setup' state.
@@ -38,8 +57,10 @@ export async function POST(): Promise<Response> {
         roundsWon: 0,
         strikes: 0,
         jokers: [],
-        // Phase 1 demo: Reader is the sole opponent persona.
-        personaIfAi: 'Reader',
+        // Day-5 gauntlet (Option B): client passes preferredPersona via request
+        // body; server defaults to 'Reader' if absent. Server-agnostic to
+        // gauntlet state — the client's localStorage drives progression.
+        personaIfAi: preferredPersona,
       },
       deck: [],
       rounds: [],

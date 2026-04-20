@@ -6,7 +6,7 @@ import type { ClientSession, Card } from '../lib/game/types';
 // ---------------------------------------------------------------------------
 
 export type GameEvent =
-  | { type: 'CreateSession' }
+  | { type: 'CreateSession'; preferredPersona?: string }
   | { type: 'PlayerClaim'; cards: Card[]; audio: Blob; claimText: string }
   | { type: 'PlayerRespond'; action: 'accept' | 'challenge' }
   | { type: 'AiAct' }
@@ -195,7 +195,9 @@ export function useGameSession(initialSession?: ClientSession): {
 
         if (event.type === 'CreateSession') {
           url = '/api/session';
-          body = {};
+          body = event.preferredPersona
+            ? { preferredPersona: event.preferredPersona }
+            : {};
         } else if (event.type === 'PlayerClaim') {
           const audioBase64 = await blobToBase64(event.audio);
           body = {
