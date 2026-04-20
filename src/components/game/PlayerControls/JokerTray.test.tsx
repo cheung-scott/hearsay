@@ -66,15 +66,14 @@ describe('JokerTray — slot rendering', () => {
     expect(buttonTexts.some(t => t.includes(JOKER_CATALOG.second_wind.name))).toBe(true);
   });
 
-  it('caps at 5 slots even if more are provided', () => {
+  it('caps at 3 slots even if more are provided', () => {
     const slots: JokerSlot[] = [
       makeSlot('poker_face'),
       makeSlot('cold_read'),
       makeSlot('second_wind'),
+      // Extra slots — should be capped at 3
       makeSlot('earful'),
       makeSlot('stage_whisper'),
-      // Duplicate — should be capped at 5
-      makeSlot('poker_face'),
     ];
 
     const { container } = render(
@@ -82,7 +81,7 @@ describe('JokerTray — slot rendering', () => {
     );
 
     const buttons = container.querySelectorAll('button');
-    expect(buttons).toHaveLength(5);
+    expect(buttons).toHaveLength(3);
   });
 });
 

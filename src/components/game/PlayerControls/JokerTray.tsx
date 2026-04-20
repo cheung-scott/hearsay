@@ -35,6 +35,13 @@ export function JokerTray({ jokerSlots, activeEffects, onActivate }: JokerTrayPr
   const firingTypes = new Set(activeEffects.map(e => e.type));
 
   return (
+    <>
+      <style>{`
+        @keyframes jokerPulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.3); opacity: 0.7; }
+        }
+      `}</style>
     <div
       style={{
         position: 'fixed',
@@ -47,7 +54,7 @@ export function JokerTray({ jokerSlots, activeEffects, onActivate }: JokerTrayPr
         alignItems: 'flex-end',
       }}
     >
-      {jokerSlots.slice(0, 5).map((slot) => {
+      {jokerSlots.slice(0, 3).map((slot) => {
         const joker = JOKER_CATALOG[slot.joker];
         const isConsumed = slot.state === 'consumed';
         const isFiring = firingTypes.has(slot.joker);
@@ -59,7 +66,7 @@ export function JokerTray({ jokerSlots, activeEffects, onActivate }: JokerTrayPr
 
         return (
           <button
-            key={slot.joker}
+            key={`${slot.joker}-${slot.acquiredAt}`}
             data-joker={slot.joker}
             data-state={slot.state}
             data-firing={isFiring ? 'true' : 'false'}
@@ -145,7 +152,7 @@ export function JokerTray({ jokerSlots, activeEffects, onActivate }: JokerTrayPr
                   borderRadius: '50%',
                   background: 'var(--amber-hi, #ffc760)',
                   boxShadow: '0 0 8px var(--amber-hi, #ffc760)',
-                  animation: 'breathe 1s ease-in-out infinite',
+                  animation: 'jokerPulse 1s ease-in-out infinite',
                   flexShrink: 0,
                 }}
               />
@@ -154,5 +161,6 @@ export function JokerTray({ jokerSlots, activeEffects, onActivate }: JokerTrayPr
         );
       })}
     </div>
+    </>
   );
 }
