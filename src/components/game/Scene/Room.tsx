@@ -1,13 +1,23 @@
 'use client';
 
+import { CourtroomBackground } from './CourtroomBackground';
+
 /**
- * Backdrop: wall gradient + wood-paneling seams (::before) + hanging bulb with
- * light pool (::after). Matches `.room` in variant-d-across-table.html.
+ * Backdrop: courtroom re-skin (iter-6 §10.6) layered under all scene children.
+ *
+ * Composition:
+ *   1. Base wall gradient (--wall tones, matches variant-d aesthetic)
+ *   2. CourtroomBackground — judge bench, columns, pendant lamps, scales, paneling
+ *   3. Centre hanging bulb (original variant-d amber bulb — now supplemented by
+ *      pendant lamps from CourtroomBackground)
+ *
+ * z-index discipline: Room sits at z:0; Scene children (Opponent, RoundTable, etc.)
+ * render ON TOP with their own z-indices (4–12). Overlays sit at z:30+.
  */
 export function Room() {
   return (
     <>
-      {/* Main room backdrop — wall gradient + amber bulb pool */}
+      {/* Base wall gradient — warm amber pool + dark floor */}
       <div
         className="room"
         style={{
@@ -21,22 +31,10 @@ export function Room() {
           zIndex: 0,
         }}
       >
-        {/* Wood paneling seams */}
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage: `repeating-linear-gradient(
-              90deg,
-              transparent 0px, transparent 120px,
-              rgba(0,0,0,0.15) 121px, rgba(0,0,0,0.15) 123px,
-              transparent 124px, transparent 244px,
-              rgba(0,0,0,0.08) 245px, rgba(0,0,0,0.08) 247px
-            )`,
-            pointerEvents: 'none',
-          }}
-        />
-        {/* Hanging bulb stem + light pool */}
+        {/* Courtroom re-skin motifs — bench, columns, lamps, scales */}
+        <CourtroomBackground />
+
+        {/* Centre hanging bulb stem + amber glow (original variant-d) */}
         <div
           style={{
             position: 'absolute',
@@ -49,6 +47,7 @@ export function Room() {
             boxShadow:
               '0 62px 0 0 var(--amber), 0 62px 50px 14px rgba(253,162,0,0.6)',
             zIndex: 2,
+            pointerEvents: 'none',
           }}
         />
       </div>

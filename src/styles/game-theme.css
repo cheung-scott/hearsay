@@ -35,6 +35,13 @@
   --amber-hi: #ffc760;
   --amber-dim: #8b5a0f;
 
+  /* Courtroom re-skin palette (DESIGN-DECISIONS.md §10.6 — iter-6) */
+  --bench-wood: #2a1608;        /* judge bench dark wood */
+  --bench-wood-hi: #3a1e0c;     /* wood grain highlight */
+  --column-dark: #1f1409;       /* column silhouette */
+  --gold: #d4a84a;              /* brass / scales emblem */
+  --lamp-glow: rgba(253,162,0,0.35);
+
   /*
    * Convenience alias — phase 1 defaults Reader/Prosecutor as the sole opponent.
    * When Day-5 ai-personas lands, a parent element will override --accent
@@ -81,4 +88,11 @@
 @keyframes flicker {
   from { opacity: 0.75; transform: translateX(-50%) scaleY(0.9); }
   to   { opacity: 1;    transform: translateX(-50%) scaleY(1.1); }
+}
+
+@keyframes lamp-flicker {
+  0%, 100% { opacity: 1; }
+  45%      { opacity: 0.92; }
+  50%      { opacity: 0.96; }
+  55%      { opacity: 0.90; }
 }
