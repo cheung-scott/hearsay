@@ -22,6 +22,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { ClientSession } from '@/lib/game/types';
 import { useTutorial, type TutorialState } from '@/hooks/useTutorial';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
+import { ClerkSprite } from './ClerkSprite';
 
 export interface ClerkTutorialProps {
   /** Current client session — tutorial observes state transitions. */
@@ -439,49 +440,7 @@ export function ClerkTutorial({ session, onComplete, tutorial }: ClerkTutorialPr
             marginBottom: '10px',
           }}
         >
-          <div
-            data-testid="clerk-sprite"
-            aria-label="CLERK"
-            style={{
-              width: '32px',
-              height: '40px',
-              flexShrink: 0,
-              background: 'var(--felt, #1a2e1a)',
-              border: '2px solid var(--amber-hi, #f5c842)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '2px',
-              boxShadow: '2px 2px 0 0 var(--shadow, rgba(0,0,0,0.5))',
-            }}
-          >
-            <div
-              style={{
-                width: '12px',
-                height: '12px',
-                background: 'var(--bone-dim, #a09070)',
-                borderRadius: '50% 50% 0 0',
-              }}
-            />
-            <div
-              style={{
-                width: '18px',
-                height: '14px',
-                background: 'var(--bone-dim, #a09070)',
-              }}
-            />
-            <span
-              style={{
-                fontFamily: '"Press Start 2P", monospace',
-                fontSize: '4px',
-                color: 'var(--amber-hi, #f5c842)',
-                letterSpacing: '0.5px',
-              }}
-            >
-              CLERK
-            </span>
-          </div>
+          <ClerkSprite size={32} showLabel />
           <div
             style={{
               fontSize: '7px',

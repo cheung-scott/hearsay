@@ -634,6 +634,17 @@ export function GameSession({ initialSession }: GameSessionProps) {
       );
     }
 
+    // Subtitle copy differs by outcome + by gauntlet position (verdict stays
+    // the same, but mid-gauntlet phrasing previews the next opponent).
+    const nextUp = nextPersona(progress);
+    const subtitle = playerWon
+      ? (nextUp
+          ? `The ${PERSONA_DISPLAY_NAMES[nextUp]} rises next.`
+          : 'The court adjourns.')
+      : 'The jury has spoken.';
+    const ctaLabel = playerWon
+      ? (nextUp ? 'NEXT CASE' : 'NEW TRIAL')
+      : 'RETRIAL';
     return (
       <div
         style={{
@@ -644,21 +655,57 @@ export function GameSession({ initialSession }: GameSessionProps) {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: '24px',
+          gap: '20px',
           fontFamily: '"Press Start 2P", monospace',
           color: 'var(--bone)',
         }}
       >
         <OverlayEffects />
-        <h1
+        {/* Verdict plate — amber border + drop shadow, stronger stage feel. */}
+        <div
           style={{
-            fontSize: '20px',
-            margin: 0,
-            color: playerWon ? 'var(--amber-hi)' : 'var(--coral)',
+            padding: '24px 44px',
+            border: `3px solid ${playerWon ? 'var(--amber-hi)' : 'var(--coral)'}`,
+            background: 'rgba(10,16,8,0.75)',
+            boxShadow: '6px 6px 0 0 var(--shadow), 0 0 32px rgba(0,0,0,0.55)',
+            textAlign: 'center',
           }}
         >
-          {playerWon ? 'CASE DISMISSED' : 'GUILTY'}
-        </h1>
+          <div
+            style={{
+              fontSize: '8px',
+              letterSpacing: '3px',
+              color: 'var(--bone-dim)',
+              marginBottom: '12px',
+              textTransform: 'uppercase',
+            }}
+          >
+            VERDICT
+          </div>
+          <h1
+            data-testid="session-verdict"
+            style={{
+              fontSize: '26px',
+              margin: 0,
+              letterSpacing: '4px',
+              color: playerWon ? 'var(--amber-hi)' : 'var(--coral)',
+            }}
+          >
+            {playerWon ? 'CASE DISMISSED' : 'GUILTY'}
+          </h1>
+          <p
+            style={{
+              fontSize: '9px',
+              letterSpacing: '2px',
+              color: 'var(--bone-dim)',
+              marginTop: '14px',
+              marginBottom: 0,
+              textTransform: 'uppercase',
+            }}
+          >
+            {subtitle}
+          </p>
+        </div>
         <button
           onClick={async () => {
             // Prime AudioContext inside the user gesture (autoplay policy).
@@ -677,7 +724,7 @@ export function GameSession({ initialSession }: GameSessionProps) {
             boxShadow: '4px 4px 0 0 var(--shadow)',
           }}
         >
-          NEW TRIAL
+          {ctaLabel}
         </button>
       </div>
     );
