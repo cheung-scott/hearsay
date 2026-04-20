@@ -1344,6 +1344,36 @@ describe('reduce — JokerPicked (7.2, Invariant 16)', () => {
     reduce(session, { type: 'JokerPicked', joker: 'cold_read', nextRoundDeal: makeNextRoundDeal(), now: 6000 });
     expect(JSON.stringify(session)).toBe(before);
   });
+
+  it('throws slot_cap_exceeded when winner has 3 held joker slots (Req 7.2)', () => {
+    const all = make20Cards();
+    const session = makeJokerOfferSession({
+      roundWinner: 'player',
+      playerTakenCards: [all[0]],
+      aiTakenCards: [all[1]],
+      roundPile: [all[10]],
+    });
+    // Pre-populate player with 3 held slots.
+    const sessionWithFullSlots: Session = {
+      ...session,
+      player: {
+        ...session.player,
+        jokerSlots: [
+          { joker: 'poker_face', acquiredAt: 0, state: 'held', acquiredRoundIdx: 0 },
+          { joker: 'earful', acquiredAt: 0, state: 'held', acquiredRoundIdx: 0 },
+          { joker: 'cold_read', acquiredAt: 0, state: 'held', acquiredRoundIdx: 0 },
+        ],
+      },
+    };
+    expect(() =>
+      reduce(sessionWithFullSlots, {
+        type: 'JokerPicked',
+        joker: 'stage_whisper',
+        nextRoundDeal: makeNextRoundDeal(),
+        now: 6000,
+      }),
+    ).toThrowError(/slot_cap_exceeded/);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -2861,5 +2891,75 @@ describe('Integration: joker lifecycle walkthrough (I2, I8, I10)', () => {
         reduce(session, { type: 'UseJoker', joker: 'second_wind', by: 'player', now: 7000 })
       ).toThrow(InvalidTransitionError);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ProbeComplete — Req 16.7
+// ---------------------------------------------------------------------------
+
+describe('reduce — ProbeComplete', () => {
+  /** Minimal valid ActiveProbe fixture. */
+  function makeActiveProbe(overrides: Partial<import('./types').ActiveProbe> = {}): import('./types').ActiveProbe {
+    return {
+      whisperId: 'whisper-abc',
+      targetAiId: 'ai',
+      roundIdx: 0,
+      triggeredAtTurn: 1,
+      revealedReasoning: 'It hesitated before answering',
+      filterSource: 'llm-heuristic-layer',
+      startedAt: 8000,
+      decayMs: 4000,
+      expiresAt: 12000,
+      rawLlmReasoning: 'Raw server-only reasoning text',
+      ...overrides,
+    };
+  }
+
+  it('throws no_pending_probe when round.activeProbe === undefined (Req 16.7)', () => {
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ status: 'response_phase' })],
+      currentRoundIdx: 0,
+    });
+    expect(() =>
+      reduce(session, { type: 'ProbeComplete', whisperId: 'whisper-abc', now: 10000 })
+    ).toThrowError(/no_pending_probe/);
+  });
+
+  it('throws probe_id_mismatch when whisperId does not match activeProbe.whisperId', () => {
+    const probe = makeActiveProbe({ whisperId: 'whisper-abc' });
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ status: 'response_phase', activeProbe: probe })],
+      currentRoundIdx: 0,
+    });
+    expect(() =>
+      reduce(session, { type: 'ProbeComplete', whisperId: 'whisper-WRONG', now: 10000 })
+    ).toThrowError(/probe_id_mismatch/);
+  });
+
+  it('clears round.activeProbe on successful ProbeComplete', () => {
+    const probe = makeActiveProbe({ whisperId: 'whisper-abc' });
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [makeRound({ status: 'response_phase', activeProbe: probe })],
+      currentRoundIdx: 0,
+    });
+    const out = reduce(session, { type: 'ProbeComplete', whisperId: 'whisper-abc', now: 10000 });
+    expect(out.rounds[0].activeProbe).toBeUndefined();
+    expect(out.status).toBe('round_active');
+  });
+
+  it('throws when session.status !== round_active', () => {
+    const probe = makeActiveProbe();
+    const session = makeSession({
+      status: 'joker_offer',
+      rounds: [makeRound({ status: 'response_phase', activeProbe: probe })],
+      currentRoundIdx: 0,
+    });
+    expect(() =>
+      reduce(session, { type: 'ProbeComplete', whisperId: 'whisper-abc', now: 10000 })
+    ).toThrow(InvalidTransitionError);
   });
 });
