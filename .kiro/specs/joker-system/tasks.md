@@ -88,7 +88,7 @@ Pre-landed in commit `29f6a34`: `src/lib/jokers/types.ts` (JokerSlot, JokerOffer
   - Test `advanceSlot` throws if joker not found in slots with `state: 'held'`
   - _Requirements: 3.2, 3.3, 4.2, 4.4, 7.1, 8.2, 8.3_
 
-- [ ] 6. Checkpoint — run `pnpm vitest run src/lib/jokers/`
+- [x] 6. Checkpoint — run `pnpm vitest run src/lib/jokers/`
   - Ensure catalog + lifecycle tests pass before touching the FSM reducer
 
 - [x] 7. Implement FSM reducer additions in `src/lib/game/fsm.ts` — JokerOffered, JokerOfferEmpty, JokerPicked extension
@@ -107,7 +107,7 @@ Pre-landed in commit `29f6a34`: `src/lib/jokers/types.ts` (JokerSlot, JokerOffer
   - Extend `applyJokerEffect` to accept `expiresAfter` override or dispatch by joker type using `JOKER_CATALOG[joker].duration`
   - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 9.1, 9.2, 9.3, 10.1, 10.3, 11.5, 11.6, 12.1, 12.3, 14.1, 14.2, 14.3, 14.4, 16.1, 16.2, 16.3, 16.4, 16.7_
 
-- [ ] 9. Checkpoint — run `pnpm vitest run src/lib/game/fsm.test.ts`
+- [x] 9. Checkpoint — run `pnpm vitest run src/lib/game/fsm.test.ts`
   - Ensure existing game-engine tests still pass after reducer additions (no regressions)
 
 - [x] 10. Implement simplest-3 effects in `src/lib/jokers/effects.ts` — Cold Read, Poker Face, Second Wind
@@ -135,7 +135,7 @@ Pre-landed in commit `29f6a34`: `src/lib/jokers/types.ts` (JokerSlot, JokerOffer
     - **I12:** player view has no `jokerDrawPile`; `discardedJokers` present when `status !== 'round_active'`, absent when `round_active`; `currentOffer` present for winner, absent for loser; `jokerSlots` present in both views; `autopsy` present for self only
   - _Requirements: 15.1, 15.2, 15.3, 15.4, 15.5, 13.2_
 
-- [ ] 13. Checkpoint — run `pnpm vitest run`
+- [x] 13. Checkpoint — run `pnpm vitest run`
   - Full test suite: catalog + lifecycle + effects + fsm + toClientView. All green before cross-spec effects.
 
 - [x] 14. Implement Earful autopsy effect in `src/lib/jokers/effects.ts`
@@ -168,7 +168,7 @@ Pre-landed in commit `29f6a34`: `src/lib/jokers/types.ts` (JokerSlot, JokerOffer
   - **I10:** JokerOfferEmpty transitions to round_active with currentRoundIdx incremented
   - _Requirements: 3.1, 4.1, 5.1, 6.1, 6.2, 6.3, 8.1, 8.2, 8.3, 8.4, 9.1, 10.1, 12.1, 13.1, 14.1, 16.1_
 
-- [ ] 17. Final checkpoint — run `pnpm vitest run`
+- [x] 17. Final checkpoint — run `pnpm vitest run`
   - Full suite green. All 13 invariants (I1-I13) covered. No regressions in game-engine, toClientView, or other spec test suites.
 
 - [ ]* 18. Optional — Catalog drift guard automation
