@@ -1221,6 +1221,19 @@ describe('reduce — RoundSettled (7.1)', () => {
     reduce(session, { type: 'RoundSettled', now: 5000 });
     expect(JSON.stringify(session)).toBe(before);
   });
+
+  it('clears session.autopsy on RoundSettled (Req 12.4)', () => {
+    const round = makeRound({ roundNumber: 1, status: 'round_over', winner: 'player' });
+    const session = makeSession({
+      status: 'round_active',
+      rounds: [round],
+      currentRoundIdx: 0,
+      player: makePlayer({ roundsWon: 0 }),
+      autopsy: { preset: 'confident_honest', roundIdx: 0, turnIdx: 1 },
+    });
+    const out = reduce(session, { type: 'RoundSettled', now: 5000 });
+    expect(out.autopsy).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------

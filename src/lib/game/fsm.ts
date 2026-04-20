@@ -436,12 +436,15 @@ function roundSettled(
     throw new InvalidTransitionError('round_over(no winner set)', event.type);
   }
 
+  // §7.4.3 / Req 12.4 — clear autopsy on RoundSettled (same as ChallengeCalled)
+  const { autopsy: _droppedAutopsy, ...sessionWithoutAutopsy } = session;
+
   // Increment roundsWon for the round winner
   const updatedSession: Session = {
-    ...session,
+    ...sessionWithoutAutopsy,
     [winner]: {
-      ...session[winner],
-      roundsWon: session[winner].roundsWon + 1,
+      ...sessionWithoutAutopsy[winner],
+      roundsWon: sessionWithoutAutopsy[winner].roundsWon + 1,
     },
   };
 
