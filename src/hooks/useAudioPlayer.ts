@@ -33,10 +33,17 @@ export function useAudioPlayer(): {
     }
 
     audioRef.current.src = url;
+    // Set isPlaying(true) optimistically, then on autoplay-policy rejection or
+    // bad-URL error: clear isPlaying AND fire the onEnded callback so any
+    // downstream state machines (e.g. typewriter, derivePhase) can advance
+    // rather than deadlocking waiting for an 'ended' event that will never fire.
+    setIsPlaying(true);
     audioRef.current.play().catch(() => {
       setIsPlaying(false);
+      const cb = onEndedCallbackRef.current;
+      onEndedCallbackRef.current = null;
+      cb?.();
     });
-    setIsPlaying(true);
   }, []);
 
   const onEnded = useCallback((cb: () => void) => {
