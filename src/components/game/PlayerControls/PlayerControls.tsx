@@ -6,6 +6,7 @@ import type { HoldState } from './HoldToSpeak';
 import { PlayerHand } from './PlayerHand';
 import { HoldToSpeak } from './HoldToSpeak';
 import { AcceptLiarButtons } from './AcceptLiarButtons';
+import { YouWillCallBanner } from './YouWillCallBanner';
 
 interface PlayerControlsProps {
   session: ClientSession;
@@ -38,6 +39,8 @@ export function PlayerControls({
 }: PlayerControlsProps) {
   const interactive = phase === 'recording';
   const acceptLiarVisible = phase === 'awaiting-player-response';
+  const round = session.rounds[session.currentRoundIdx];
+  const targetRank = round?.targetRank ?? 'Queen';
 
   return (
     <div
@@ -55,6 +58,13 @@ export function PlayerControls({
           selectedIds={selectedIds}
           onToggle={toggleSelection}
           interactive={interactive}
+        />
+        {/* Live claim preview — clarifies that the rank you call is locked to
+            the target rank (playtest fix). */}
+        <YouWillCallBanner
+          visible={phase === 'recording'}
+          selectedCount={selectedIds.size}
+          targetRank={targetRank}
         />
         <HoldToSpeak
           phase={phase}

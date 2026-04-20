@@ -9,8 +9,9 @@
  * Settings: stability 0.72, similarityBoost 0.80, style 0.35, speed 0.95
  *
  * Usage:
- *   pnpm tsx scripts/gen-tutorial-mp3s.ts
- *   npx tsx scripts/gen-tutorial-mp3s.ts
+ *   pnpm tsx scripts/gen-tutorial-mp3s.ts              # regen all 7
+ *   pnpm tsx scripts/gen-tutorial-mp3s.ts --only=3     # regen step 3 only
+ *   pnpm tsx scripts/gen-tutorial-mp3s.ts --only=3,6   # regen steps 3 + 6
  *
  * Requires ELEVENLABS_API_KEY in .env.local (or already in process.env).
  */
@@ -76,7 +77,7 @@ const CLERK_VOICE_ID = 'Al9pMcZxV70KAzzehiTE';  // hearsay-clerk
 const TUTORIAL_LINES: string[] = [
   "Court is in session. Before your trial, let me brief you on the rules.",
   "The rank called each round is here.",
-  "Select your cards here. Press and hold this button, then say the number of cards you're playing followed by the rank. You can be honest, or you can bluff — the defendant will listen to your voice and decide whether to believe you. You win the round by emptying your hand, or by catching him in three lies.",
+  "Pick one or two cards, then press and hold this button and call 'one queen' or 'two queens' — or whatever rank the court is demanding. The rank is locked each round, but the cards you actually play can be anything. Tell the truth, or bluff. The defendant will listen to your voice and decide whether to believe you. Win by emptying your hand, or by catching him in three lies.",
   "If you're caught bluffing, you take a strike. Three strikes and you lose the round. Win best-of-three to advance to the next opponent.",
   "The defendant just made his claim. Listen for the tells. Do you believe him?",
   "Well played. Winning a round grants you a joker which holds a power — use it against your opponent to gain an advantage. Most expire after one turn.",
@@ -124,14 +125,35 @@ async function streamToUint8Array(stream: ReadableStream<Uint8Array>): Promise<U
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
+function parseOnly(): Set<number> | null {
+  const arg = process.argv.find((a) => a.startsWith('--only='));
+  if (!arg) return null;
+  const raw = arg.slice('--only='.length);
+  const steps = raw.split(',').map((s) => Number(s.trim())).filter((n) => n >= 1 && n <= 7);
+  if (steps.length === 0) {
+    console.error(`ERROR: --only=${raw} parsed to no valid steps (expected 1..7, comma-separated)`);
+    process.exit(1);
+  }
+  return new Set(steps);
+}
+
 async function main(): Promise<void> {
   const outDir = path.resolve(process.cwd(), 'public', 'sfx', 'tutorial');
   fs.mkdirSync(outDir, { recursive: true });
   console.log(`[init] Output dir: ${outDir}`);
 
-  const totalChars = TUTORIAL_LINES.reduce((sum, line) => sum + line.length, 0);
-  const totalEstCredits = totalChars * FLASH_CREDITS_PER_CHAR;
-  console.log(`[plan] 7 lines, ~${totalChars} total chars, ~${totalEstCredits} estimated credits (Flash v2.5)`);
+  const only = parseOnly();
+  const targetSteps = only
+    ? TUTORIAL_LINES.map((_, i) => i + 1).filter((n) => only.has(n))
+    : TUTORIAL_LINES.map((_, i) => i + 1);
+
+  const targetChars = targetSteps.reduce((sum, n) => sum + TUTORIAL_LINES[n - 1].length, 0);
+  const targetEstCredits = targetChars * FLASH_CREDITS_PER_CHAR;
+  console.log(
+    only
+      ? `[plan] regenerating steps ${targetSteps.join(', ')} (${targetChars} chars, ~${targetEstCredits} credits)`
+      : `[plan] 7 lines, ~${targetChars} total chars, ~${targetEstCredits} estimated credits (Flash v2.5)`,
+  );
   console.log(`[plan] Voice: ${CLERK_VOICE_ID} (hearsay-clerk)`);
   console.log('');
 
@@ -143,6 +165,7 @@ async function main(): Promise<void> {
 
   for (let i = 0; i < TUTORIAL_LINES.length; i++) {
     const stepNum = i + 1;
+    if (only && !only.has(stepNum)) continue;
     const text = TUTORIAL_LINES[i];
     const creditsEst = text.length * FLASH_CREDITS_PER_CHAR;
     const outPath = path.join(outDir, `step-${stepNum}.mp3`);
