@@ -309,20 +309,25 @@ export function ClerkTutorial({ session, onComplete, tutorial }: ClerkTutorialPr
 
       setBubblePos({ top, left, transform });
 
-      // Arrow endpoints — run after layout when bubble is measured.
-      requestAnimationFrame(() => {
-        if (!bubbleRef.current) return;
-        const bRect = bubbleRef.current.getBoundingClientRect();
-        const fromX = bRect.left + bRect.width / 2;
-        // From bubble edge closest to target.
-        const fromY = anchor.kind === 'below-target' ? bRect.top : bRect.bottom;
-        const toX = targetCenterX;
-        const toY =
-          anchor.kind === 'below-target'
-            ? tRect.top + 4
-            : tRect.bottom - 4;
-        setArrowCoords({ fromX, fromY, toX, toY });
-      });
+      // Arrow endpoints — derive from the bubble position we just set (no
+      // need to measure the DOM; rAF-on-commit was unreliable under HMR /
+      // backgrounded tabs). We know the bubble's center-x = `left` and its
+      // edge closest to the target is `top` (below-target) or `top` again
+      // when transform is translate(-50%,-100%) — the visual bottom edge.
+      // Arrow starts at the bubble edge nearest the target and ends just
+      // inside the target edge nearest the bubble.
+      //   below-target: bubble is BELOW target → arrow goes UP from bubble.top
+      //                 (= `top`) to target.bottom.
+      //   above-target: bubble is ABOVE target (translateY -100%, so the
+      //                 visual bottom edge aligns with the CSS `top` value)
+      //                 → arrow goes DOWN from that edge to target.top.
+      const fromX = left;
+      const fromY = top;
+      const toX = targetCenterX;
+      const toY = anchor.kind === 'below-target'
+        ? tRect.bottom - 4
+        : tRect.top + 4;
+      setArrowCoords({ fromX, fromY, toX, toY });
       return true;
     };
 
