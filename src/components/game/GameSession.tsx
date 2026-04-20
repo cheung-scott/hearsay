@@ -82,6 +82,12 @@ export function GameSession({ initialSession }: GameSessionProps) {
   const stingerPlayer = useAudioPlayer();
   // One-shot player for per-persona final-words clips.
   const finalWordsPlayer = useAudioPlayer();
+  // One-shot player for the §1.5 silent-beat whoosh (courtroom hush / inhale).
+  // Hoisted separately from stingerPlayer so the pre-reveal whoosh and the
+  // strike-3 elimination sting can't overwrite each other if they ever race.
+  const silentBeatPlayer = useAudioPlayer();
+  // One-shot player for the verdict gavel strike on session-over.
+  const gavelPlayer = useAudioPlayer();
   const holdToSpeak = useHoldToSpeak();
 
   // -------------------------------------------------------------------------
@@ -390,6 +396,28 @@ export function GameSession({ initialSession }: GameSessionProps) {
   // Track whether we've already fired the elimination-beat sequence for the
   // current session so we don't replay on re-renders.
   const eliminationFiredRef = useRef<string | null>(null);
+  // Separate once-per-session guard for the verdict gavel. Unlike the
+  // eliminationFiredRef path this fires on ANY session-over (strike-3 OR
+  // hand-empty), so it uses its own guard.
+  const gavelFiredRef = useRef<string | null>(null);
+
+  // Gavel strike on verdict — fires exactly once when phase first becomes
+  // session-over for a given session id. Silently no-ops if the MP3 is
+  // missing (useAudioPlayer fires onEnded on play() rejection).
+  useEffect(() => {
+    const session = state.session;
+    if (!session) return;
+    if (state.phase !== 'session-over') return;
+    if (gavelFiredRef.current === session.id) return;
+    gavelFiredRef.current = session.id;
+    try {
+      gavelPlayer.play('/sfx/gavel.mp3');
+    } catch {
+      /* file missing — non-fatal */
+    }
+    // gavelPlayer is a stable ref.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.phase, state.session?.id]);
 
   useEffect(() => {
     const session = state.session;
@@ -476,6 +504,17 @@ export function GameSession({ initialSession }: GameSessionProps) {
     // Duck music for the silent beat (400ms linear ramp per spec §1.5 LOCK).
     if (musicEnabledRef.current) {
       musicRef.current.duckForOutput({ fadeMs: SILENT_BEAT_DUCK_MS });
+    }
+
+    // Fire the silent-beat whoosh SFX (courtroom hush / inhale) during the
+    // dead-air window so it feels intentional, not broken. Silently no-ops if
+    // the MP3 hasn't been generated yet (useAudioPlayer fires onEnded on
+    // play() rejection — no state machine deadlocks here, this is a pure
+    // one-shot with no onEnded consumer).
+    try {
+      silentBeatPlayer.play('/sfx/silent-beat.mp3');
+    } catch {
+      /* file missing or decode error — non-fatal, dead-air still works */
     }
 
     // Cancel any in-flight timer (rapid double-click guard).
