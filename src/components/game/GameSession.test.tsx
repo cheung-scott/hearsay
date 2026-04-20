@@ -152,3 +152,44 @@ describe('GameSession — invariant 12 smoke test', () => {
     expect(rankText).toMatch(/Q|K|A|J/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// NEW TRIAL state reset — bug fix #1 from holistic review
+// ---------------------------------------------------------------------------
+
+describe('GameSession — pregen fires per session id (NEW TRIAL reset)', () => {
+  it('POSTs /api/music/pregen with the initial session id on mount', async () => {
+    const { GameSession } = await import('./GameSession');
+
+    const pregenCalls: string[] = [];
+    const spyFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/music/pregen')) {
+        try {
+          const body = JSON.parse((init?.body as string) ?? '{}');
+          if (body.sessionId) pregenCalls.push(body.sessionId);
+        } catch { /* noop */ }
+        return new Response(JSON.stringify({ tracks: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }) as Response;
+      }
+      return new Response(JSON.stringify({ session: makeClientSession() }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }) as Response;
+    });
+    vi.stubGlobal('fetch', spyFetch);
+
+    const initialSession = makeClientSession({ id: 'session-A' });
+    const { unmount } = render(<GameSession initialSession={initialSession} />);
+    await new Promise(r => setTimeout(r, 10));
+    expect(pregenCalls).toContain('session-A');
+
+    unmount();
+    // NOTE: cross-session reset (session-A → session-B via NEW TRIAL dispatch)
+    // is a known coverage gap — useGameSession lazily-inits initialSession only
+    // on first mount, so a meaningful test requires DOM interaction with the
+    // BEGIN TRIAL button + fetch chaining. Deferred to followup.
+  });
+});

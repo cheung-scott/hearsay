@@ -73,6 +73,8 @@ interface AudioGraph {
   ctx: AudioContext;
   primary: AudioPair;
   secondary: AudioPair;
+  /** Captured to remove on stop() so toggling enabled doesn't leak listeners. */
+  errorListener: EventListener;
 }
 
 function buildAudioPair(ctx: AudioContext, dest: AudioNode): AudioPair {
@@ -124,12 +126,14 @@ export function useMusicBed(args: UseMusicBedArgs): UseMusicBedAPI {
     const primary = buildAudioPair(ctx, ctx.destination);
     const secondary = buildAudioPair(ctx, ctx.destination);
 
-    // R15.2 — wire load-error fallback on both elements.
-    const onError = () => onTrackLoadErrorRef.current?.();
-    primary.audio.addEventListener('error', onError);
-    secondary.audio.addEventListener('error', onError);
+    // R15.2 — wire load-error fallback on both elements. Captured on the graph
+    // so stop() can remove it (toggling `enabled` would otherwise leak listeners
+    // on each rebuild).
+    const errorListener: EventListener = () => onTrackLoadErrorRef.current?.();
+    primary.audio.addEventListener('error', errorListener);
+    secondary.audio.addEventListener('error', errorListener);
 
-    graphRef.current = { ctx, primary, secondary };
+    graphRef.current = { ctx, primary, secondary, errorListener };
     return graphRef.current;
   }, [enabled]);
 
@@ -332,6 +336,12 @@ export function useMusicBed(args: UseMusicBedArgs): UseMusicBedAPI {
       clearTimeout(crossfadeTimerRef.current);
       crossfadeTimerRef.current = null;
     }
+    // Pair the addEventListener from ensureGraph — prevents listener leak on
+    // enabled toggle cycles.
+    try {
+      graph.primary.audio.removeEventListener('error', graph.errorListener);
+      graph.secondary.audio.removeEventListener('error', graph.errorListener);
+    } catch { /* noop */ }
     try { graph.primary.audio.pause(); } catch { /* noop */ }
     try { graph.secondary.audio.pause(); } catch { /* noop */ }
     graph.ctx.close().catch(() => { /* noop */ });
