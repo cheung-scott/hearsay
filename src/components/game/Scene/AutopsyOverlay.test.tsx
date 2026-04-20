@@ -4,8 +4,8 @@
 // Tests: per-preset captions, unknown fallback, optional onDismiss,
 //        click-to-dismiss semantics, preset text visibility.
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { render, fireEvent, cleanup, act } from '@testing-library/react';
 import { AutopsyOverlay } from './AutopsyOverlay';
 
 afterEach(() => cleanup());
@@ -160,6 +160,71 @@ describe('AutopsyOverlay — preset text visible', () => {
     );
 
     expect(getByText('AI WAS USING:')).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 7 (AO-2): Escape key calls onDismiss exactly once
+// ---------------------------------------------------------------------------
+
+describe('AutopsyOverlay — Escape key dismiss', () => {
+  it('fires onDismiss exactly once when Escape is pressed', () => {
+    const onDismiss = vi.fn();
+
+    render(
+      <AutopsyOverlay autopsy={makeAutopsy('CONFIDENT')} onDismiss={onDismiss} />,
+    );
+
+    vi.useFakeTimers();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    vi.runAllTimers();
+    vi.useRealTimers();
+
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not register Escape handler when onDismiss is absent', () => {
+    // Should not throw even if Escape is pressed
+    render(<AutopsyOverlay autopsy={makeAutopsy('CONFIDENT')} />);
+
+    expect(() => {
+      fireEvent.keyDown(document, { key: 'Escape' });
+    }).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 8 (AO-3): Unmount before 200ms timer fires → onDismiss NOT called
+// ---------------------------------------------------------------------------
+
+describe('AutopsyOverlay — timeout cleanup on unmount', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('does not call onDismiss if component unmounts before 200ms elapses', () => {
+    const onDismiss = vi.fn();
+
+    const { getByTestId, unmount } = render(
+      <AutopsyOverlay autopsy={makeAutopsy('CONFIDENT')} onDismiss={onDismiss} />,
+    );
+
+    // Click starts the 200ms timer
+    fireEvent.click(getByTestId('autopsy-overlay-card'));
+
+    // Unmount before the timer fires
+    unmount();
+
+    // Advance past the 200ms — timer should have been cleared
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(onDismiss).not.toHaveBeenCalled();
   });
 });
 

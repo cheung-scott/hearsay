@@ -68,6 +68,7 @@ export function AutopsyOverlay({ autopsy, onDismiss }: AutopsyOverlayProps) {
   const [visible, setVisible] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const dismissedRef = useRef(false);
+  const dismissTimerRef = useRef<number | null>(null);
 
   // Fade-in on mount
   useEffect(() => {
@@ -75,14 +76,34 @@ export function AutopsyOverlay({ autopsy, onDismiss }: AutopsyOverlayProps) {
     return () => cancelAnimationFrame(id);
   }, []);
 
+  // Clear pending dismiss timer on unmount (AO-3)
+  useEffect(() => {
+    return () => {
+      if (dismissTimerRef.current !== null) {
+        clearTimeout(dismissTimerRef.current);
+      }
+    };
+  }, []);
+
   function handleDismiss() {
     if (dismissedRef.current) return;
     dismissedRef.current = true;
     setLeaving(true);
-    setTimeout(() => {
+    dismissTimerRef.current = window.setTimeout(() => {
       onDismiss?.();
     }, 200);
   }
+
+  // Escape-key dismiss (AO-2)
+  useEffect(() => {
+    if (!onDismiss) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') handleDismiss();
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onDismiss]);
 
   const { label, caption, known } = getPresetInfo(autopsy.preset);
 
@@ -108,9 +129,9 @@ export function AutopsyOverlay({ autopsy, onDismiss }: AutopsyOverlayProps) {
     width: 360,
     minHeight: 200,
     background: 'linear-gradient(160deg, #1a1006 0%, #0d0a04 100%)',
-    border: '1px solid var(--amber-dim)',
+    border: '2px solid var(--amber-hi, #ffc760)',
     boxShadow:
-      '0 0 24px rgba(139, 90, 15, 0.4), inset 0 0 12px rgba(0,0,0,0.6)',
+      '4px 4px 0 0 var(--shadow, #050302), 0 0 24px rgba(253,162,0,0.4)',
     borderRadius: 4,
     padding: '20px 24px',
     display: 'flex',
