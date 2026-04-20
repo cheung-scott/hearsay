@@ -11,6 +11,9 @@ interface StrikeCounterProps {
  * / `.strike.lit` in variant-d-across-table.html.
  */
 export function StrikeCounter({ strikes }: StrikeCounterProps) {
+  // Progressive intensification: at strikes >= 2 the smoke rises faster and
+  // slightly larger to match the §1.5 strike-2 CSS dim already in GameSession.
+  const smokeAccelerated = strikes >= 2;
   return (
     <div
       data-testid="strikes-row"
@@ -21,6 +24,14 @@ export function StrikeCounter({ strikes }: StrikeCounterProps) {
         alignItems: 'center',
       }}
     >
+      {/* Local keyframes — same inline <style> pattern as JokerTray.tsx's jokerPulse. */}
+      <style>{`
+        @keyframes smokeWisp {
+          0%   { transform: translate(-50%, 0) scale(0.9); opacity: 0.5; }
+          60%  { opacity: 0.28; }
+          100% { transform: translate(-50%, -18px) scale(1.6); opacity: 0; }
+        }
+      `}</style>
       <span
         className="strikes-label"
         style={{
@@ -73,6 +84,27 @@ export function StrikeCounter({ strikes }: StrikeCounterProps) {
                   borderRadius: '50% 50% 40% 40%',
                   boxShadow: '0 0 8px var(--amber-hi), 0 0 14px var(--amber)',
                   animation: 'flicker 1.2s ease-in-out infinite alternate',
+                }}
+              />
+            )}
+            {/* Smoke wisp — rises & fades above the flame. Only on lit strikes.
+                Variant-D defaults: bone-dim color, 2s/1.4s, 0.5→0 opacity ramp. */}
+            {lit && (
+              <div
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  top: '-22px',
+                  left: '50%',
+                  width: '6px',
+                  height: '10px',
+                  background: 'var(--bone-dim)',
+                  transform: 'translateX(-50%)',
+                  borderRadius: '50%',
+                  filter: 'blur(2px)',
+                  opacity: 0,
+                  pointerEvents: 'none',
+                  animation: `smokeWisp ${smokeAccelerated ? '1.4s' : '2s'} ease-out infinite`,
                 }}
               />
             )}

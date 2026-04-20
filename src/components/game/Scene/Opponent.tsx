@@ -6,16 +6,21 @@ import { OpponentHand } from './OpponentHand';
 interface OpponentProps {
   /** Number of face-down cards in the opponent's hand. */
   handSize: number;
-  /** Display name shown beneath the silhouette (e.g. "THE PROSECUTOR"). */
+  /**
+   * Persona display name. §10.5: opponent name now lives in TopBar CaseLabel —
+   * retained on props for tests / future use.
+   */
   displayName: string;
 }
 
 /**
- * Composes the opponent area: silhouette body + hand of card backs + label.
+ * Composes the opponent area: silhouette body + hand of card backs.
  * z-index 4 places the opponent BEHIND the table (z 5) so the table edge
  * naturally occludes the lower torso. The hand is z-index 6 (above the table).
  */
 export function Opponent({ handSize, displayName }: OpponentProps) {
+  // §10.5: opponent name now lives in TopBar CaseLabel — retained on props for tests.
+  void displayName;
   return (
     <div
       className="opponent-area"
@@ -31,24 +36,6 @@ export function Opponent({ handSize, displayName }: OpponentProps) {
     >
       <Silhouette />
       <OpponentHand handSize={handSize} />
-      <div
-        className="opponent-label"
-        style={{
-          position: 'absolute',
-          top: '280px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          fontFamily: '"Press Start 2P", monospace',
-          fontSize: '11px',
-          letterSpacing: '3px',
-          color: 'var(--amber)',
-          textShadow: '0 0 12px rgba(253,162,0,0.6)',
-          whiteSpace: 'nowrap',
-          zIndex: 12,
-        }}
-      >
-        {displayName}
-      </div>
     </div>
   );
 }

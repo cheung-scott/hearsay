@@ -16,17 +16,21 @@ export function AcceptLiarButtons({ visible, onAccept, onLiar }: AcceptLiarButto
   if (!visible) return null;
 
   return (
+    // §10.4: group Accept + Liar as a centered pair (24px gap) so they read as
+    // a single binary choice rather than two unrelated edge-anchored actions.
+    // Vertical position (`bottom: 8%`) stays locked per §10.4.
     <div
       className="actions"
       style={{
         position: 'absolute',
         bottom: '8%',
-        left: '28px',
-        right: '28px',
+        left: 0,
+        right: 0,
         zIndex: 26,
         display: 'flex',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
         alignItems: 'flex-end',
+        gap: '24px',
       }}
     >
       <button

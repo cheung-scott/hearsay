@@ -381,8 +381,7 @@ export function GameSession({ initialSession }: GameSessionProps) {
   }, [holdToSpeak.audioBlob]);
 
   // Persona display name is threaded through Scene → Opponent via
-  // session.opponent.personaIfAi — Scene does the lookup. This import is
-  // retained for future top-bar merge (§10.5 pending).
+  // session.opponent.personaIfAi — Scene does the lookup.
   void PERSONA_DISPLAY_NAMES;
 
   // -------------------------------------------------------------------------
