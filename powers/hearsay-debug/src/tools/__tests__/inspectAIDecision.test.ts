@@ -1,7 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import {
   makeClaim,
-  makePlayer,
   makeRound,
   makeSession,
 } from '../../__tests__/fixtures';
@@ -88,6 +87,30 @@ describe('inspectAIDecision', () => {
     expect(env.data.llmReasoning).toBe('I suspect this is a bluff');
     expect(env.data.actualCardIds).toBeDefined();
     expect(env.data.ttsSettings).toBeDefined();
+    // mathProb is re-derived for AI claims (design §5 tool 3 note).
+    expect(typeof env.data.mathProb).toBe('number');
+    expect(env.data.mathProb).toBeGreaterThanOrEqual(0);
+    expect(env.data.mathProb).toBeLessThanOrEqual(1);
+  });
+
+  it('omits mathProb for player claims (only AI claims get re-derivation)', async () => {
+    const session = makeSession({
+      id: 'sp',
+      rounds: [
+        makeRound({
+          claimHistory: [makeClaim({ by: 'player' })],
+        }),
+      ],
+    });
+    kvMock.map.set('hearsay:session:sp', session);
+
+    const tool = makeInspectAIDecision({
+      allowForceTransition: true,
+      allowInspectAIDecision: true,
+    });
+    const env = parseEnvelope(await tool({ sessionId: 'sp', turnIndex: 0 }));
+    expect(env.ok).toBe(true);
+    expect(env.data.mathProb).toBeUndefined();
   });
 
   it('out-of-range turnIndex → TURN_NOT_FOUND', async () => {

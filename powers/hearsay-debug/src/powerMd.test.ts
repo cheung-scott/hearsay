@@ -27,13 +27,19 @@ describe('POWER.md metadata drift (I6)', () => {
     expect(TOOL_NAMES).toHaveLength(7);
   });
 
-  it('frontmatter contains name, version, description, mcpServers', () => {
+  it('frontmatter carries name, version, description, mcpServers keys', () => {
+    // Intentionally permissive: design §11 Q1 flagged that exact required
+    // frontmatter keys are unverified in Kiro's schema. We check for
+    // substring presence (not strict anchors) so a future Kiro schema
+    // change doesn't break our metadata drift test unless the keys go
+    // away entirely.
     const frontmatter = content.match(/^---\s*\n([\s\S]*?)\n---/);
     expect(frontmatter, 'POWER.md must start with YAML frontmatter').not.toBeNull();
     const body = frontmatter![1]!;
-    expect(body).toMatch(/^name:\s*hearsay-debug/m);
-    expect(body).toMatch(/^version:\s*/m);
-    expect(body).toMatch(/^description:\s*/m);
-    expect(body).toMatch(/^mcpServers:\s*$/m);
+    expect(body).toContain('name:');
+    expect(body).toContain('hearsay-debug');
+    expect(body).toContain('version:');
+    expect(body).toContain('description:');
+    expect(body).toContain('mcpServers:');
   });
 });

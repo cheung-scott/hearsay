@@ -173,8 +173,23 @@ export function buildServer(permissions: DebugPermissions): McpServer {
   return server;
 }
 
+// Early warning for the six-out-of-seven tools that reach KV. `listFSMEvents`
+// still works without creds, so we WARN rather than abort — a judge cloning
+// for a quick `listFSMEvents` demo shouldn't be blocked, but a developer who
+// forgot to source the env should see the reason up front instead of first
+// hitting a cryptic `@vercel/kv` runtime error on tool call.
+function warnIfKvEnvMissing(env: NodeJS.ProcessEnv): void {
+  const missing = ['KV_URL', 'KV_REST_API_TOKEN'].filter((k) => !env[k]);
+  if (missing.length > 0) {
+    console.error(
+      `[hearsay-debug] WARN: ${missing.join(' + ')} not set. All tools except listFSMEvents will return KV_ERROR until env is provided. See README.`,
+    );
+  }
+}
+
 async function main() {
   const permissions = loadPermissions();
+  warnIfKvEnvMissing(process.env);
   const selection = pickTransport(process.argv.slice(2), process.env);
   const server = buildServer(permissions);
 

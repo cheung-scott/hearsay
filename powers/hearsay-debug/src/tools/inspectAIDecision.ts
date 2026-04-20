@@ -74,10 +74,18 @@ export function makeInspectAIDecision(permissions: DebugPermissions) {
   };
 }
 
-// Rebuild a DecisionContext matching the state at `turnInRound` and re-run
-// claimMathProbability. Design §5 tool 3 implementation note: if the stored
-// Claim lacks mathProb (it is NOT persisted), re-derive from context; if
-// re-derivation fails for any reason, omit rather than fake.
+// Re-run claimMathProbability for this turn. Design §5 tool 3 implementation
+// note: mathProb is NOT persisted on Claim (it lives on AiDecision only), so
+// we re-derive from context; if re-derivation fails for any reason, omit
+// rather than fake.
+//
+// CAVEAT — the DecisionContext is built from the CURRENT session state
+// (hand, strikes, pile), not the state at claim time. For post-mortem
+// inspection on a completed session this is the best signal available
+// without a full event replay; callers should read `mathProb` as "what
+// this AI would compute looking at this claim from today's board", not
+// "what this AI actually saw when deciding". A full-replay reconstruction
+// is out of scope for Day-5 and would duplicate reducer logic.
 function tryDeriveMathProb(
   session: Session,
   claim: Claim,
