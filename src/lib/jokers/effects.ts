@@ -9,7 +9,7 @@
 // Stage Whisper (§7.2) — Task 15.
 
 import type { Round, JokerSlot, Claim, Session } from '../game/types';
-import type { ProbeRequest } from './types';
+import type { ProbeRequest } from '../probe/types';
 
 // ---------------------------------------------------------------------------
 // applyPokerFace

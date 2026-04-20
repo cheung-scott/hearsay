@@ -97,16 +97,3 @@ export interface Joker {
   accentVar: string;
 }
 
-/**
- * Payload sent to the probe endpoint when Stage Whisper fires.
- * Shape is LOCKED — byte-for-byte aligned with probe-phase §4.
- * Spec: joker-system §7.2.
- */
-export interface ProbeRequest {
-  whisperId: string;
-  targetAiId: 'ai';
-  roundIdx: number;
-  triggeredAtTurn: number;
-  now: number;
-  mathProb?: number;
-}
