@@ -7,6 +7,7 @@
 
 import type {
   ActiveJokerEffect,
+  ActiveProbe,
   Card,
   Claim,
   GameEvent,
@@ -165,6 +166,12 @@ function claimAccepted(
       event.type,
     );
   }
+  if (currentRound.activeProbe !== undefined) {
+    throw new InvalidTransitionError(
+      `round_active(probe_active)`,
+      event.type,
+    );
+  }
 
   const activeKey = currentRound.activePlayer;
   const activeHandSize = session[activeKey].hand.length;
@@ -209,6 +216,12 @@ function challengeCalled(
   if (!currentRound || currentRound.status !== 'response_phase') {
     throw new InvalidTransitionError(
       `round_active(round.status=${currentRound?.status ?? 'none'})`,
+      event.type,
+    );
+  }
+  if (currentRound.activeProbe !== undefined) {
+    throw new InvalidTransitionError(
+      `round_active(probe_active)`,
       event.type,
     );
   }
@@ -575,6 +588,82 @@ function timeout(
 }
 
 // ---------------------------------------------------------------------------
+// Probe reducer slices (probe-phase spec §7.1)
+// ---------------------------------------------------------------------------
+
+/** Shared guard + activeProbe writer. `nextProbe` of undefined clears the slot. */
+function writeActiveProbe(
+  session: Session,
+  eventType: string,
+  nextProbe: ActiveProbe | undefined,
+): Session {
+  const currentRound = session.rounds[session.currentRoundIdx];
+  if (!currentRound) {
+    throw new InvalidTransitionError(
+      `round_active(no_round)`,
+      eventType,
+    );
+  }
+  // `activeProbe` is declared `?: ActiveProbe` on Round, so assigning
+  // `undefined` is equivalent to omitting the key for downstream
+  // `round.activeProbe === undefined` checks and JSON serialization.
+  const newRound: Round = { ...currentRound, activeProbe: nextProbe };
+  return {
+    ...session,
+    rounds: session.rounds.map((r, i) =>
+      i === session.currentRoundIdx ? newRound : r,
+    ),
+  };
+}
+
+/** probe-phase §7.1 — ProbeStart sets Round.activeProbe without touching Round.status. */
+function probeStart(
+  session: Session,
+  event: Extract<GameEvent, { type: 'ProbeStart' }>,
+): Session {
+  if (session.status !== 'round_active') {
+    throw new InvalidTransitionError(session.status, event.type);
+  }
+  const currentRound = session.rounds[session.currentRoundIdx];
+  if (!currentRound || currentRound.status !== 'response_phase') {
+    throw new InvalidTransitionError(
+      `round_active(round.status=${currentRound?.status ?? 'none'})`,
+      event.type,
+    );
+  }
+  if (currentRound.activeProbe !== undefined) {
+    throw new InvalidTransitionError(
+      `round_active(probe_already_active)`,
+      event.type,
+    );
+  }
+  return writeActiveProbe(session, event.type, event.probe);
+}
+
+/** probe-phase §7.1 — ProbeComplete / ProbeExpired both clear activeProbe. */
+function probeEnd(
+  session: Session,
+  event:
+    | Extract<GameEvent, { type: 'ProbeComplete' }>
+    | Extract<GameEvent, { type: 'ProbeExpired' }>,
+): Session {
+  const currentRound = session.rounds[session.currentRoundIdx];
+  if (!currentRound || currentRound.activeProbe === undefined) {
+    throw new InvalidTransitionError(
+      `round_active(no_pending_probe)`,
+      event.type,
+    );
+  }
+  if (currentRound.activeProbe.whisperId !== event.whisperId) {
+    throw new InvalidTransitionError(
+      `round_active(whisperId_mismatch)`,
+      event.type,
+    );
+  }
+  return writeActiveProbe(session, event.type, undefined);
+}
+
+// ---------------------------------------------------------------------------
 // Public reducer — spec §3.2
 // ---------------------------------------------------------------------------
 
@@ -624,11 +713,9 @@ export function reduce(session: Session, event: GameEvent): Session {
         event.type,
       );
     case 'ProbeStart':
+      return probeStart(session, event);
     case 'ProbeComplete':
     case 'ProbeExpired':
-      throw new InvalidTransitionError(
-        `${session.status} (pending probe-phase worktree)`,
-        event.type,
-      );
+      return probeEnd(session, event);
   }
 }
