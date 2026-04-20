@@ -56,13 +56,4 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-.vercel
-
-.vercel
 .env*.local
-
-# worktrees (local git worktrees)
-.worktrees/
-
-# Worktrees (local-only, never committed)
-.worktrees/
