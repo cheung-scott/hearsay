@@ -19,6 +19,10 @@ export function useHoldToSpeak(): {
   const rafIdRef = useRef<number | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  // Mirror of `state` in a ref so start/stop callbacks read the latest value
+  // without stale closure (rapid re-entry would see the prior render's state
+  // through the React state closure, causing double-starts or missed stops).
+  const stateRef = useRef<HoldState>('idle');
 
   const stopWaveformLoop = useCallback(() => {
     if (rafIdRef.current !== null) {
@@ -65,18 +69,21 @@ export function useHoldToSpeak(): {
 
   const start = useCallback(async () => {
     // Idempotent: no-op if already requesting or recording.
-    if (state === 'requesting' || state === 'recording') return;
+    // Read stateRef (not `state`) to avoid stale closure on rapid re-entry.
+    if (stateRef.current === 'requesting' || stateRef.current === 'recording') return;
 
     // Clear any prior blob so UI consumers don't see stale data during the
     // new recording (onstop will set the fresh blob).
     setAudioBlob(null);
 
+    stateRef.current = 'requesting';
     setState('requesting');
 
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
+      stateRef.current = 'idle';
       setState('idle');
       return;
     }
@@ -105,6 +112,7 @@ export function useHoldToSpeak(): {
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
       setAudioBlob(blob);
+      stateRef.current = 'stopped';
       setState('stopped');
       stopWaveformLoop();
 
@@ -114,13 +122,15 @@ export function useHoldToSpeak(): {
     };
 
     recorder.start();
+    stateRef.current = 'recording';
     setState('recording');
     startWaveformLoop();
-  }, [state, startWaveformLoop, stopWaveformLoop]);
+  }, [startWaveformLoop, stopWaveformLoop]);
 
   const stop = useCallback(() => {
     // No-op if not recording or already stopped.
-    if (state !== 'recording') return;
+    // Read stateRef (not `state`) to avoid stale closure on rapid re-entry.
+    if (stateRef.current !== 'recording') return;
 
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== 'inactive') {
@@ -134,8 +144,8 @@ export function useHoldToSpeak(): {
     }
 
     stopWaveformLoop();
-    // Note: setState('stopped') and setAudioBlob happen in onstop callback.
-  }, [state, stopWaveformLoop]);
+    // Note: stateRef + setState('stopped') and setAudioBlob happen in onstop callback.
+  }, [stopWaveformLoop]);
 
   return { state, audioBlob, waveformData, start, stop };
 }
