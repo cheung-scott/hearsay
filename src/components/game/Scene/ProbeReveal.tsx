@@ -45,6 +45,10 @@ function getPillConfig(filterSource: RevealedProbe['filterSource']): PillConfig 
       return { label: 'SANITIZED', color: '#9ca3af' /* gray */ };
     case 'fallback-static':
       return { label: 'INTUITION', color: 'var(--coral, #fd5f55)' };
+    default: {
+      const _exhaustive: never = filterSource;
+      throw new Error('Unknown filterSource: ' + _exhaustive);
+    }
   }
 }
 
@@ -80,7 +84,7 @@ export function ProbeReveal({ probe }: ProbeRevealProps) {
       role="status"
       style={{
         position: 'absolute',
-        top: '16px',
+        top: '96px',
         left: '50%',
         transform: 'translateX(-50%)',
         width: '340px',
