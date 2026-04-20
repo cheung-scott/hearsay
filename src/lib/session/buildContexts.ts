@@ -41,8 +41,11 @@ export function buildDecisionContext(session: Session, round: Round): DecisionCo
   }
 
   const publicHistory: PublicClaim[] = round.claimHistory.map(toPublicClaim);
+  // Build base PublicClaim without voiceMeta, then overlay the full server-side
+  // VoiceMeta independently of PublicClaim's narrow client shape (§7.4.2).
+  const { voiceMeta: _publicVoiceMeta, ...publicBase } = toPublicClaim(lastClaim);
   const publicLastClaim: Omit<PublicClaim, 'voiceMeta'> & { voiceMeta?: VoiceMeta } = {
-    ...toPublicClaim(lastClaim),
+    ...publicBase,
     ...(lastClaim.voiceMeta !== undefined ? { voiceMeta: lastClaim.voiceMeta } : {}),
   };
 
