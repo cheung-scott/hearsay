@@ -1,29 +1,20 @@
 // Tension-music-system spec §9 invariant I8 — deriveTensionLevel purity + mapping.
 
 import { describe, it, expect } from 'vitest';
-import { deriveTensionLevel, DUCK_FADE_MS, DUCK_GAIN, BASE_GAIN, CROSSFADE_MS } from './tension';
-import type { Session, PlayerState } from '@/lib/game/types';
+import {
+  deriveTensionLevel,
+  DUCK_FADE_MS,
+  DUCK_GAIN,
+  BASE_GAIN,
+  CROSSFADE_MS,
+  type TensionInput,
+} from './tension';
 
-function makePlayer(strikes = 0): PlayerState {
+function makeSession(overrides: Partial<TensionInput> = {}): TensionInput {
   return {
-    hand: [],
-    takenCards: [],
-    roundsWon: 0,
-    strikes,
-    jokers: [],
-  };
-}
-
-function makeSession(overrides: Partial<Session> = {}): Session {
-  return {
-    id: 'test',
-    player: makePlayer(),
-    ai: makePlayer(),
-    deck: [],
-    rounds: [],
-    currentRoundIdx: 0,
     status: 'setup',
-    musicTracks: [],
+    player: { strikes: 0 },
+    ai: { strikes: 0 },
     ...overrides,
   };
 }
@@ -43,32 +34,32 @@ describe('deriveTensionLevel — I8 mapping', () => {
 
   it('round_active with 1 strike (player) → tense', () => {
     expect(
-      deriveTensionLevel(makeSession({ status: 'round_active', player: makePlayer(1) })),
+      deriveTensionLevel(makeSession({ status: 'round_active', player: { strikes: 1 } })),
     ).toBe('tense');
   });
 
   it('round_active with 1 strike (ai) → tense', () => {
     expect(
-      deriveTensionLevel(makeSession({ status: 'round_active', ai: makePlayer(1) })),
+      deriveTensionLevel(makeSession({ status: 'round_active', ai: { strikes: 1 } })),
     ).toBe('tense');
   });
 
   it('round_active with 2 strikes (player) → critical', () => {
     expect(
-      deriveTensionLevel(makeSession({ status: 'round_active', player: makePlayer(2) })),
+      deriveTensionLevel(makeSession({ status: 'round_active', player: { strikes: 2 } })),
     ).toBe('critical');
   });
 
   it('round_active with 2 strikes (ai) → critical', () => {
     expect(
-      deriveTensionLevel(makeSession({ status: 'round_active', ai: makePlayer(2) })),
+      deriveTensionLevel(makeSession({ status: 'round_active', ai: { strikes: 2 } })),
     ).toBe('critical');
   });
 
   it('round_active with both at 2 strikes → critical', () => {
     expect(
       deriveTensionLevel(
-        makeSession({ status: 'round_active', player: makePlayer(2), ai: makePlayer(2) }),
+        makeSession({ status: 'round_active', player: { strikes: 2 }, ai: { strikes: 2 } }),
       ),
     ).toBe('critical');
   });
@@ -78,12 +69,28 @@ describe('deriveTensionLevel — I8 mapping', () => {
   });
 
   it('is pure — same input yields same output across calls', () => {
-    const s = makeSession({ status: 'round_active', player: makePlayer(1) });
+    const s = makeSession({ status: 'round_active', player: { strikes: 1 } });
     const a = deriveTensionLevel(s);
     const b = deriveTensionLevel(s);
     const c = deriveTensionLevel(s);
     expect(a).toBe(b);
     expect(b).toBe(c);
+  });
+
+  it('accepts ClientSession-shaped input without synthesis', () => {
+    // Demonstrates the shape narrowing — a real ClientSession's self/opponent
+    // (PlayerState / ClientOpponent) both satisfy { strikes: number }.
+    const clientLike = {
+      status: 'round_active' as const,
+      self: { strikes: 1, hand: [], takenCards: [], roundsWon: 0, jokers: [] },
+      opponent: { strikes: 0, handSize: 5, takenCards: [], roundsWon: 0, jokers: [] },
+    };
+    const result = deriveTensionLevel({
+      status: clientLike.status,
+      player: { strikes: clientLike.self.strikes },
+      ai: { strikes: clientLike.opponent.strikes },
+    });
+    expect(result).toBe('tense');
   });
 });
 

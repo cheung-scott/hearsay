@@ -35,6 +35,13 @@ export interface UseMusicBedArgs {
   tracks: MusicTrack[] | undefined;
   currentTensionLevel: TensionLevel;
   enabled: boolean;
+  /**
+   * R15.2 — fires when a track URL fails to load (404, network error, decode
+   * fail). Caller typically flips `enabled` to false and surfaces the
+   * music-disabled state. Without this, a 404 would silently produce a non-
+   * playing primary and the spec invariant goes uncaught.
+   */
+  onTrackLoadError?: () => void;
 }
 
 export interface UseMusicBedAPI {
@@ -88,7 +95,12 @@ function anchoredRamp(gain: GainNode, target: number, fadeMs: number, ctx: Audio
 }
 
 export function useMusicBed(args: UseMusicBedArgs): UseMusicBedAPI {
-  const { tracks, currentTensionLevel, enabled } = args;
+  const { tracks, currentTensionLevel, enabled, onTrackLoadError } = args;
+
+  // Stable ref for the error callback so the audio-element listener captures
+  // the latest function without re-binding.
+  const onTrackLoadErrorRef = useRef(onTrackLoadError);
+  useEffect(() => { onTrackLoadErrorRef.current = onTrackLoadError; });
 
   const graphRef = useRef<AudioGraph | null>(null);
   const duckStateRef = useRef<DuckState>('idle');
@@ -111,6 +123,12 @@ export function useMusicBed(args: UseMusicBedArgs): UseMusicBedAPI {
     const ctx = new Ctor();
     const primary = buildAudioPair(ctx, ctx.destination);
     const secondary = buildAudioPair(ctx, ctx.destination);
+
+    // R15.2 — wire load-error fallback on both elements.
+    const onError = () => onTrackLoadErrorRef.current?.();
+    primary.audio.addEventListener('error', onError);
+    secondary.audio.addEventListener('error', onError);
+
     graphRef.current = { ctx, primary, secondary };
     return graphRef.current;
   }, [enabled]);

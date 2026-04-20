@@ -32,10 +32,18 @@ interface MockAudioContext {
   close: ReturnType<typeof vi.fn>;
 }
 
+interface MockAudioInstance {
+  src: string;
+  play: ReturnType<typeof vi.fn>;
+  pause: ReturnType<typeof vi.fn>;
+  dispatchEvent: (e: Event) => boolean;
+}
+
 interface CtorRecord {
   ctxs: MockAudioContext[];
   gainNodes: MockGainNode[];
   ctor: ReturnType<typeof vi.fn>;
+  audioInstances: MockAudioInstance[];
 }
 
 function setupAudioMocks(): CtorRecord {
@@ -71,7 +79,8 @@ function setupAudioMocks(): CtorRecord {
 
   vi.stubGlobal('AudioContext', ctor);
 
-  // jsdom Audio() — minimal stub
+  // jsdom Audio() — minimal stub with event-target semantics so error/load
+  // events can be dispatched in tests (R15.2 path).
   class MockAudio {
     src = '';
     crossOrigin: string | null = null;
@@ -79,10 +88,26 @@ function setupAudioMocks(): CtorRecord {
     preload = '';
     play = vi.fn().mockResolvedValue(undefined);
     pause = vi.fn();
+    private listeners = new Map<string, Set<EventListener>>();
+    addEventListener(type: string, cb: EventListener) {
+      if (!this.listeners.has(type)) this.listeners.set(type, new Set());
+      this.listeners.get(type)!.add(cb);
+    }
+    removeEventListener(type: string, cb: EventListener) {
+      this.listeners.get(type)?.delete(cb);
+    }
+    dispatchEvent(e: Event) {
+      this.listeners.get(e.type)?.forEach(cb => cb(e));
+      return true;
+    }
   }
-  vi.stubGlobal('Audio', MockAudio as unknown as typeof Audio);
-
-  return { ctxs, gainNodes, ctor };
+  // Capture every constructed instance per-setup so each test gets a fresh list.
+  const audioInstances: MockAudio[] = [];
+  const AudioCtor = vi.fn(function () { const a = new MockAudio(); audioInstances.push(a); return a; });
+  vi.stubGlobal('Audio', AudioCtor as unknown as typeof Audio);
+  // Re-export the instances list on each setup so tests reading it via
+  // mocks.audioInstances see only this test's audio elements.
+  return { ctxs, gainNodes, ctor, audioInstances };
 }
 
 const TRACKS: MusicTrack[] = [
@@ -389,6 +414,34 @@ describe('I10 — concurrent duck-both state', () => {
     expect(rampSpy.mock.calls.length).toBe(baseCount + 2);
     const last = rampSpy.mock.calls[rampSpy.mock.calls.length - 1]!;
     expect(last[0]).toBe(BASE_GAIN);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R15.2 — track URL load failure flips music-disabled
+// ---------------------------------------------------------------------------
+
+describe('R15.2 — track load failure surfaces via onTrackLoadError', () => {
+  it('fires onTrackLoadError when an <audio> element emits "error"', async () => {
+    const onError = vi.fn();
+    const { result } = renderHook(() =>
+      useMusicBed({
+        tracks: TRACKS,
+        currentTensionLevel: 'calm',
+        enabled: true,
+        onTrackLoadError: onError,
+      }),
+    );
+    await act(async () => { await result.current.prime(); });
+
+    // Two <audio> elements were constructed (primary + secondary). Fire an
+    // "error" event on each — both must invoke the callback (production case
+    // is /api/music/track/[hash] returning 404 on either).
+    expect(mocks.audioInstances.length).toBeGreaterThanOrEqual(2);
+    mocks.audioInstances[0]!.dispatchEvent(new Event('error'));
+    expect(onError).toHaveBeenCalledTimes(1);
+    mocks.audioInstances[1]!.dispatchEvent(new Event('error'));
+    expect(onError).toHaveBeenCalledTimes(2);
   });
 });
 

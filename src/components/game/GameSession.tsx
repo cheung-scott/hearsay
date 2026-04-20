@@ -10,7 +10,7 @@ import { useMusicBed } from '@/hooks/useMusicBed';
 import { deriveTensionLevel } from '@/lib/music/tension';
 import { hasAllTracks } from '@/lib/music/tracks';
 import { PERSONA_DISPLAY_NAMES } from '@/lib/persona/displayNames';
-import type { ClientSession, Session, MusicTrack } from '@/lib/game/types';
+import type { ClientSession, MusicTrack } from '@/lib/game/types';
 import { Scene } from './Scene/Scene';
 import { TopBar } from './Hud/TopBar';
 import { PlayerControls } from './PlayerControls/PlayerControls';
@@ -45,37 +45,26 @@ export function GameSession({ initialSession }: GameSessionProps) {
   // Music bed (tension-music-system spec §6.5)
   // -------------------------------------------------------------------------
 
-  // Local musicState — populated by pregen result. Lives on ClientSession.musicState
-  // shape but kept in component state because the field is NOT projected by
-  // toClientView (per types.ts L320 — populated client-side).
+  // Local music UI state. `musicDisabled` mirrors the ClientSession.musicState
+  // shape but lives in component state (not projected by toClientView per
+  // types.ts L320 — populated client-side).
   const [musicDisabled, setMusicDisabled] = useState(false);
   const [userMuted] = useState(false); // mute toggle UX is owned by ui-gameplay phase 2
   const [pregenTracks, setPregenTracks] = useState<MusicTrack[]>([]);
   const pregenFiredRef = useRef<string | null>(null);
+  // Hoisted so the per-session reset effect can clear it; the audioPlayer
+  // false→true transition effect below also writes it.
+  const wasPlayingRef = useRef(false);
 
-  // Derive a Session-shaped object for the tension function. The hook lives in
-  // a ClientSession world, so we synthesize the minimal shape it needs.
-  const tensionSessionLike: Session = state.session
-    ? ({
-        id: state.session.id,
+  // deriveTensionLevel takes the narrowest shape it actually reads, so no
+  // synthesis-cast needed: ClientSession.{status, self, opponent} satisfies it.
+  const tensionInput = state.session
+    ? {
         status: state.session.status,
-        player: state.session.self,
-        ai: { ...state.session.opponent, hand: [] },
-        deck: [],
-        rounds: [],
-        currentRoundIdx: state.session.currentRoundIdx,
-        musicTracks: [],
-      } as Session)
-    : ({
-        id: '',
-        status: 'setup',
-        player: { hand: [], takenCards: [], roundsWon: 0, strikes: 0, jokers: [] },
-        ai: { hand: [], takenCards: [], roundsWon: 0, strikes: 0, jokers: [] },
-        deck: [],
-        rounds: [],
-        currentRoundIdx: 0,
-        musicTracks: [],
-      } as Session);
+        player: { strikes: state.session.self.strikes },
+        ai: { strikes: state.session.opponent.strikes },
+      }
+    : ({ status: 'setup' as const, player: { strikes: 0 }, ai: { strikes: 0 } });
 
   // Prefer pregen response tracks (fresh URLs) over the session snapshot,
   // which started empty pre-pregen. The next session refetch will reconcile.
@@ -85,32 +74,56 @@ export function GameSession({ initialSession }: GameSessionProps) {
   const tracksReady = hasAllTracks(sessionMusicTracks);
   const musicEnabled = !musicDisabled && !userMuted && tracksReady;
 
+  // R15.2 — track URL load failure flips music-disabled.
+  const handleTrackLoadError = () => setMusicDisabled(true);
+
   const music = useMusicBed({
     tracks: sessionMusicTracks,
-    currentTensionLevel: deriveTensionLevel(tensionSessionLike),
+    currentTensionLevel: deriveTensionLevel(tensionInput),
     enabled: musicEnabled,
+    onTrackLoadError: handleTrackLoadError,
   });
 
-  // Fire pregen once per fresh session.
+  // Fire pregen once per fresh session, and reset all carried-over per-session
+  // music state so NEW TRIAL after session-over starts cleanly. AbortController
+  // covers the rapid CreateSession-twice race where an in-flight fetch resolves
+  // for a stale session id.
   useEffect(() => {
-    if (!state.session?.id) return;
-    if (pregenFiredRef.current === state.session.id) return;
-    pregenFiredRef.current = state.session.id;
+    const id = state.session?.id;
+    if (!id) return;
+    if (pregenFiredRef.current === id) return;
 
+    // Per-session reset — prevents NEW TRIAL inheriting prior session's tracks
+    // or sticky musicDisabled flag.
+    pregenFiredRef.current = id;
+    setPregenTracks([]);
+    setMusicDisabled(false);
+    wasPlayingRef.current = false;
+
+    const ac = new AbortController();
     fetch('/api/music/pregen', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: state.session.id }),
+      body: JSON.stringify({ sessionId: id }),
+      signal: ac.signal,
     })
       .then(r => r.ok ? r.json() : Promise.reject(r))
       .then((data: { tracks: MusicTrack[] }) => {
+        // Stale-response guard — ignore if the user has since started a newer session.
+        if (pregenFiredRef.current !== id) return;
         if (data.tracks?.length) {
           setPregenTracks(data.tracks);
         } else {
           setMusicDisabled(true);
         }
       })
-      .catch(() => setMusicDisabled(true));
+      .catch(err => {
+        if (err?.name === 'AbortError') return;
+        if (pregenFiredRef.current !== id) return;
+        setMusicDisabled(true);
+      });
+
+    return () => { ac.abort(); };
   }, [state.session?.id]);
 
   // Wire input ducking from useHoldToSpeak.
@@ -129,7 +142,7 @@ export function GameSession({ initialSession }: GameSessionProps) {
   // restoreFromOutput is hooked into the combined onEnded below — useAudioPlayer's
   // onEnded is one-shot/self-clearing, so we must register markAudioEnded AND
   // restoreFromOutput as a single callback per turn (last writer wins otherwise).
-  const wasPlayingRef = useRef(false);
+  // wasPlayingRef is hoisted above (per-session reset effect needs to clear it).
   useEffect(() => {
     if (audioPlayer.isPlaying && !wasPlayingRef.current && musicEnabled) {
       music.duckForOutput();

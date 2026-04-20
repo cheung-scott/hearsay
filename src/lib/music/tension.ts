@@ -9,6 +9,18 @@ import type { Session } from '@/lib/game/types';
 
 export type TensionLevel = 'calm' | 'tense' | 'critical';
 
+/**
+ * Narrowest input shape needed by `deriveTensionLevel`. Both `Session` and
+ * `ClientSession` (with a different `player`/`opponent` projection) satisfy
+ * this — callers don't need to synthesize a fake Session just to derive the
+ * tension level.
+ */
+export interface TensionInput {
+  status: Session['status'];
+  player: { strikes: number };
+  ai: { strikes: number };
+}
+
 /** Steering §1.5 lock — 400ms linear ramp for both duck + restore + cross-fade. */
 export const DUCK_FADE_MS = 400;
 
@@ -30,11 +42,11 @@ export const CROSSFADE_MS = 800;
  * - max strikes === 1 → tense
  * - else → calm
  */
-export function deriveTensionLevel(session: Session): TensionLevel {
-  if (session.status === 'session_over') return 'critical';
-  if (session.status !== 'round_active') return 'calm';
+export function deriveTensionLevel(input: TensionInput): TensionLevel {
+  if (input.status === 'session_over') return 'critical';
+  if (input.status !== 'round_active') return 'calm';
 
-  const maxStrikes = Math.max(session.player.strikes, session.ai.strikes);
+  const maxStrikes = Math.max(input.player.strikes, input.ai.strikes);
   if (maxStrikes >= 2) return 'critical';
   if (maxStrikes === 1) return 'tense';
   return 'calm';
