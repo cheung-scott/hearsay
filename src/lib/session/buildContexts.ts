@@ -2,7 +2,7 @@
 // Called by /api/turn before invoking aiDecideOnClaim / aiDecideOwnPlay.
 // Spec: ui-gameplay design §10.1, ai-opponent design §5-6.
 
-import type { Session, Round, Claim, PublicClaim } from '../game/types';
+import type { Session, Round, Claim, PublicClaim, VoiceMeta } from '../game/types';
 import type { DecisionContext, OwnPlayContext } from '../ai/types';
 
 // ---------------------------------------------------------------------------
@@ -41,7 +41,7 @@ export function buildDecisionContext(session: Session, round: Round): DecisionCo
   }
 
   const publicHistory: PublicClaim[] = round.claimHistory.map(toPublicClaim);
-  const publicLastClaim: PublicClaim & { voiceMeta?: typeof lastClaim.voiceMeta } = {
+  const publicLastClaim: Omit<PublicClaim, 'voiceMeta'> & { voiceMeta?: VoiceMeta } = {
     ...toPublicClaim(lastClaim),
     ...(lastClaim.voiceMeta !== undefined ? { voiceMeta: lastClaim.voiceMeta } : {}),
   };

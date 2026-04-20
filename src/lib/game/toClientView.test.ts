@@ -457,12 +457,7 @@ describe('toClientView — I5: Cold Read lie-score retention', () => {
     expect(publicClaim.voiceMeta).toBeUndefined();
   });
 
-  it('Cold Read active: voiceMeta carried through on AI claim (lieScore readable)', () => {
-    // Task 12 originally narrowed PublicClaim.voiceMeta to `{ lieScore }` only,
-    // but that clashed with buildContexts.ts's local intersection type. The
-    // type was widened to the full VoiceMeta for assignment compatibility;
-    // UI consumers still read only `lieScore` per spec §7.4.2. See tasks.md
-    // drift flag for rationale.
+  it('Cold Read active: only lieScore retained on AI claim (no other voiceMeta fields leaked)', () => {
     const aiClaim = makeAiClaimWithLieScore(0.55);
     const round = makeRound({
       claimHistory: [aiClaim],
@@ -471,9 +466,8 @@ describe('toClientView — I5: Cold Read lie-score retention', () => {
     const session = makeSession({ status: 'round_active', rounds: [round] });
     const client = toClientView(session, 'player');
     const publicClaim = client.rounds[0].claimHistory[0];
-    expect(publicClaim.voiceMeta?.lieScore).toBe(0.55);
-    // Shallow-copied (not the same reference as the source claim's voiceMeta)
-    expect(publicClaim.voiceMeta).not.toBe(aiClaim.voiceMeta);
+    expect(publicClaim.voiceMeta).toEqual({ lieScore: 0.55 });
+    expect(Object.keys(publicClaim.voiceMeta!)).toEqual(['lieScore']);
   });
 
   it('Cold Read active: last AI claim targeted (player claim after AI claim stays stripped)', () => {

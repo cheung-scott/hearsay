@@ -59,13 +59,12 @@ function toClientRound(round: Round): ClientRound {
       const c = projectedHistory[i];
       if (c.by === 'ai') {
         const srcClaim = claimHistory[i];
-        if (srcClaim.voiceMeta !== undefined) {
-          // Cold Read spec (§7.4.2) retains `lieScore`; the full VoiceMeta is
-          // passed through for type compatibility with buildContexts.ts —
-          // downstream UI only renders `lieScore`.
+        if (srcClaim.voiceMeta?.lieScore !== undefined) {
+          // Cold Read spec (§7.4.2): only `lieScore` crosses the wire.
+          // Other VoiceMeta fields are server-only and must not be projected.
           projectedHistory[i] = {
             ...c,
-            voiceMeta: { ...srcClaim.voiceMeta },
+            voiceMeta: { lieScore: srcClaim.voiceMeta.lieScore },
           };
         }
         break;

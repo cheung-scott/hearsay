@@ -11,6 +11,13 @@ optional field that the pre-land commit did not anticipate because
 Cold Read's projection contract depends on effect semantics in this
 worktree. Flagged for Scott's awareness.
 
+Final shape: `PublicClaim.voiceMeta?: { lieScore: number }` — spec-faithful.
+Initial Task 12 landing briefly widened this to full `VoiceMeta` as a
+reaction to a `buildContexts.ts` type-check failure; that widening was
+a mistake caught in post-merge review and reverted. The real fix
+explicitly types buildContexts.ts's local intersection as
+`Omit<PublicClaim, 'voiceMeta'> & { voiceMeta?: VoiceMeta }`.
+
 Also corrected autopsy projection gate: pre-land code spread autopsy to
 both viewers; Task 12 corrects it to `viewer === 'player'` only, matching
 spec §7.4.3 ("self viewer only") and task description. Strictly additive
