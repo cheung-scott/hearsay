@@ -17,7 +17,7 @@
  * NEEDS_SCOPE_EXPANSION.
  */
 
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
 import type { JokerType, JokerOffer } from '@/lib/game/types';
 import { JOKER_CATALOG } from '@/lib/jokers/catalog';
 
@@ -35,10 +35,35 @@ export function JokerPicker({ offer, onPick }: JokerPickerProps) {
   // Prevent double-fire: track whether a pick has been made
   const pickedRef = useRef(false);
 
+  // JP-1: Refs for first and last card buttons — used for initial focus + focus trap
+  const firstButtonRef = useRef<HTMLButtonElement>(null);
+  const lastButtonRef = useRef<HTMLButtonElement>(null);
+
+  // JP-1: Move focus to the first card on modal mount (WAI-ARIA dialog pattern)
+  useEffect(() => {
+    firstButtonRef.current?.focus();
+  }, []);
+
   function handlePick(joker: JokerType) {
     if (pickedRef.current) return;
     pickedRef.current = true;
     onPick(joker);
+  }
+
+  // JP-2: Focus-trap — cycle Tab/Shift+Tab within the modal
+  function handleBackdropKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== 'Tab') return;
+    const first = firstButtonRef.current;
+    const last = lastButtonRef.current;
+    if (!first || !last) return;
+
+    if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    } else if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    }
   }
 
   return (
@@ -47,6 +72,7 @@ export function JokerPicker({ offer, onPick }: JokerPickerProps) {
       role="dialog"
       aria-modal="true"
       aria-label="Court Recess — Pick a Power"
+      onKeyDown={handleBackdropKeyDown}
       style={{
         position: 'fixed',
         inset: 0,
@@ -106,11 +132,18 @@ export function JokerPicker({ offer, onPick }: JokerPickerProps) {
             flexWrap: 'wrap',
           }}
         >
-          {offered.map((jokerType) => (
+          {offered.map((jokerType, idx) => (
             <JokerCard
               key={jokerType}
               jokerType={jokerType}
               onPick={handlePick}
+              buttonRef={
+                idx === 0
+                  ? firstButtonRef
+                  : idx === offered.length - 1
+                    ? lastButtonRef
+                    : undefined
+              }
             />
           ))}
         </div>
@@ -141,9 +174,11 @@ export function JokerPicker({ offer, onPick }: JokerPickerProps) {
 interface JokerCardProps {
   jokerType: JokerType;
   onPick: (joker: JokerType) => void;
+  /** JP-1/JP-2: ref forwarded from parent for initial-focus + focus-trap */
+  buttonRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
-function JokerCard({ jokerType, onPick }: JokerCardProps) {
+function JokerCard({ jokerType, onPick, buttonRef }: JokerCardProps) {
   const joker = JOKER_CATALOG[jokerType];
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLButtonElement>) {
@@ -155,6 +190,7 @@ function JokerCard({ jokerType, onPick }: JokerCardProps) {
 
   return (
     <button
+      ref={buttonRef}
       data-joker={jokerType}
       aria-label={`Pick ${joker.name}: ${joker.flavor}`}
       onClick={() => onPick(jokerType)}

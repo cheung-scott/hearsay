@@ -5,7 +5,7 @@
 //        no dismiss via backdrop, keyboard accessibility.
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent } from '@testing-library/react';
+import { render, fireEvent, screen, waitFor } from '@testing-library/react';
 import { JokerPicker } from './JokerPicker';
 import { JOKER_CATALOG } from '@/lib/jokers/catalog';
 import type { JokerOffer } from '@/lib/game/types';
@@ -249,5 +249,71 @@ describe('JokerPicker — keyboard accessibility', () => {
       // HTML buttons are focusable by default (tabIndex is 0 unless set to -1)
       expect(btn.tabIndex).toBeGreaterThanOrEqual(0);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 7: JP-1 — Initial focus moves to first card on modal mount
+// ---------------------------------------------------------------------------
+
+describe('JokerPicker — JP-1 initial focus', () => {
+  it('first card button receives focus on mount', async () => {
+    const offer = makeOffer(['poker_face', 'cold_read', 'second_wind']);
+    const { container } = render(<JokerPicker offer={offer} onPick={vi.fn()} />);
+
+    const firstButton = container.querySelectorAll('button[data-joker]')[0] as HTMLButtonElement;
+    await waitFor(() => {
+      expect(document.activeElement).toBe(firstButton);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 8: JP-2 — Focus-trap Tab / Shift+Tab cycling
+// ---------------------------------------------------------------------------
+
+describe('JokerPicker — JP-2 focus trap', () => {
+  it('Tab past the last card wraps focus to the first card', () => {
+    const offer = makeOffer(['poker_face', 'cold_read', 'second_wind']);
+    const { container } = render(
+      <JokerPicker offer={offer} onPick={vi.fn()} />,
+    );
+
+    const buttons = Array.from(
+      container.querySelectorAll('button[data-joker]'),
+    ) as HTMLButtonElement[];
+    const lastButton = buttons[buttons.length - 1];
+    const firstButton = buttons[0];
+
+    // Focus the last button then simulate Tab
+    lastButton.focus();
+    const backdrop = container.querySelector(
+      '[data-testid="joker-picker-backdrop"]',
+    ) as HTMLElement;
+    fireEvent.keyDown(backdrop, { key: 'Tab', shiftKey: false });
+
+    expect(document.activeElement).toBe(firstButton);
+  });
+
+  it('Shift+Tab on the first card wraps focus to the last card', () => {
+    const offer = makeOffer(['poker_face', 'cold_read', 'second_wind']);
+    const { container } = render(
+      <JokerPicker offer={offer} onPick={vi.fn()} />,
+    );
+
+    const buttons = Array.from(
+      container.querySelectorAll('button[data-joker]'),
+    ) as HTMLButtonElement[];
+    const firstButton = buttons[0];
+    const lastButton = buttons[buttons.length - 1];
+
+    // Focus the first button then simulate Shift+Tab
+    firstButton.focus();
+    const backdrop = container.querySelector(
+      '[data-testid="joker-picker-backdrop"]',
+    ) as HTMLElement;
+    fireEvent.keyDown(backdrop, { key: 'Tab', shiftKey: true });
+
+    expect(document.activeElement).toBe(lastButton);
   });
 });
