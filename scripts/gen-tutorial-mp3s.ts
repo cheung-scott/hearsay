@@ -79,7 +79,7 @@ const TUTORIAL_LINES: string[] = [
   "Select your cards here. Press and hold this button, then say the number of cards you're playing followed by the rank. You can be honest, or you can bluff — the defendant will listen to your voice and decide whether to believe you. You win the round by emptying your hand, or by catching him in three lies.",
   "If you're caught bluffing, you take a strike. Three strikes and you lose the round. Win best-of-three to advance to the next opponent.",
   "The defendant just made his claim. Listen for the tells. Do you believe him?",
-  "Well played. Winning a round grants you a joker which holds a power — use it wisely against the opponent. Most expire after one turn.",
+  "Well played. Winning a round grants you a joker which holds a power — use it against your opponent to gain an advantage. Most expire after one turn.",
   "Court is now in recess. Good luck.",
 ];
 
