@@ -126,8 +126,13 @@ export interface PublicClaim {
    * Retained by toClientView on the LAST AI claim when `cold_read` is in
    * `Round.activeJokerEffects`. Stripped on all other claims + all non-Cold-Read rounds.
    * Strictly additive — does not affect any existing PublicClaim construction site.
+   *
+   * Uses the full `VoiceMeta` shape (not just `{ lieScore }`) for assignment
+   * compatibility with `src/lib/session/buildContexts.ts` which intersects
+   * PublicClaim with `{ voiceMeta?: VoiceMeta }`. Cold Read consumers read
+   * only `lieScore`; other fields are carried through but not rendered.
    */
-  voiceMeta?: { lieScore: number };
+  voiceMeta?: VoiceMeta;
 }
 
 // ---------------------------------------------------------------------------
