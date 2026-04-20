@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { applyPokerFace, applyColdRead, applySecondWind, applyEarful, produceProbeRequest } from './effects';
-import type { Round, JokerSlot, ActiveJokerEffect, Claim } from '../game/types';
+import type { Round, JokerSlot, ActiveJokerEffect, Claim, VoiceTellPreset } from '../game/types';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -198,10 +198,10 @@ const makeClaim = (overrides: Partial<Claim> = {}): Claim => ({
 describe('applyEarful', () => {
   it('I7: held earful + voicePreset populated → correct autopsy + slot consumed', () => {
     const slots: JokerSlot[] = [heldSlot('earful')];
-    const claim = makeClaim({ voicePreset: 'confident_honest' });
+    const claim = makeClaim({ voicePreset: 'CONFIDENT' as VoiceTellPreset });
     const result = applyEarful(slots, claim, 0, 1);
     expect(result).not.toBeNull();
-    expect(result!.autopsy.preset).toBe('confident_honest');
+    expect(result!.autopsy.preset).toBe('CONFIDENT');
     expect(result!.autopsy.roundIdx).toBe(0);
     expect(result!.autopsy.turnIdx).toBe(1);
     expect(result!.updatedSlots[0].state).toBe('consumed');
@@ -217,19 +217,19 @@ describe('applyEarful', () => {
 
   it('no held earful → returns null', () => {
     const slots: JokerSlot[] = [heldSlot('cold_read')];
-    const claim = makeClaim({ voicePreset: 'confident_honest' });
+    const claim = makeClaim({ voicePreset: 'CONFIDENT' as VoiceTellPreset });
     expect(applyEarful(slots, claim, 0, 0)).toBeNull();
   });
 
   it('already-consumed earful → returns null', () => {
     const slots: JokerSlot[] = [consumedSlot('earful')];
-    const claim = makeClaim({ voicePreset: 'confident_honest' });
+    const claim = makeClaim({ voicePreset: 'CONFIDENT' as VoiceTellPreset });
     expect(applyEarful(slots, claim, 0, 0)).toBeNull();
   });
 
   it('mixed slots: cold_read held + earful held → cold_read untouched, earful consumed', () => {
     const slots: JokerSlot[] = [heldSlot('cold_read'), heldSlot('earful')];
-    const claim = makeClaim({ voicePreset: 'confident_honest' });
+    const claim = makeClaim({ voicePreset: 'CONFIDENT' as VoiceTellPreset });
     const result = applyEarful(slots, claim, 0, 0);
     expect(result).not.toBeNull();
     expect(result!.updatedSlots).toHaveLength(2);
@@ -241,7 +241,7 @@ describe('applyEarful', () => {
 
   it('purity: input slots are NOT mutated after call', () => {
     const slots: JokerSlot[] = [heldSlot('earful')];
-    const claim = makeClaim({ voicePreset: 'confident_honest' });
+    const claim = makeClaim({ voicePreset: 'CONFIDENT' as VoiceTellPreset });
     applyEarful(slots, claim, 0, 0);
     expect(slots[0].state).toBe('held');
   });

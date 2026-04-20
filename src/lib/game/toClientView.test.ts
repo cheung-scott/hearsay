@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { Claim, PlayerState, Round, Session } from './types';
+import type { Claim, PlayerState, Round, Session, VoiceTellPreset } from './types';
 import { toClientView } from './toClientView';
 
 // ---------------------------------------------------------------------------
@@ -619,7 +619,7 @@ describe('toClientView — I12: joker field projections', () => {
   });
 
   it('autopsy present for self viewer only (not opponent)', () => {
-    const autopsy = { preset: 'confident_honest' as const, roundIdx: 0, turnIdx: 2 };
+    const autopsy = { preset: 'CONFIDENT' as VoiceTellPreset, roundIdx: 0, turnIdx: 2 };
     const session = makeSession({
       status: 'round_active',
       autopsy,

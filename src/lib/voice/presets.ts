@@ -1,11 +1,23 @@
 import type { Persona, TruthState, VoiceSettings } from '@/lib/game/types';
 
-// Day-5 pre-land (2026-04-19). Placeholder string alias pending the
-// voice-tell-taxonomy Day-5 worktree narrowing to a literal union
-// ('CONFIDENT' | 'HESITANT' | 'RAMBLE' | 'CLIPPED' | 'PROBE' — exact names
-// land with that spec). Referenced by `Claim.voicePreset?` (game/types.ts)
-// and `ClientSession.autopsy.preset` for the Earful preset-reveal mechanic.
-export type VoiceTellPreset = string;
+// Literal-union lock — narrows from the Day-5 `string` placeholder. The five
+// canonical presets correspond to voice-tell-taxonomy spec §2:
+//   CONFIDENT — honest steady read (high stability, low style)
+//   HESITANT  — mild lying tell (dropped stability, rising fillers)
+//   RAMBLE    — heavy lying tell (over-explanation, high latency)
+//   CLIPPED   — short-cut lying tell (low latency + speech rate dip)
+//   PROBE     — Stage Whisper reveal preset (out-of-band lane)
+// `unknown` is the spec-sanctioned runtime fallback (src/lib/jokers/effects.ts
+// + src/lib/game/fsm.ts both populate with `?? 'unknown'` when the upstream
+// classifier has nothing to hang on to). Non-canonical strings in tests must
+// use `as VoiceTellPreset` casts to opt out of this guarantee.
+export type VoiceTellPreset =
+  | 'CONFIDENT'
+  | 'HESITANT'
+  | 'RAMBLE'
+  | 'CLIPPED'
+  | 'PROBE'
+  | 'unknown';
 
 // Locked from architecture §6.1 + voice-tell-taxonomy spec §2.
 // Any change here must re-run presets.test.ts invariants (Misdirector inversion,

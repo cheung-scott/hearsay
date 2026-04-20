@@ -7,15 +7,18 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, fireEvent, cleanup, act } from '@testing-library/react';
 import { AutopsyOverlay } from './AutopsyOverlay';
+import type { VoiceTellPreset } from '@/lib/game/types';
 
 afterEach(() => cleanup());
 
 // ---------------------------------------------------------------------------
-// Fixture helper
+// Fixture helper — accepts any string so we can exercise the component's
+// unknown-preset fallback path. The cast is intentional (runtime-behavior
+// test case, not a type claim).
 // ---------------------------------------------------------------------------
 
 function makeAutopsy(preset: string) {
-  return { preset, roundIdx: 0, turnIdx: 1 };
+  return { preset: preset as VoiceTellPreset, roundIdx: 0, turnIdx: 1 };
 }
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { Card, Claim, GameEvent, JokerType, PlayerState, Round, Session } from './types';
+import type { Card, Claim, GameEvent, JokerType, PlayerState, Round, Session, VoiceTellPreset } from './types';
 import { InvalidTransitionError } from './types';
 import {
   applyJokerEffect,
@@ -1229,7 +1229,7 @@ describe('reduce — RoundSettled (7.1)', () => {
       rounds: [round],
       currentRoundIdx: 0,
       player: makePlayer({ roundsWon: 0 }),
-      autopsy: { preset: 'confident_honest', roundIdx: 0, turnIdx: 1 },
+      autopsy: { preset: 'CONFIDENT' as VoiceTellPreset, roundIdx: 0, turnIdx: 1 },
     });
     const out = reduce(session, { type: 'RoundSettled', now: 5000 });
     expect(out.autopsy).toBeUndefined();
@@ -2591,7 +2591,7 @@ describe('Integration: joker lifecycle walkthrough (I2, I8, I10)', () => {
         actualCardIds: ['King-0'],
         truthState: 'lying',
         timestamp: 7000,
-        voicePreset: 'nervous_liar',
+        voicePreset: 'HESITANT' as VoiceTellPreset,
       };
       const round = makeRound({
         status: 'resolving',
@@ -2623,7 +2623,7 @@ describe('Integration: joker lifecycle walkthrough (I2, I8, I10)', () => {
 
       // Autopsy set
       expect(out.autopsy).toBeDefined();
-      expect(out.autopsy!.preset).toBe('nervous_liar');
+      expect(out.autopsy!.preset).toBe('HESITANT');
       expect(out.autopsy!.roundIdx).toBe(0);
       expect(out.autopsy!.turnIdx).toBe(0); // index of lastClaim in claimHistory
 
@@ -2691,7 +2691,7 @@ describe('Integration: joker lifecycle walkthrough (I2, I8, I10)', () => {
         actualCardIds: ['King-0'],
         truthState: 'lying',
         timestamp: 7000,
-        voicePreset: 'nervous_liar',
+        voicePreset: 'HESITANT' as VoiceTellPreset,
       };
       const round = makeRound({
         status: 'resolving',
