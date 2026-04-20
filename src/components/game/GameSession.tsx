@@ -1,7 +1,7 @@
 'use client';
 
 import '@/styles/game-theme.css';
-import { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useGameSession } from '@/hooks/useGameSession';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { useHoldToSpeak } from '@/hooks/useHoldToSpeak';
@@ -10,11 +10,30 @@ import { useMusicBed } from '@/hooks/useMusicBed';
 import { deriveTensionLevel } from '@/lib/music/tension';
 import { hasAllTracks } from '@/lib/music/tracks';
 import { PERSONA_DISPLAY_NAMES } from '@/lib/persona/displayNames';
-import type { ClientSession, MusicTrack } from '@/lib/game/types';
+import type { ClientSession, MusicTrack, Persona } from '@/lib/game/types';
 import { Scene } from './Scene/Scene';
 import { TopBar } from './Hud/TopBar';
 import { PlayerControls } from './PlayerControls/PlayerControls';
 import { OverlayEffects } from './Scene/OverlayEffects';
+
+// ---------------------------------------------------------------------------
+// §1.5 Elimination-Beat constants
+// ---------------------------------------------------------------------------
+
+/** 400ms linear ramp for silent-beat duck (spec §1.5 LOCK). */
+const SILENT_BEAT_DUCK_MS = 400;
+/** Dead-air duration before cards flip on every challenge reveal. */
+const SILENT_BEAT_DURATION_MS = 2000;
+/** Delay between stinger end and per-persona final-words clip. */
+const FINAL_WORDS_DELAY_MS = 1000;
+
+/** Maps AI persona → pre-generated final-words clip path. */
+const FINAL_WORDS_URLS: Record<Persona, string> = {
+  Novice:      '/sfx/final-words/novice.mp3',
+  Reader:      '/sfx/final-words/reader.mp3',
+  Misdirector: '/sfx/final-words/misdirector.mp3',
+  Silent:      '/sfx/final-words/silent.mp3',
+};
 
 export interface GameSessionProps {
   /** Optional hydration — if provided, populates initial state (for testing). */
@@ -36,6 +55,10 @@ export function GameSession({ initialSession }: GameSessionProps) {
     useGameSession(initialSession);
 
   const audioPlayer = useAudioPlayer();
+  // One-shot player for the strike-3 elimination stinger.
+  const stingerPlayer = useAudioPlayer();
+  // One-shot player for per-persona final-words clips.
+  const finalWordsPlayer = useAudioPlayer();
   const holdToSpeak = useHoldToSpeak();
 
   // Typewriter: 110 ms per char per DESIGN-DECISIONS.md §8.
@@ -213,6 +236,99 @@ export function GameSession({ initialSession }: GameSessionProps) {
   void PERSONA_DISPLAY_NAMES;
 
   // -------------------------------------------------------------------------
+  // §1.5 Elimination-Beat: stinger + final-words on session_over
+  // -------------------------------------------------------------------------
+  // Track whether we've already fired the elimination-beat sequence for the
+  // current session so we don't replay on re-renders.
+  const eliminationFiredRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const session = state.session;
+    if (!session) return;
+    if (state.phase !== 'session-over') return;
+    // Only fire once per session.
+    if (eliminationFiredRef.current === session.id) return;
+
+    // Check if the session ended via strike-3 (at least one side has strikes >= 3).
+    const strikeElimination =
+      session.self.strikes >= 3 || session.opponent.strikes >= 3;
+
+    if (!strikeElimination) return;
+
+    eliminationFiredRef.current = session.id;
+
+    // Step 1: play the stinger.
+    stingerPlayer.play('/sfx/stinger.mp3');
+
+    // Step 2: if AI was eliminated (player won), schedule per-persona final-words
+    // ~1s after the stinger ends. We use onEnded for reliable chaining.
+    if (session.sessionWinner === 'player') {
+      const persona = session.opponent.personaIfAi;
+      if (persona) {
+        const finalWordsUrl = FINAL_WORDS_URLS[persona];
+        stingerPlayer.onEnded(() => {
+          setTimeout(() => {
+            finalWordsPlayer.play(finalWordsUrl);
+          }, FINAL_WORDS_DELAY_MS);
+        });
+      }
+    }
+    // If AI won (player eliminated), no final-words — stinger IS the sign-off.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.phase, state.session?.id]);
+
+  // -------------------------------------------------------------------------
+  // §1.5 Elimination-Beat: silent-beat before reveal
+  // -------------------------------------------------------------------------
+  // Intercept the "Liar!" challenge to enforce ~2s dead air BEFORE the server
+  // resolves and cards visually flip. Music ducks immediately on click, then
+  // the dispatch fires after SILENT_BEAT_DURATION_MS. restoreFromOutput is
+  // called once the server responds (existing TTS-ended path handles it for
+  // ongoing play; for session_over there's no TTS so we restore in handleLiar).
+  const silentBeatTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Keep music API stable ref for use inside setTimeout callback.
+  const musicRef = useRef(music);
+  useEffect(() => { musicRef.current = music; });
+  const musicEnabledRef = useRef(musicEnabled);
+  useEffect(() => { musicEnabledRef.current = musicEnabled; });
+
+  const handleLiar = useCallback(() => {
+    // Duck music for the silent beat (400ms linear ramp per spec §1.5 LOCK).
+    if (musicEnabledRef.current) {
+      musicRef.current.duckForOutput({ fadeMs: SILENT_BEAT_DUCK_MS });
+    }
+
+    // Cancel any in-flight timer (rapid double-click guard).
+    if (silentBeatTimerRef.current) {
+      clearTimeout(silentBeatTimerRef.current);
+    }
+
+    // After the dead-air window, dispatch the challenge. The server resolves
+    // RevealComplete and returns the updated session; cards will then flip
+    // via normal React re-render. Music restore happens:
+    //   - Via the existing markAudioEnded + restoreFromOutput path (if TTS follows)
+    //   - Or immediately here if no TTS follows (session_over / accepted-claim path)
+    silentBeatTimerRef.current = setTimeout(() => {
+      silentBeatTimerRef.current = null;
+      dispatch({ type: 'PlayerRespond', action: 'challenge' })
+        .then(() => {
+          // The server returns synchronously. If no TTS audio URL was set,
+          // the existing restoreFromOutput path won't fire — restore manually
+          // so the duck doesn't persist.
+          if (musicEnabledRef.current) {
+            musicRef.current.restoreFromOutput();
+          }
+        })
+        .catch(() => {
+          // Error is surfaced via state.error — restore music anyway.
+          if (musicEnabledRef.current) musicRef.current.restoreFromOutput();
+        });
+    }, SILENT_BEAT_DURATION_MS);
+  // dispatch is stable (useCallback with [] deps in useGameSession).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch]);
+
+  // -------------------------------------------------------------------------
   // Render: idle / no session → Start CTA
   // -------------------------------------------------------------------------
   if (state.session === null) {
@@ -320,6 +436,21 @@ export function GameSession({ initialSession }: GameSessionProps) {
   }
 
   // -------------------------------------------------------------------------
+  // §1.5 Strike-2 CSS dim: progressive intensification
+  // -------------------------------------------------------------------------
+  // On strike 2, apply a CSS filter to the root gameplay container to dim
+  // ambient lighting and heighten tension. (Strike-3 viewport crack is a
+  // spec stretch item — skipped per Day-5 time pressure.)
+  const maxStrikes = Math.max(
+    state.session?.self.strikes ?? 0,
+    state.session?.opponent.strikes ?? 0,
+  );
+  const strike2DimStyle: React.CSSProperties =
+    maxStrikes >= 2
+      ? { filter: 'brightness(0.85) contrast(1.1)' }
+      : {};
+
+  // -------------------------------------------------------------------------
   // Render: active gameplay
   // -------------------------------------------------------------------------
   return (
@@ -329,9 +460,31 @@ export function GameSession({ initialSession }: GameSessionProps) {
         inset: 0,
         overflow: 'hidden',
         background: 'var(--wall)',
+        ...strike2DimStyle,
       }}
     >
       <OverlayEffects />
+      {/* H-I1: surface dispatch errors during active gameplay (previously silent) */}
+      {state.error && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '8px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 100,
+            background: 'rgba(0,0,0,0.75)',
+            color: 'var(--coral)',
+            fontFamily: '"Press Start 2P", monospace',
+            fontSize: '9px',
+            padding: '8px 14px',
+            letterSpacing: '1px',
+            pointerEvents: 'none',
+          }}
+        >
+          {state.error}
+        </div>
+      )}
       <Scene
         session={state.session}
         phase={state.phase}
@@ -349,7 +502,7 @@ export function GameSession({ initialSession }: GameSessionProps) {
         onStartSpeak={() => { holdToSpeak.start().catch(() => {}); }}
         onStopSpeak={() => { holdToSpeak.stop(); }}
         onAccept={() => { dispatch({ type: 'PlayerRespond', action: 'accept' }).catch(() => {}); }}
-        onLiar={() => { dispatch({ type: 'PlayerRespond', action: 'challenge' }).catch(() => {}); }}
+        onLiar={handleLiar}
       />
     </div>
   );
