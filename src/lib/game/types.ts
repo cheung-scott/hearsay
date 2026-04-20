@@ -121,6 +121,19 @@ export interface PublicClaim {
   claimedRank: Rank;
   claimText?: string;
   timestamp: number;
+  /**
+   * Cold Read projection only (joker-system §7.4.2, Task 12).
+   * Retained by toClientView on the LAST AI claim when `cold_read` is in
+   * `Round.activeJokerEffects`. Stripped on all other claims + all non-Cold-Read rounds.
+   * Strictly additive — does not affect any existing PublicClaim construction site.
+   *
+   * Spec-faithful narrow shape: only `lieScore` crosses the wire. Other
+   * VoiceMeta fields (latencyMs, fillerCount, etc.) are server-only and MUST
+   * NOT be projected to the client. `buildContexts.ts` carries the full
+   * VoiceMeta server-side via an explicit `Omit<PublicClaim,'voiceMeta'> &
+   * { voiceMeta?: VoiceMeta }` intersection, independent of this narrow shape.
+   */
+  voiceMeta?: { lieScore: number };
 }
 
 // ---------------------------------------------------------------------------

@@ -27,6 +27,12 @@ export interface JokerSlot {
   joker: JokerType;
   /** ms since epoch, from the `JokerPicked.now` event that placed this slot. */
   acquiredAt: number;
+  /** Lifecycle state of this joker slot. Spec: joker-system §4. */
+  state: 'held' | 'consumed';
+  /** 0-based round index when joker was acquired. Spec: joker-system §4. */
+  acquiredRoundIdx: number;
+  /** 0-based round index when joker was consumed; undefined while held. Spec: joker-system §4. */
+  consumedRoundIdx?: number;
 }
 
 /**
@@ -41,4 +47,66 @@ export interface JokerOffer {
   /** Length 1..3 per spec §7.1.1. No duplicate types within one offer. */
   offered: JokerType[];
   offeredToWinner: 'player' | 'ai';
+}
+
+/**
+ * The game-phase windows in which a joker may be activated. Spec: joker-system §4.
+ */
+export type JokerTrigger =
+  | { kind: 'self_claim_phase' }
+  | { kind: 'pre_ai_claim' }
+  | { kind: 'opponent_claim_resolved' }
+  | { kind: 'on_my_strike' };
+
+/**
+ * How long a joker's effect persists after activation. Spec: joker-system §4.
+ */
+export type JokerDuration =
+  | 'next_claim'
+  | 'next_challenge'
+  | 'one_shot_on_use'
+  | 'session';
+
+/**
+ * The cost a player pays to activate a joker. Spec: joker-system §4.
+ */
+export type JokerCost =
+  | { kind: 'none' }
+  | { kind: 'reveal_own_card'; count: 1 }
+  | { kind: 'strike_penalty'; amount: 1 };
+
+/**
+ * Full definition of a joker card — static catalog shape. Spec: joker-system §4.
+ */
+export interface Joker {
+  /** Matches a key in the `JOKER_CATALOG`. */
+  type: JokerType;
+  /** Display name, Title Case. */
+  name: string;
+  /** One-line flavour text, ≤80 chars. Spec: §4. */
+  flavor: string;
+  /** Ordered list of phases in which this joker can fire. */
+  triggers: JokerTrigger[];
+  /** How long the effect lasts once activated. */
+  duration: JokerDuration;
+  /** Activation cost. */
+  cost: JokerCost;
+  /** Whether the card face is shown to both players on activation. */
+  visibleOnActivate: boolean;
+  /** CSS custom property name for theming, e.g. `--joker-poker-face`. Spec: §4. */
+  accentVar: string;
+}
+
+/**
+ * Payload sent to the probe endpoint when Stage Whisper fires.
+ * Shape is LOCKED — byte-for-byte aligned with probe-phase §4.
+ * Spec: joker-system §7.2.
+ */
+export interface ProbeRequest {
+  whisperId: string;
+  targetAiId: 'ai';
+  roundIdx: number;
+  triggeredAtTurn: number;
+  now: number;
+  mathProb?: number;
 }
