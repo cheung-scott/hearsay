@@ -152,6 +152,7 @@ export function toClientView(session: Session, viewer: 'player' | 'ai'): ClientS
     status: session.status,
     sessionWinner: session.sessionWinner,
     currentMusicUrl,
+    musicTracks: session.musicTracks.map(t => ({ ...t })),
     ...(autopsy ? { autopsy } : {}),
     ...(discardedJokers ? { discardedJokers } : {}),
     ...(currentOffer ? { currentOffer } : {}),

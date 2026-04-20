@@ -1,13 +1,16 @@
 'use client';
 
 import '@/styles/game-theme.css';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGameSession } from '@/hooks/useGameSession';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { useHoldToSpeak } from '@/hooks/useHoldToSpeak';
 import { useTypewriter } from '@/hooks/useTypewriter';
+import { useMusicBed } from '@/hooks/useMusicBed';
+import { deriveTensionLevel } from '@/lib/music/tension';
+import { hasAllTracks } from '@/lib/music/tracks';
 import { PERSONA_DISPLAY_NAMES } from '@/lib/persona/displayNames';
-import type { ClientSession } from '@/lib/game/types';
+import type { ClientSession, MusicTrack } from '@/lib/game/types';
 import { Scene } from './Scene/Scene';
 import { TopBar } from './Hud/TopBar';
 import { PlayerControls } from './PlayerControls/PlayerControls';
@@ -38,10 +41,124 @@ export function GameSession({ initialSession }: GameSessionProps) {
   // Typewriter: 110 ms per char per DESIGN-DECISIONS.md §8.
   const { displayedText, isDone } = useTypewriter(state.lastClaimText ?? '', 110);
 
-  // When a new TTS audio URL arrives, play it and register the onEnded callback.
+  // -------------------------------------------------------------------------
+  // Music bed (tension-music-system spec §6.5)
+  // -------------------------------------------------------------------------
+
+  // Local music UI state. `musicDisabled` mirrors the ClientSession.musicState
+  // shape but lives in component state (not projected by toClientView per
+  // types.ts L320 — populated client-side).
+  const [musicDisabled, setMusicDisabled] = useState(false);
+  const [userMuted] = useState(false); // mute toggle UX is owned by ui-gameplay phase 2
+  const [pregenTracks, setPregenTracks] = useState<MusicTrack[]>([]);
+  const pregenFiredRef = useRef<string | null>(null);
+  // Hoisted so the per-session reset effect can clear it; the audioPlayer
+  // false→true transition effect below also writes it.
+  const wasPlayingRef = useRef(false);
+
+  // deriveTensionLevel takes the narrowest shape it actually reads, so no
+  // synthesis-cast needed: ClientSession.{status, self, opponent} satisfies it.
+  const tensionInput = state.session
+    ? {
+        status: state.session.status,
+        player: { strikes: state.session.self.strikes },
+        ai: { strikes: state.session.opponent.strikes },
+      }
+    : ({ status: 'setup' as const, player: { strikes: 0 }, ai: { strikes: 0 } });
+
+  // Prefer pregen response tracks (fresh URLs) over the session snapshot,
+  // which started empty pre-pregen. The next session refetch will reconcile.
+  const sessionMusicTracks =
+    pregenTracks.length > 0 ? pregenTracks : (state.session?.musicTracks ?? []);
+
+  const tracksReady = hasAllTracks(sessionMusicTracks);
+  const musicEnabled = !musicDisabled && !userMuted && tracksReady;
+
+  // R15.2 — track URL load failure flips music-disabled.
+  const handleTrackLoadError = () => setMusicDisabled(true);
+
+  const music = useMusicBed({
+    tracks: sessionMusicTracks,
+    currentTensionLevel: deriveTensionLevel(tensionInput),
+    enabled: musicEnabled,
+    onTrackLoadError: handleTrackLoadError,
+  });
+
+  // Fire pregen once per fresh session, and reset all carried-over per-session
+  // music state so NEW TRIAL after session-over starts cleanly. AbortController
+  // covers the rapid CreateSession-twice race where an in-flight fetch resolves
+  // for a stale session id.
+  useEffect(() => {
+    const id = state.session?.id;
+    if (!id) return;
+    if (pregenFiredRef.current === id) return;
+
+    // Per-session reset — prevents NEW TRIAL inheriting prior session's tracks
+    // or sticky musicDisabled flag.
+    pregenFiredRef.current = id;
+    setPregenTracks([]);
+    setMusicDisabled(false);
+    wasPlayingRef.current = false;
+
+    const ac = new AbortController();
+    fetch('/api/music/pregen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: id }),
+      signal: ac.signal,
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(r))
+      .then((data: { tracks: MusicTrack[] }) => {
+        // Stale-response guard — ignore if the user has since started a newer session.
+        if (pregenFiredRef.current !== id) return;
+        if (data.tracks?.length) {
+          setPregenTracks(data.tracks);
+        } else {
+          setMusicDisabled(true);
+        }
+      })
+      .catch(err => {
+        if (err?.name === 'AbortError') return;
+        if (pregenFiredRef.current !== id) return;
+        setMusicDisabled(true);
+      });
+
+    return () => { ac.abort(); };
+  }, [state.session?.id]);
+
+  // Wire input ducking from useHoldToSpeak.
+  useEffect(() => {
+    if (!musicEnabled) return;
+    if (holdToSpeak.state === 'recording') {
+      music.duckForInput();
+    } else if (holdToSpeak.state === 'idle' || holdToSpeak.state === 'stopped') {
+      music.restoreFromInput();
+    }
+    // music API is stable; intentionally narrow deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdToSpeak.state, musicEnabled]);
+
+  // Track isPlaying transitions so we can duck on false→true (spec §6.5).
+  // restoreFromOutput is hooked into the combined onEnded below — useAudioPlayer's
+  // onEnded is one-shot/self-clearing, so we must register markAudioEnded AND
+  // restoreFromOutput as a single callback per turn (last writer wins otherwise).
+  // wasPlayingRef is hoisted above (per-session reset effect needs to clear it).
+  useEffect(() => {
+    if (audioPlayer.isPlaying && !wasPlayingRef.current && musicEnabled) {
+      music.duckForOutput();
+    }
+    wasPlayingRef.current = audioPlayer.isPlaying;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioPlayer.isPlaying, musicEnabled]);
+
+  // When a new TTS audio URL arrives, play it and register a combined onEnded
+  // callback (markAudioEnded for FSM phase advance + restoreFromOutput for music).
   useEffect(() => {
     if (state.lastClaimAudioUrl) {
-      audioPlayer.onEnded(markAudioEnded);
+      audioPlayer.onEnded(() => {
+        markAudioEnded();
+        if (musicEnabled) music.restoreFromOutput();
+      });
       audioPlayer.play(state.lastClaimAudioUrl);
     }
     // audioPlayer and markAudioEnded are stable refs — intentionally omitted.
@@ -123,7 +240,11 @@ export function GameSession({ initialSession }: GameSessionProps) {
           <p style={{ fontSize: '10px', color: 'var(--coral)' }}>{state.error}</p>
         )}
         <button
-          onClick={() => dispatch({ type: 'CreateSession' })}
+          onClick={async () => {
+            // Prime AudioContext inside the user gesture (autoplay policy).
+            await music.prime().catch(() => { /* music will be silently disabled */ });
+            await dispatch({ type: 'CreateSession' });
+          }}
           style={{
             fontFamily: '"Press Start 2P", monospace',
             fontSize: '12px',
@@ -175,7 +296,11 @@ export function GameSession({ initialSession }: GameSessionProps) {
           {playerWon ? 'CASE DISMISSED' : 'GUILTY'}
         </h1>
         <button
-          onClick={() => dispatch({ type: 'CreateSession' })}
+          onClick={async () => {
+            // Prime AudioContext inside the user gesture (autoplay policy).
+            await music.prime().catch(() => { /* music will be silently disabled */ });
+            await dispatch({ type: 'CreateSession' });
+          }}
           style={{
             fontFamily: '"Press Start 2P", monospace',
             fontSize: '11px',
