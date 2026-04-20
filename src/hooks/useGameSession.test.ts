@@ -115,6 +115,32 @@ describe('derivePhase — phase gate table', () => {
       audioUrl: undefined,
       expected: 'awaiting-player-response',
     },
+    // H-H4 / H-H6: resolving + round_over must not fall through to idle
+    {
+      label: 'round_active + resolving → awaiting-ai (H-H4)',
+      session: makeClientSession({
+        status: 'round_active',
+        rounds: [makeClientRound({ status: 'resolving', activePlayer: 'player' })],
+      }),
+      expected: 'awaiting-ai',
+    },
+    {
+      label: 'round_active + round_over → awaiting-ai (H-H4)',
+      session: makeClientSession({
+        status: 'round_active',
+        rounds: [makeClientRound({ status: 'round_over', activePlayer: 'player' })],
+      }),
+      expected: 'awaiting-ai',
+    },
+    {
+      label: 'round_active + setup (empty rounds) → idle',
+      session: makeClientSession({
+        status: 'round_active',
+        rounds: [],
+        currentRoundIdx: 0,
+      }),
+      expected: 'idle',
+    },
   ])('$label', ({ session, audioUrl, expected }) => {
     expect(derivePhase(session, audioUrl)).toBe(expected);
   });
@@ -169,6 +195,33 @@ describe('useGameSession — dispatch issues fetch', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
     const [calledUrl] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string, ...unknown[]];
     expect(calledUrl).toBe('/api/session');
+  });
+
+  // H-I2: assert that PlayerClaim dispatch threads sessionId into the body
+  // (catches the CreateSession drift CRITICAL: a missing sessionId 400s silently)
+  it('dispatch PlayerClaim includes sessionId in POST body (H-I2)', async () => {
+    const initial = makeClientSession({ id: 'claim-session-id' });
+    const { result } = renderHook(() => useGameSession(initial));
+
+    const fakeCard = initial.self.hand[0];
+    const fakeBlob = new Blob(['audio-data'], { type: 'audio/webm' });
+
+    await act(async () => {
+      await result.current.dispatch({
+        type: 'PlayerClaim',
+        cards: [fakeCard],
+        audio: fakeBlob,
+        claimText: '1 Queen',
+      });
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [calledUrl, calledInit] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+    expect(calledUrl).toBe('/api/turn');
+    const body = JSON.parse(calledInit.body as string);
+    expect(body.sessionId).toBe('claim-session-id');
+    expect(body.type).toBe('PlayerClaim');
+    expect(Array.isArray(body.cards)).toBe(true);
   });
 });
 
@@ -257,6 +310,62 @@ describe('useGameSession — card selection resets on phase change', () => {
 
     expect(result.current.state.phase).toBe('awaiting-ai');
     expect(result.current.selectedCardIds.size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// H-H7 — concurrent-dispatch race: stale response is dropped
+// ---------------------------------------------------------------------------
+
+describe('useGameSession — concurrent dispatch race (H-H7)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('a stale response does not overwrite state when a newer dispatch completes first', async () => {
+    // Slow response for dispatch-1 (resolves after dispatch-2 completes).
+    // Fast response for dispatch-2.
+    let resolveSlowFetch!: (value: unknown) => void;
+    const slowPromise = new Promise(r => { resolveSlowFetch = r; });
+
+    const staleSession = makeClientSession({
+      status: 'round_active',
+      rounds: [makeClientRound({ status: 'claim_phase', activePlayer: 'ai' })],
+    });
+    const freshSession = makeClientSession({
+      status: 'round_active',
+      rounds: [makeClientRound({ status: 'claim_phase', activePlayer: 'player' })],
+    });
+
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => slowPromise.then(() => ({
+        ok: true,
+        json: async () => ({ session: staleSession }),
+      })))
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ session: freshSession }),
+      });
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useGameSession());
+
+    // Fire dispatch-1 (will hang).
+    const d1 = result.current.dispatch({ type: 'AiAct' });
+
+    // Fire dispatch-2 immediately (wins the seq race).
+    await act(async () => {
+      await result.current.dispatch({ type: 'AiAct' });
+    });
+
+    // Now let dispatch-1's slow fetch resolve.
+    act(() => { resolveSlowFetch(undefined); });
+    await act(async () => { await d1; });
+
+    // The stale (awaiting-ai) response from dispatch-1 must NOT overwrite
+    // the fresh (recording) state set by dispatch-2.
+    expect(result.current.state.phase).toBe('recording');
   });
 });
 

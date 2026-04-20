@@ -75,7 +75,18 @@ export function derivePhase(
     }
   }
 
-  // Fallback for setup / resolving / round_over sub-states.
+  // `resolving` and `round_over` are transient server-side sub-states where the
+  // server is still computing the outcome. From the client's perspective the AI
+  // is acting; return 'awaiting-ai' so the auto-trigger effect re-fires AiAct
+  // rather than dropping to the start-screen idle branch.
+  if (session.status === 'round_active') {
+    const round = session.rounds[session.currentRoundIdx];
+    if (round && (round.status === 'resolving' || round.status === 'round_over')) {
+      return 'awaiting-ai';
+    }
+  }
+
+  // Fallback for setup sub-state.
   return 'idle';
 }
 
@@ -160,7 +171,11 @@ export function useGameSession(initialSession?: ClientSession): {
   }, []);
 
   // Called by the audio player when TTS playback ends.
+  // Guard via phaseRef: only advance if we're still in playing-ai-audio.
+  // Without this guard, a double-fire (e.g. play() rejection + real 'ended'
+  // event) would overwrite whatever phase the FSM had already advanced to.
   const markAudioEnded = useCallback(() => {
+    if (phaseRef.current !== 'playing-ai-audio') return;
     setLastClaimAudioUrl(undefined);
     setPhase('awaiting-player-response');
   }, []);
