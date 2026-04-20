@@ -11,6 +11,15 @@ import { deriveTensionLevel } from '@/lib/music/tension';
 import { hasAllTracks } from '@/lib/music/tracks';
 import { PERSONA_DISPLAY_NAMES } from '@/lib/persona/displayNames';
 import type { ClientSession, MusicTrack, Persona } from '@/lib/game/types';
+import {
+  loadProgress,
+  saveProgress,
+  clearProgress,
+  nextPersona,
+  isGauntletComplete,
+  GAUNTLET_ORDER,
+} from '@/lib/game/progress';
+import type { GauntletProgress } from '@/lib/game/progress';
 import { Scene } from './Scene/Scene';
 import { TopBar } from './Hud/TopBar';
 import { PlayerControls } from './PlayerControls/PlayerControls';
@@ -67,6 +76,17 @@ export function GameSession({ initialSession }: GameSessionProps) {
   // One-shot player for per-persona final-words clips.
   const finalWordsPlayer = useAudioPlayer();
   const holdToSpeak = useHoldToSpeak();
+
+  // -------------------------------------------------------------------------
+  // Gauntlet progression (Option B — localStorage)
+  // -------------------------------------------------------------------------
+  const [progress, setProgress] = useState<GauntletProgress>(() => loadProgress());
+  // Ref guard: tracks session id for which we've already saved a gauntlet win,
+  // to ensure the save-on-win effect fires exactly once per session_over.
+  const gauntletWinFiredRef = useRef<string | null>(null);
+
+  // Derive the preferred persona for the next CreateSession call.
+  const preferredPersona = nextPersona(progress) ?? undefined;
 
   // Typewriter: 110 ms per char per DESIGN-DECISIONS.md §8.
   const { displayedText, isDone } = useTypewriter(state.lastClaimText ?? '', 110);
@@ -285,6 +305,35 @@ export function GameSession({ initialSession }: GameSessionProps) {
   }, [state.phase, state.session?.id]);
 
   // -------------------------------------------------------------------------
+  // Gauntlet save-on-win (fires exactly once per session_over with ref guard)
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    const session = state.session;
+    if (!session) return;
+    if (state.phase !== 'session-over') return;
+    if (session.sessionWinner !== 'player') return;
+    // Ref guard: only fire once per session id.
+    if (gauntletWinFiredRef.current === session.id) return;
+
+    const persona = session.opponent.personaIfAi;
+    if (!persona) return;
+    // Only count personas that belong to the gauntlet order and haven't been recorded yet.
+    if (!GAUNTLET_ORDER.includes(persona)) return;
+
+    // Mark as fired before any state updates so concurrent re-renders don't double-fire.
+    gauntletWinFiredRef.current = session.id;
+
+    setProgress((prev) => {
+      if (prev.defeated.includes(persona)) return prev; // idempotent
+      const updated: GauntletProgress = { defeated: [...prev.defeated, persona] };
+      saveProgress(updated);
+      return updated;
+    });
+    // gauntletWinFiredRef, saveProgress, GAUNTLET_ORDER are stable refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.phase, state.session?.id, state.session?.sessionWinner]);
+
+  // -------------------------------------------------------------------------
   // §1.5 Elimination-Beat: silent-beat before reveal
   // -------------------------------------------------------------------------
   // Intercept the "Liar!" challenge to enforce ~2s dead air BEFORE the server
@@ -366,7 +415,7 @@ export function GameSession({ initialSession }: GameSessionProps) {
           onClick={async () => {
             // Prime AudioContext inside the user gesture (autoplay policy).
             await music.prime().catch(() => { /* music will be silently disabled */ });
-            await dispatch({ type: 'CreateSession' });
+            await dispatch({ type: 'CreateSession', preferredPersona });
           }}
           style={{
             fontFamily: '"Press Start 2P", monospace',
@@ -387,11 +436,78 @@ export function GameSession({ initialSession }: GameSessionProps) {
   }
 
   // -------------------------------------------------------------------------
-  // Render: session-over → NEW TRIAL CTA
+  // Render: session-over → gauntlet-complete final win screen OR NEW TRIAL CTA
   // -------------------------------------------------------------------------
   if (state.phase === 'session-over') {
     const winner = state.session.sessionWinner;
     const playerWon = winner === 'player';
+
+    // Gauntlet-complete override: all 4 opponents beaten → COURT ADJOURNED screen.
+    if (isGauntletComplete(progress)) {
+      return (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'var(--wall)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '24px',
+            fontFamily: '"Press Start 2P", monospace',
+            color: 'var(--bone)',
+          }}
+        >
+          <OverlayEffects />
+          <h1
+            style={{
+              fontSize: '20px',
+              margin: 0,
+              color: 'var(--amber-hi)',
+              letterSpacing: '3px',
+              textAlign: 'center',
+            }}
+          >
+            CASE DISMISSED
+          </h1>
+          <p
+            style={{
+              fontSize: '10px',
+              color: 'var(--amber-hi)',
+              letterSpacing: '2px',
+              margin: 0,
+              textAlign: 'center',
+            }}
+          >
+            COURT ADJOURNED
+          </p>
+          <button
+            data-testid="gauntlet-start-over"
+            onClick={async () => {
+              clearProgress();
+              const reset: GauntletProgress = { defeated: [] };
+              setProgress(reset);
+              await music.prime().catch(() => { /* music will be silently disabled */ });
+              await dispatch({ type: 'CreateSession', preferredPersona: 'Novice' });
+            }}
+            style={{
+              fontFamily: '"Press Start 2P", monospace',
+              fontSize: '11px',
+              letterSpacing: '3px',
+              background: 'var(--felt)',
+              color: 'var(--bone)',
+              border: '2px solid var(--amber-dim)',
+              padding: '14px 28px',
+              cursor: 'pointer',
+              boxShadow: '4px 4px 0 0 var(--shadow)',
+            }}
+          >
+            START OVER
+          </button>
+        </div>
+      );
+    }
 
     return (
       <div
@@ -422,7 +538,7 @@ export function GameSession({ initialSession }: GameSessionProps) {
           onClick={async () => {
             // Prime AudioContext inside the user gesture (autoplay policy).
             await music.prime().catch(() => { /* music will be silently disabled */ });
-            await dispatch({ type: 'CreateSession' });
+            await dispatch({ type: 'CreateSession', preferredPersona });
           }}
           style={{
             fontFamily: '"Press Start 2P", monospace',
@@ -498,7 +614,7 @@ export function GameSession({ initialSession }: GameSessionProps) {
         claimBubbleText={displayedText}
         claimBubbleIsDone={isDone}
       />
-      <TopBar session={state.session} />
+      <TopBar session={state.session} progress={progress} />
       <PlayerControls
         session={state.session}
         phase={state.phase}

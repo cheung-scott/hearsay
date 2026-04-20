@@ -28,44 +28,78 @@ export interface GauntletProgress {
 
 const LOCALSTORAGE_KEY = 'hearsay-progress';
 
-/** Read gauntlet progress from localStorage. STUB — agent fills in persistence. */
+const DEFAULT_PROGRESS: GauntletProgress = { defeated: [] };
+
+/** Validate that a parsed value has the expected GauntletProgress shape. */
+function isValidProgress(value: unknown): value is GauntletProgress {
+  if (typeof value !== 'object' || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  if (!Array.isArray(obj.defeated)) return false;
+  const validPersonas: Persona[] = ['Novice', 'Reader', 'Misdirector', 'Silent'];
+  return (obj.defeated as unknown[]).every(
+    (p) => typeof p === 'string' && validPersonas.includes(p as Persona),
+  );
+}
+
+/** Read gauntlet progress from localStorage. Returns default if unavailable or corrupted. */
 export function loadProgress(): GauntletProgress {
-  // STUB: agent-fill will implement localStorage.getItem + JSON.parse + validation.
-  return { defeated: [] };
+  try {
+    // localStorage is unavailable in SSR (typeof localStorage will throw
+    // a ReferenceError in some environments, or be undefined in others).
+    if (typeof localStorage === 'undefined') return { defeated: [] };
+    const raw = localStorage.getItem(LOCALSTORAGE_KEY);
+    if (!raw) return { defeated: [] };
+    const parsed: unknown = JSON.parse(raw);
+    if (isValidProgress(parsed)) return parsed;
+    return { defeated: [] };
+  } catch {
+    // JSON.parse failure, localStorage access denied, or SSR ReferenceError.
+    return { defeated: [] };
+  }
 }
 
-/** Write gauntlet progress to localStorage. STUB — agent fills in persistence. */
-export function saveProgress(_progress: GauntletProgress): void {
-  // STUB: agent-fill will implement localStorage.setItem + JSON.stringify.
+/** Write gauntlet progress to localStorage. Silently swallows write failures. */
+export function saveProgress(progress: GauntletProgress): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(LOCALSTORAGE_KEY, JSON.stringify(progress));
+  } catch {
+    // Quota exceeded, private browsing, or SSR — fail silently.
+  }
 }
 
-/** Clear gauntlet progress (e.g. "Start Over" button). STUB. */
+/** Clear gauntlet progress (e.g. "Start Over" button). */
 export function clearProgress(): void {
-  // STUB: localStorage.removeItem(LOCALSTORAGE_KEY).
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.removeItem(LOCALSTORAGE_KEY);
+  } catch {
+    // Fail silently.
+  }
 }
 
 /**
  * Returns the NEXT persona the player should face, or null if the gauntlet
- * is complete (i.e. all 4 defeated). STUB — agent fills in.
+ * is complete (i.e. all 4 defeated).
  */
-export function nextPersona(_progress: GauntletProgress): Persona | null {
-  // STUB: agent returns GAUNTLET_ORDER.find(p => !progress.defeated.includes(p)) ?? null.
-  return null;
+export function nextPersona(progress: GauntletProgress): Persona | null {
+  return GAUNTLET_ORDER.find((p) => !progress.defeated.includes(p)) ?? null;
 }
 
-/** Case number the player is on (1..N or N+1 if complete). STUB. */
-export function currentCaseNumber(_progress: GauntletProgress): number {
-  // STUB: progress.defeated.length + 1 (capped at GAUNTLET_LENGTH + 1 for complete-state).
-  return 1;
+/** Case number the player is on (1..N). Clamped to GAUNTLET_LENGTH when complete. */
+export function currentCaseNumber(progress: GauntletProgress): number {
+  return Math.min(progress.defeated.length + 1, GAUNTLET_LENGTH);
 }
 
-/** Has the player beaten all 4 opponents? STUB. */
-export function isGauntletComplete(_progress: GauntletProgress): boolean {
-  // STUB: progress.defeated.length >= GAUNTLET_LENGTH.
-  return false;
+/** Has the player beaten all 4 opponents? */
+export function isGauntletComplete(progress: GauntletProgress): boolean {
+  return progress.defeated.length >= GAUNTLET_LENGTH;
 }
 
 /** Internal — exported for agent/test visibility. */
 export const __PROGRESS_INTERNAL = {
   LOCALSTORAGE_KEY,
 };
+
+/** Exported for test teardown convenience. */
+export { DEFAULT_PROGRESS };

@@ -6,9 +6,18 @@ import { TargetTag } from './TargetTag';
 import { RoundPill } from './RoundPill';
 import { StrikeCounter } from './StrikeCounter';
 import { RoundsWonGavels } from './RoundsWonGavels';
+import { CaseLabel } from './CaseLabel';
+import {
+  currentCaseNumber,
+  nextPersona,
+  GAUNTLET_LENGTH,
+} from '../../../lib/game/progress';
+import type { GauntletProgress } from '../../../lib/game/progress';
 
 interface TopBarProps {
   session: ClientSession;
+  /** Optional gauntlet progress. When present, renders a CaseLabel below the HUD row. */
+  progress?: GauntletProgress;
 }
 
 /**
@@ -18,7 +27,7 @@ interface TopBarProps {
  * Wave-5 A1: Below the main row, renders an "ACTIVE POWERS" chip row when
  * `round.activeJokerEffects` is non-empty — one chip per unique joker type.
  */
-export function TopBar({ session }: TopBarProps) {
+export function TopBar({ session, progress }: TopBarProps) {
   const round = session.rounds[session.currentRoundIdx];
   const roundNumber = (round?.roundNumber ?? 1) as 1 | 2 | 3;
   const targetRank = round?.targetRank ?? 'Queen';
@@ -126,6 +135,15 @@ export function TopBar({ session }: TopBarProps) {
             })}
           </div>
         </>
+      )}
+
+      {/* Gauntlet CaseLabel — only rendered when progress prop is provided */}
+      {progress !== undefined && (
+        <CaseLabel
+          caseNumber={currentCaseNumber(progress)}
+          totalCases={GAUNTLET_LENGTH}
+          persona={nextPersona(progress)}
+        />
       )}
     </div>
   );
