@@ -43,6 +43,7 @@ export function JokerTray({ jokerSlots, activeEffects, onActivate }: JokerTrayPr
         }
       `}</style>
     <div
+      data-testid="joker-tray"
       style={{
         position: 'fixed',
         bottom: '16px',

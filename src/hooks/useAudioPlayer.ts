@@ -22,14 +22,24 @@ export function useAudioPlayer(): {
 
   const play = useCallback((url: string) => {
     if (!audioRef.current) {
-      const audio = new Audio();
-      audio.addEventListener('ended', () => {
+      try {
+        const audio = new Audio();
+        audio.addEventListener('ended', () => {
+          setIsPlaying(false);
+          const cb = onEndedCallbackRef.current;
+          onEndedCallbackRef.current = null;
+          cb?.();
+        });
+        audioRef.current = audio;
+      } catch {
+        // Environment (test / SSR) can't construct Audio — fire onEnded so
+        // downstream state machines don't deadlock.
         setIsPlaying(false);
         const cb = onEndedCallbackRef.current;
         onEndedCallbackRef.current = null;
         cb?.();
-      });
-      audioRef.current = audio;
+        return;
+      }
     }
 
     audioRef.current.src = url;
@@ -38,12 +48,22 @@ export function useAudioPlayer(): {
     // downstream state machines (e.g. typewriter, derivePhase) can advance
     // rather than deadlocking waiting for an 'ended' event that will never fire.
     setIsPlaying(true);
-    audioRef.current.play().catch(() => {
-      setIsPlaying(false);
-      const cb = onEndedCallbackRef.current;
-      onEndedCallbackRef.current = null;
-      cb?.();
-    });
+    // Some jsdom mocks return undefined from play() rather than a Promise —
+    // guard so we don't throw "Cannot read properties of undefined".
+    let p: Promise<void> | undefined;
+    try {
+      p = audioRef.current.play() as Promise<void> | undefined;
+    } catch {
+      p = undefined;
+    }
+    if (p && typeof p.catch === 'function') {
+      p.catch(() => {
+        setIsPlaying(false);
+        const cb = onEndedCallbackRef.current;
+        onEndedCallbackRef.current = null;
+        cb?.();
+      });
+    }
   }, []);
 
   const onEnded = useCallback((cb: () => void) => {

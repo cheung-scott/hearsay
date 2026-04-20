@@ -14,6 +14,7 @@ interface TargetTagProps {
 export function TargetTag({ rank }: TargetTagProps) {
   return (
     <div
+      data-testid="target-rank-tag"
       className="target-tag"
       style={{
         fontFamily: '"Press Start 2P", monospace',

@@ -31,6 +31,13 @@ import { JokerTray } from './PlayerControls/JokerTray';
 import { JokerPicker } from './Scene/JokerPicker';
 import { ProbeReveal } from './Scene/ProbeReveal';
 import { AutopsyOverlay } from './Scene/AutopsyOverlay';
+import { ClerkTutorial } from './Scene/ClerkTutorial';
+import { useTutorial } from '@/hooks/useTutorial';
+import {
+  YouPlayedBanner,
+  ChallengeOutcomeBanner,
+  type ChallengeOutcome,
+} from './Scene/OutcomeBanners';
 
 // ---------------------------------------------------------------------------
 // §1.5 Elimination-Beat constants
@@ -90,6 +97,115 @@ export function GameSession({ initialSession }: GameSessionProps) {
 
   // Typewriter: 110 ms per char per DESIGN-DECISIONS.md §8.
   const { displayedText, isDone } = useTypewriter(state.lastClaimText ?? '', 110);
+
+  // -------------------------------------------------------------------------
+  // Playtest-fix HUD: YouPlayed readback + ChallengeOutcome banner.
+  // -------------------------------------------------------------------------
+  // Track prev strikes to detect who just took a strike after a response.
+  const prevStrikesRef = useRef<{ player: number; ai: number }>({ player: 0, ai: 0 });
+  const [outcome, setOutcome] = useState<ChallengeOutcome | null>(null);
+  const outcomeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track the last response action the player (or implicitly AI) took, so we
+  // can disambiguate "no strike changed" between ACCEPT and a caught-truth no-op.
+  const lastRespondActionRef = useRef<'accept' | 'challenge' | null>(null);
+  // Who made the most recent claim (player or ai) — informs outcome wording
+  // (ai-wrong-call vs caught-lie when the challenger side flips).
+  const lastClaimByRef = useRef<'player' | 'ai' | null>(null);
+
+  const showOutcomeForMs = useCallback((o: ChallengeOutcome, ms = 2200) => {
+    if (outcomeTimerRef.current) clearTimeout(outcomeTimerRef.current);
+    setOutcome(o);
+    outcomeTimerRef.current = setTimeout(() => {
+      setOutcome(null);
+      outcomeTimerRef.current = null;
+    }, ms);
+  }, []);
+
+  // Clean up the timer on unmount.
+  useEffect(() => {
+    return () => {
+      if (outcomeTimerRef.current) clearTimeout(outcomeTimerRef.current);
+    };
+  }, []);
+
+  // Reset strike baseline when a new session starts.
+  useEffect(() => {
+    if (!state.session) {
+      prevStrikesRef.current = { player: 0, ai: 0 };
+      return;
+    }
+    // When we see a fresh session id for the first time, sync the baseline
+    // without firing a banner.
+    // (No persistence between sessions — each new session zeroes strikes.)
+  }, [state.session?.id]);
+
+  // Detect strike deltas and show outcome banner.
+  useEffect(() => {
+    const s = state.session;
+    if (!s) return;
+    const nowPlayer = s.self.strikes;
+    const nowAi = s.opponent.strikes;
+    const prev = prevStrikesRef.current;
+
+    if (nowPlayer !== prev.player || nowAi !== prev.ai) {
+      const playerGained = nowPlayer > prev.player;
+      const aiGained = nowAi > prev.ai;
+
+      if (playerGained && !aiGained) {
+        // Player took a strike.
+        if (lastRespondActionRef.current === 'challenge') {
+          // Player called LIAR but was wrong.
+          showOutcomeForMs('false-accusation');
+        } else {
+          // AI called LIAR on the player and caught them.
+          showOutcomeForMs('player-caught');
+        }
+      } else if (aiGained && !playerGained) {
+        // AI took a strike.
+        if (lastClaimByRef.current === 'ai') {
+          // Player caught the AI's lie.
+          showOutcomeForMs('caught-lie');
+        } else {
+          // AI challenged player's truth.
+          showOutcomeForMs('ai-wrong-call');
+        }
+      }
+      prevStrikesRef.current = { player: nowPlayer, ai: nowAi };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.session?.self.strikes, state.session?.opponent.strikes]);
+
+  // Track who made the most recent claim — read from claimHistory tail.
+  useEffect(() => {
+    const s = state.session;
+    if (!s) return;
+    const round = s.rounds[s.currentRoundIdx];
+    if (!round || round.claimHistory.length === 0) return;
+    const last = round.claimHistory[round.claimHistory.length - 1];
+    lastClaimByRef.current = last.by;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.session?.rounds, state.session?.currentRoundIdx]);
+
+  // Most recent player claim text for the YouPlayed readback.
+  const lastPlayerClaimText: string | null = (() => {
+    const s = state.session;
+    if (!s) return null;
+    const round = s.rounds[s.currentRoundIdx];
+    if (!round) return null;
+    // Walk claimHistory from tail → find latest 'player' claim.
+    for (let i = round.claimHistory.length - 1; i >= 0; i--) {
+      const c = round.claimHistory[i];
+      if (c.by === 'player' && c.claimText) return c.claimText;
+    }
+    return null;
+  })();
+
+  // Show YouPlayed readback only while it's the AI's turn to respond/claim
+  // (i.e. player just finished speaking) — not during the next player turn.
+  const youPlayedVisible =
+    state.phase === 'awaiting-ai' ||
+    state.phase === 'playing-ai-audio' ||
+    state.phase === 'awaiting-player-response';
 
   // -------------------------------------------------------------------------
   // Music bed (tension-music-system spec §6.5)
@@ -215,15 +331,22 @@ export function GameSession({ initialSession }: GameSessionProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.lastClaimAudioUrl]);
 
+  // -------------------------------------------------------------------------
+  // Tutorial — hoisted here so the auto-AI effect can gate on `tutorial.active`.
+  // While the overlay is visible, we refuse to fire `AiAct` so the Defendant
+  // waits for the player to read / dismiss each step.
+  // -------------------------------------------------------------------------
+  const tutorial = useTutorial(state.session);
+
   // Auto-trigger AI's turn when it's their move. Without this, rounds where
   // activePlayer starts as 'ai' hang in 'awaiting-ai' forever because the
   // server chains AI judgment inside PlayerClaim but has no AI-first pathway.
   useEffect(() => {
-    if (state.phase === 'awaiting-ai') {
+    if (state.phase === 'awaiting-ai' && !tutorial.active) {
       dispatch({ type: 'AiAct' }).catch(() => { /* error surfaces via state.error */ });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.phase]);
+  }, [state.phase, tutorial.active]);
 
   // When holdToSpeak audioBlob transitions from null to non-null, AND we're
   // in recording phase with cards selected, dispatch PlayerClaim.
@@ -349,6 +472,8 @@ export function GameSession({ initialSession }: GameSessionProps) {
   useEffect(() => { musicEnabledRef.current = musicEnabled; });
 
   const handleLiar = useCallback(() => {
+    // Record action for outcome-banner disambiguation.
+    lastRespondActionRef.current = 'challenge';
     // Duck music for the silent beat (400ms linear ramp per spec §1.5 LOCK).
     if (musicEnabledRef.current) {
       musicRef.current.duckForOutput({ fadeMs: SILENT_BEAT_DUCK_MS });
@@ -624,7 +749,11 @@ export function GameSession({ initialSession }: GameSessionProps) {
         waveformData={holdToSpeak.waveformData}
         onStartSpeak={() => { holdToSpeak.start().catch(() => {}); }}
         onStopSpeak={() => { holdToSpeak.stop(); }}
-        onAccept={() => { dispatch({ type: 'PlayerRespond', action: 'accept' }).catch(() => {}); }}
+        onAccept={() => {
+          lastRespondActionRef.current = 'accept';
+          showOutcomeForMs('accepted', 1500);
+          dispatch({ type: 'PlayerRespond', action: 'accept' }).catch(() => {});
+        }}
         onLiar={handleLiar}
       />
 
@@ -664,6 +793,14 @@ export function GameSession({ initialSession }: GameSessionProps) {
       {state.session?.autopsy && (
         <AutopsyOverlay autopsy={state.session.autopsy} />
       )}
+
+      {/* STT readback + outcome banner — playtest fixes. */}
+      <YouPlayedBanner text={lastPlayerClaimText} visible={youPlayedVisible} />
+      <ChallengeOutcomeBanner outcome={outcome} />
+
+      {/* ClerkTutorial — 7-step annotated walkthrough, first session only.
+          The hoisted `tutorial` prop is what we also use to gate AiAct above. */}
+      <ClerkTutorial session={state.session} tutorial={tutorial} />
     </div>
   );
 }

@@ -13,6 +13,7 @@ interface StrikeCounterProps {
 export function StrikeCounter({ strikes }: StrikeCounterProps) {
   return (
     <div
+      data-testid="strikes-row"
       className="strikes"
       style={{
         display: 'flex',

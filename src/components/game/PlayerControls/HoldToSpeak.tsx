@@ -52,6 +52,7 @@ export function HoldToSpeak({ phase, onStart, onStop, waveformData, state }: Hol
 
       {/* Hold-to-speak button */}
       <button
+        data-testid="hold-to-speak"
         style={{
           fontFamily: '"Press Start 2P", monospace',
           fontSize: '11px',
