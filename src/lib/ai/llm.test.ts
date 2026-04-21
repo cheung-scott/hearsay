@@ -272,7 +272,7 @@ describe('invariant 8 (count): exactly 2 SDK invocations on invalid-JSON-twice',
 describe('invariant 8 (same-signal-on-retry): AbortSignal reference equality across attempts', () => {
   it('passes the same AbortSignal instance on both the initial call and the retry', async () => {
     mockReturnText('not-valid-json');
-    mockReturnText(JSON.stringify({ action: 'accept', innerThought: 'ok' }));
+    mockReturnText(JSON.stringify({ action: 'accept', innerThought: 'ok', voiceline: 'Accepted. Proceed.' }));
 
     const controller = new AbortController();
     const result = await callLLMJudgment(makeDecisionCtx(), 0.5, controller.signal);
@@ -346,7 +346,7 @@ describe('invariant 13: GEMINI_API_KEY missing throws at module load', () => {
 describe('retry-once success: invalid-then-valid resolves with valid output', () => {
   it('resolves with LLMJudgmentOutput after 1 retry (exactly 2 invocations)', async () => {
     mockReturnText('not-json');
-    mockReturnText(JSON.stringify({ action: 'challenge', innerThought: 'Suspicious.' }));
+    mockReturnText(JSON.stringify({ action: 'challenge', innerThought: 'Suspicious.', voiceline: 'You are lying.' }));
 
     const signal = new AbortController().signal;
     const result = await callLLMJudgment(makeDecisionCtx(), 0.5, signal);

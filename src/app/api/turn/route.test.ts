@@ -295,6 +295,7 @@ describe('Invariant 9 — chain AI judgment inline (PlayerClaim)', () => {
     aiDecideOnClaimSpy().mockResolvedValue({
       action: 'accept',
       innerThought: 'Seems fine to me.',
+      voiceline: 'Proceed.',
       source: 'llm',
       latencyMs: 42,
       mathProb: 0.3,
@@ -385,6 +386,7 @@ describe('Invariant 11 — toClientView on every response type', () => {
     aiDecideOnClaimSpy().mockResolvedValue({
       action: 'accept',
       innerThought: 'Looks good.',
+      voiceline: 'Acknowledged.',
       source: 'llm',
       latencyMs: 20,
       mathProb: 0.5,

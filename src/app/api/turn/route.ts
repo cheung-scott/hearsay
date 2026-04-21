@@ -210,6 +210,43 @@ export async function POST(req: Request): Promise<Response> {
         session = reduce(session, { type: 'ClaimAccepted', now: Date.now() });
       }
 
+      // Synthesize TTS for the AI's spoken judgment (voiceline). Uses the same
+      // ElevenLabs Flash v2.5 pipeline as AiAct's claim TTS. Voice settings
+      // come from the persona's "lying" preset for a challenge (AI is
+      // accusing) and "honest" for an accept (AI is giving approval) — a
+      // loose register mapping that gives challenge-lines more edge and
+      // accept-lines more calm.
+      const respondingPersona = session.ai.personaIfAi ?? 'Reader';
+      let aiResponseAudioUrl = '';
+      try {
+        const ttsClient = makeElevenLabsClient();
+        const voiceId = PERSONA_VOICE_IDS[respondingPersona];
+        const voicePreset = VOICE_PRESETS[respondingPersona][
+          aiDecision.action === 'challenge' ? 'lying' : 'honest'
+        ];
+        const audioStream = await ttsClient.textToSpeech.convert(voiceId, {
+          text: aiDecision.voiceline,
+          modelId: 'eleven_flash_v2_5',
+          outputFormat: 'mp3_44100_128',
+          voiceSettings: {
+            stability: voicePreset.stability,
+            similarityBoost: voicePreset.similarity_boost,
+            style: voicePreset.style,
+            speed: voicePreset.speed,
+          },
+        });
+        aiResponseAudioUrl = await streamToDataUrl(
+          audioStream as unknown as AsyncIterable<Uint8Array>,
+        );
+      } catch (err) {
+        // TTS failure is non-fatal — client still shows the text + the
+        // outcome banner still fires. Voiceline text survives for the
+        // transcript even when audio bytes don't. Log the failure so it's
+        // visible in server logs (instead of silently swallowed).
+        console.error('[turn] Voiceline TTS failed:', err instanceof Error ? err.message : err);
+        aiResponseAudioUrl = '';
+      }
+
       await store.set(sessionId, session);
 
       return Response.json({
@@ -217,6 +254,11 @@ export async function POST(req: Request): Promise<Response> {
         aiDecision: {
           action: aiDecision.action,
           innerThought: aiDecision.innerThought,
+        },
+        aiResponse: {
+          voiceline: aiDecision.voiceline,
+          audioUrl: aiResponseAudioUrl,
+          persona: respondingPersona,
         },
       });
     }

@@ -30,6 +30,14 @@ export interface GameSessionState {
   phase: GamePhase;
   lastClaimAudioUrl?: string;
   lastClaimText?: string;
+  /**
+   * Audio URL (data: URL) for the AI's spoken accept/liar verdict on the
+   * player's last claim. Set fresh each time /api/turn PlayerClaim returns
+   * with an aiResponse payload. GameSession.tsx plays this via responsePlayer.
+   */
+  lastAiResponseAudioUrl?: string;
+  /** Text version of the above — rendered alongside the audio for clarity. */
+  lastAiResponseText?: string;
   error?: string;
 }
 
@@ -127,6 +135,12 @@ export function useGameSession(initialSession?: ClientSession): {
   const [lastClaimText, setLastClaimText] = useState<string | undefined>(
     undefined,
   );
+  const [lastAiResponseAudioUrl, setLastAiResponseAudioUrl] = useState<
+    string | undefined
+  >(undefined);
+  const [lastAiResponseText, setLastAiResponseText] = useState<
+    string | undefined
+  >(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
 
   // Card selection — local Set<CardId>.
@@ -236,6 +250,7 @@ export function useGameSession(initialSession?: ClientSession): {
         const data = (await response.json()) as {
           session: ClientSession;
           aiClaim?: { claimText: string; ttsAudioUrl: string };
+          aiResponse?: { voiceline: string; audioUrl: string; persona: string };
         };
 
         // Second stale-response guard after JSON parse (async boundary).
@@ -243,6 +258,7 @@ export function useGameSession(initialSession?: ClientSession): {
 
         const newSession = data.session;
         const aiClaim = data.aiClaim;
+        const aiResponse = data.aiResponse;
 
         // If an aiClaim with TTS audio was returned, store it before deriving
         // phase so derivePhase sees lastClaimAudioUrl and returns 'playing-ai-audio'.
@@ -252,6 +268,13 @@ export function useGameSession(initialSession?: ClientSession): {
         setSession(newSession);
         setLastClaimAudioUrl(newAudioUrl);
         setLastClaimText(newClaimText);
+        // Capture the AI's verdict voiceline (if present) so GameSession can
+        // play it via a dedicated audio player without colliding with the
+        // main claim-TTS player.
+        if (aiResponse?.audioUrl) {
+          setLastAiResponseAudioUrl(aiResponse.audioUrl);
+          setLastAiResponseText(aiResponse.voiceline);
+        }
         setError(undefined);
 
         const derived = derivePhase(newSession, newAudioUrl);
@@ -273,6 +296,8 @@ export function useGameSession(initialSession?: ClientSession): {
     phase,
     lastClaimAudioUrl,
     lastClaimText,
+    lastAiResponseAudioUrl,
+    lastAiResponseText,
     error,
   };
 

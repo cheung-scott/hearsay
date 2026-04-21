@@ -33,8 +33,10 @@ const JUDGMENT_SCHEMA = {
   properties: {
     action:       { type: Type.STRING, enum: ['accept', 'challenge'] },
     innerThought: { type: Type.STRING },
+    /** Short spoken reaction — server TTSes this so the AI verbalises its verdict. */
+    voiceline:    { type: Type.STRING },
   },
-  required: ['action', 'innerThought'],
+  required: ['action', 'innerThought', 'voiceline'],
 };
 
 const OWN_PLAY_SCHEMA = {
@@ -91,6 +93,8 @@ Pile face-down: {{pileSize}} cards. Claim history this round: {{publicClaims}}.
 Opponent hand size: {{playerHandSize}}. Opponent jokers: {{opponentJokers}}.
 Strikes: you {{strikesMe}}/3, them {{strikesPlayer}}/3.
 
+The opponent just claimed: "{{claimCount}} {{claimedRank}}".
+
 DETERMINISTIC GROUNDING:
 - Math probability opponent's claim is a lie: {{mathProb}} (0=honest, 1=impossible)
 - Opponent voice lie-score: {{voiceLie}} (0=calm, 1=nervous)
@@ -98,7 +102,14 @@ DETERMINISTIC GROUNDING:
 Decide: accept the claim, or call "Liar!"
 Stay in-character for {{persona}}.
 
-Return JSON: {"action": "accept"|"challenge", "innerThought": "<one sentence>"}`;
+You must also utter one short spoken reaction (8 to 14 words MAX) — it will be synthesized and played aloud. Rules:
+- Stay tightly in-character; no stage directions, no quotation marks, no ellipses.
+- Do NOT address the player by name.
+- If challenging, the line must sound like a rebuke or disbelief.
+- If accepting, the line must sound resigned, appraising, or terse approval.
+- May obliquely reference the claim count/rank (e.g. "Two queens? Unlikely.") but do NOT say "claim" or "opponent".
+
+Return JSON: {"action": "accept"|"challenge", "innerThought": "<one sentence>", "voiceline": "<8-14 word spoken reaction>"}`;
 
   return interpolate(template, {
     persona:             ctx.persona,
@@ -113,6 +124,8 @@ Return JSON: {"action": "accept"|"challenge", "innerThought": "<one sentence>"}`
     strikesPlayer:       String(ctx.strikesPlayer),
     mathProb:            mathProb.toFixed(2),
     voiceLie:            (ctx.claim.voiceMeta?.lieScore ?? 0.5).toFixed(2),
+    claimCount:          String(ctx.claim.count),
+    claimedRank:         String(ctx.claim.claimedRank),
   });
 }
 
@@ -161,7 +174,12 @@ function validateJudgment(raw: string, parsed: unknown): LLMJudgmentOutput {
   if (typeof p.innerThought !== 'string') {
     throw new LLMInvalidJSONError(raw, 'bad-innerThought');
   }
-  return { action: p.action, innerThought: p.innerThought };
+  if (typeof p.voiceline !== 'string' || p.voiceline.trim().length === 0) {
+    throw new LLMInvalidJSONError(raw, 'bad-voiceline');
+  }
+  // Trim + clamp to a sane length so a rogue LLM can't TTS an essay.
+  const voiceline = p.voiceline.trim().slice(0, 180);
+  return { action: p.action, innerThought: p.innerThought, voiceline };
 }
 
 function validateOwnPlay(

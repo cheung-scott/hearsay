@@ -88,6 +88,12 @@ export function GameSession({ initialSession }: GameSessionProps) {
   const silentBeatPlayer = useAudioPlayer();
   // One-shot player for the verdict gavel strike on session-over.
   const gavelPlayer = useAudioPlayer();
+  // One-shot player for the AI's spoken accept/liar verdict on the player's
+  // claim. Fires on every /api/turn PlayerClaim response when an aiResponse
+  // payload is present. Hoisted separately so it never collides with the
+  // main claim-TTS audioPlayer or the §1.5 stinger/gavel/silent-beat players.
+  const responsePlayer = useAudioPlayer();
+  const lastResponseAudioUrlRef = useRef<string | undefined>(undefined);
   const holdToSpeak = useHoldToSpeak();
 
   // -------------------------------------------------------------------------
@@ -336,6 +342,25 @@ export function GameSession({ initialSession }: GameSessionProps) {
     // audioPlayer and markAudioEnded are stable refs — intentionally omitted.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.lastClaimAudioUrl]);
+
+  // When the AI's spoken accept/liar verdict arrives from /api/turn PlayerClaim
+  // (Gemini → ElevenLabs pipe), play it on the dedicated responsePlayer so it
+  // doesn't overwrite the main claim-TTS audioPlayer if one happens to be
+  // mid-playback. Ref guard ensures we don't replay the same URL on re-renders
+  // (data: URLs are stable per response, so this is reliable).
+  useEffect(() => {
+    const url = state.lastAiResponseAudioUrl;
+    if (!url) return;
+    if (lastResponseAudioUrlRef.current === url) return;
+    lastResponseAudioUrlRef.current = url;
+    try {
+      responsePlayer.play(url);
+    } catch {
+      // Audio playback failure is non-fatal; the outcome banner + session
+      // state already convey the verdict. Silent swallow.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.lastAiResponseAudioUrl]);
 
   // -------------------------------------------------------------------------
   // Tutorial — hoisted here so the auto-AI effect can gate on `tutorial.active`.

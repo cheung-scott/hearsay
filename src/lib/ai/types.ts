@@ -56,6 +56,14 @@ export interface AiDecision {
   innerThought: string;
   /** LLM-path only; undefined on fallback paths. */
   llmReasoning?: string;
+  /**
+   * Short (≤15-word) in-character spoken reaction the AI utters when applying
+   * its verdict. The server TTSes this via ElevenLabs Flash v2.5 with the
+   * persona's voice + a voice-settings preset matched to the decision.
+   * Always populated — LLM path returns it directly, fallback paths fill in
+   * a static pool line per (persona, action).
+   */
+  voiceline: string;
   source: AiSource;
   /** Includes math + LLM + any retry. */
   latencyMs: number;
@@ -87,6 +95,11 @@ export interface LLMJudgmentOutput {
   action: 'accept' | 'challenge';
   /** One sentence. */
   innerThought: string;
+  /**
+   * Short (≤15 words) in-character spoken reaction. Server pipes into
+   * ElevenLabs Flash v2.5 TTS so the AI actually verbalises its verdict.
+   */
+  voiceline: string;
 }
 
 /** Raw LLM JSON output for own-play — validated against this schema. */

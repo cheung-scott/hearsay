@@ -107,6 +107,7 @@ describe('aiDecideOnClaim — LLM success path', () => {
     callLLMJudgmentSpy.mockResolvedValueOnce({
       action: 'accept',
       innerThought: 'looks fine',
+      voiceline: 'Accepted. Proceed.',
     });
 
     const ctx = makeDecisionCtx();
@@ -281,7 +282,7 @@ describe('aiDecideOwnPlay — fallback paths', () => {
 describe('invariant 11: latencyMs > 0 on every pipeline path', () => {
   it('latencyMs > 0 on LLM success, timeout, invalid-json, and network-error paths', async () => {
     // LLM success
-    callLLMJudgmentSpy.mockResolvedValueOnce({ action: 'accept', innerThought: 'ok' });
+    callLLMJudgmentSpy.mockResolvedValueOnce({ action: 'accept', innerThought: 'ok', voiceline: 'OK.' });
     const llmResult = await aiDecideOnClaim(makeDecisionCtx());
     expect(llmResult.latencyMs).toBeGreaterThan(0);
     // LLM path resolves immediately (mock) so latency should be well under 2000ms
