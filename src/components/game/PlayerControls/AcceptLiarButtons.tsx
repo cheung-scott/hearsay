@@ -1,5 +1,7 @@
 'use client';
 
+import { useIsMobile } from '../../../hooks/useIsMobile';
+
 interface AcceptLiarButtonsProps {
   /** When false the component returns null (only visible in `awaiting-player-response`). */
   visible: boolean;
@@ -8,22 +10,24 @@ interface AcceptLiarButtonsProps {
 }
 
 /**
- * Accept + Liar! button pair. Returns null when not `visible`. Positioned at
- * `bottom: 8%` per §10.4 locked default (overrides variant-d `bottom: 14px`).
- * Matches `.actions` / `.btn` / `.btn-challenge` class names.
+ * Accept + Liar! button pair. Returns null when not `visible`. §10.4 originally
+ * locked `bottom: 8%` — but the player's hand fan (rotateX(-22deg) at
+ * bottom: -20px with 150px cards) visibly overlaps that zone. Moved to
+ * `bottom: 22%` (desktop) / `26%` (mobile) so the buttons sit in the dead
+ * space between opponent and hand. Grouped as a centered pair (24px gap) so
+ * they read as a single binary choice. Matches `.actions` / `.btn` /
+ * `.btn-challenge` class names.
  */
 export function AcceptLiarButtons({ visible, onAccept, onLiar }: AcceptLiarButtonsProps) {
+  const isMobile = useIsMobile();
   if (!visible) return null;
 
   return (
-    // §10.4: group Accept + Liar as a centered pair (24px gap) so they read as
-    // a single binary choice rather than two unrelated edge-anchored actions.
-    // Vertical position (`bottom: 8%`) stays locked per §10.4.
     <div
       className="actions"
       style={{
         position: 'absolute',
-        bottom: '8%',
+        bottom: isMobile ? '26%' : '22%',
         left: 0,
         right: 0,
         zIndex: 26,
