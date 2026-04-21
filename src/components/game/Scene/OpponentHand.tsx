@@ -27,7 +27,8 @@ export function OpponentHand({ handSize }: OpponentHandProps) {
       className="opponent-hand"
       style={{
         position: 'absolute',
-        top: '132px',
+        top: '210px',           // was 132px — scaled down the portrait height to keep
+                                // the hand fanned around the character's chest level
         left: '50%',
         transform: 'translateX(-50%) rotateX(16deg)',
         transformOrigin: 'center bottom',

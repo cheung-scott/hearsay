@@ -35,11 +35,11 @@ export function Opponent({ handSize, displayName, persona = 'Reader' }: Opponent
       className="opponent-area"
       style={{
         position: 'absolute',
-        top: '14%',
+        top: '18%',            // was 14% — pulled down so the character meets the table edge
         left: '50%',
         transform: 'translateX(-50%)',
-        width: '620px',
-        height: '280px',
+        width: '720px',        // was 620px — expanded so the larger portrait has room
+        height: '360px',       // was 280px — taller to accommodate the larger portrait
         zIndex: 4,
       }}
     >

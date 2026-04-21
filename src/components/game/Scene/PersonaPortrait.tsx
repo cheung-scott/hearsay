@@ -57,8 +57,8 @@ export function PersonaPortrait({ persona, personaAccent }: PersonaPortraitProps
         left: '50%',
         top: 0,
         transform: 'translateX(-50%)',
-        width: '160px',
-        height: '240px',
+        width: '240px',     // was 160px — 1.5× scale so the character reads at demo distance
+        height: '360px',    // was 240px — 1.5× scale
         animation: 'breathe 4.5s ease-in-out infinite',
         filter: 'drop-shadow(0 18px 32px rgba(0,0,0,0.9))',
       }}
