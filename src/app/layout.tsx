@@ -33,8 +33,17 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      {/* `suppressHydrationWarning` on <body> — browser extensions (Grammarly,
+          LastPass, ColorZilla, dark-mode scripts, etc.) inject attributes
+          like `data-gr-ext-installed` on <body> AFTER React hydrates,
+          which triggers a spurious hydration-mismatch warning. This flag
+          tells React "I know this element may differ from SSR; don't warn."
+          Only suppresses warnings for the single element, not its children. */}
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   );
 }
