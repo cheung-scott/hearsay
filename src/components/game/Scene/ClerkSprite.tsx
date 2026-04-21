@@ -1,17 +1,17 @@
 'use client';
 
 /**
- * Pixel-art courtroom clerk sprite. Chunky SVG rectangles painted with
- * theme tokens so the sprite re-skins with the rest of the UI (felt robe,
- * bone face, amber-hi trim, gold jabot). Swap to a real PNG asset once
- * Scott generates one — the ClerkTutorial still looks for `clerk-sprite`
- * testid and the 'CLERK' label for the existing test suite.
+ * Pixel-art courtroom clerk sprite. If `/images/personas/clerk.png` exists,
+ * it renders that. Otherwise falls back to the chunky inline SVG rectangles
+ * painted with theme tokens (felt robe, bone face, amber-hi trim, gold
+ * jabot). The ClerkTutorial still looks for `clerk-sprite` testid and the
+ * 'CLERK' label — both are preserved regardless of which branch renders.
  *
  * Sized via the `size` prop (default 32×40 — matches the prior placeholder
  * so the speech-bubble header row layout is unchanged).
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 
 export interface ClerkSpriteProps {
   /** Square width of the bounding box, in px. Height = size * 1.25. */
@@ -22,6 +22,63 @@ export interface ClerkSpriteProps {
 
 export function ClerkSprite({ size = 32, showLabel = true }: ClerkSpriteProps) {
   const h = Math.round(size * 1.25);
+  const [pngFailed, setPngFailed] = useState(false);
+
+  // Prefer the real PNG if present. onError swaps to the inline-SVG fallback
+  // below so the tutorial renders in every environment.
+  if (!pngFailed) {
+    return (
+      <div
+        data-testid="clerk-sprite"
+        aria-label="CLERK"
+        style={{
+          width: `${size}px`,
+          height: `${h}px`,
+          flexShrink: 0,
+          background: 'var(--felt, #1a2e1a)',
+          border: '2px solid var(--amber-hi, #f5c842)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          gap: '1px',
+          padding: '2px 0 1px',
+          boxShadow: '2px 2px 0 0 var(--shadow, rgba(0,0,0,0.5))',
+          imageRendering: 'pixelated',
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/personas/clerk.png"
+          alt=""
+          onError={() => setPngFailed(true)}
+          draggable={false}
+          style={{
+            width: '100%',
+            height: showLabel ? `calc(100% - 8px)` : '100%',
+            objectFit: 'contain',
+            imageRendering: 'pixelated',
+            userSelect: 'none',
+            pointerEvents: 'none',
+          }}
+        />
+        {showLabel && (
+          <span
+            style={{
+              fontFamily: '"Press Start 2P", monospace',
+              fontSize: '4px',
+              color: 'var(--amber-hi, #f5c842)',
+              letterSpacing: '0.5px',
+              lineHeight: 1,
+            }}
+          >
+            CLERK
+          </span>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       data-testid="clerk-sprite"

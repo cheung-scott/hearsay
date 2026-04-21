@@ -41,6 +41,7 @@ export function Scene({ session, phase, claimBubbleText, claimBubbleIsDone }: Sc
       <Opponent
         handSize={session.opponent.handSize}
         displayName={displayName}
+        persona={opponentPersona}
       />
       <RoundTable />
       <ClaimBubble
