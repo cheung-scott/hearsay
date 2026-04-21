@@ -23,14 +23,16 @@ export function ClaimBubble({ displayedText, isDone, visible }: ClaimBubbleProps
   return (
     <>
       {/* Speech-trail dots — anchored between the opponent's head and the
-          bubble so the dots "lead" from the character toward the speech. */}
+          bubble so the dots "lead" from the character toward the speech.
+          Uses calc() off the 50% center so it tracks the portrait regardless
+          of viewport width (portrait is 240px wide, centered). */}
       <div
         className="speech-trail"
         style={{
           position: 'absolute',
-          top: '21%',
-          left: '56%',
-          width: '100px',
+          top: '22%',
+          left: 'calc(50% + 40px)',
+          width: '120px',
           height: '20px',
           pointerEvents: 'none',
           zIndex: 11,
@@ -98,15 +100,15 @@ export function ClaimBubble({ displayedText, isDone, visible }: ClaimBubbleProps
         />
       </div>
 
-      {/* Main bubble — anchored next to the opponent's head (right side of
-          the portrait) so it reads as a speech bubble emerging from him,
-          not a floating HUD card in the corner. */}
+      {/* Main bubble — pinned 20px past the right edge of the 240px portrait
+          (which is centered at 50%), so it always sits right next to the
+          opponent's head regardless of viewport width. */}
       <div
         className="claim-bubble"
         style={{
           position: 'absolute',
-          top: '20%',
-          left: '64%',
+          top: '19%',
+          left: 'calc(50% + 140px)',
           zIndex: 12,
           background: 'var(--navy)',
           border: '3px solid var(--amber)',
