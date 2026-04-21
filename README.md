@@ -2,7 +2,7 @@
 
 > A voice-bluffing card game where the AI's voice betrays its lies — and yours might too.
 
-**[▶ Play the live demo](https://hearsay-hazel.vercel.app)** · Built for [ElevenHacks](https://elevenhacks.xyz) Hack #5 (AWS Kiro partner week, Apr 16–23 2026).
+**[Play the live demo](https://hearsay-hazel.vercel.app)** · Built for [ElevenHacks](https://elevenhacks.xyz) Hack #5 (AWS Kiro partner week, Apr 16–23 2026).
 
 ---
 
