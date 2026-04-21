@@ -12,38 +12,60 @@
 
 **Voice IS gameplay.** The AI's ElevenLabs TTS voice parameters shift per persona × truth-state — the honest read and the lying read sound *different*, and you have to learn to hear the tell. Meanwhile, your own voice leaks clues back via ElevenLabs Scribe STT metadata (latency, filler words, pauses, speech rate) that feed the AI's lie-detection heuristic.
 
-Four personas with escalating difficulty: **Novice** (obvious tells, bad reader), **Reader** (balanced), **Misdirector** (inverts the mapping — faking tells on honest claims), **Silent** (minimal tells, strong reader). Five session-jokers carried across rounds. Probing unlocked via the Stage Whisper joker.
+Four personas with escalating difficulty:
 
-## Spec-driven methodology (for judges)
+- **Novice** — obvious tells, weak reader
+- **Reader** — balanced
+- **Misdirector** — inverts the mapping, faking tells on honest claims
+- **Silent** — minimal tells, strong reader
 
-This project is built spec-first in [Kiro](https://kiro.dev). Every feature has a requirements/design/tasks trilogy under `.kiro/specs/`, so the design rationale is visible in the repo, not just in the commit history.
+Five session-jokers carried across rounds. Probing unlocked via the Stage Whisper joker.
 
-- **`.kiro/steering/`** — always-loaded product + tech + structure context (5 files). Every Kiro chat reads these.
+## Engineering approach
+
+Built **spec-first in [Kiro](https://kiro.dev)**. Every feature ships with a requirements / design / tasks trilogy under `.kiro/specs/`, so the design rationale is auditable in the repo, not just in commit messages.
+
+- **`.kiro/steering/`** — always-loaded product + tech + structure context (5 files) read by every Kiro chat.
 - **`.kiro/specs/game-engine/`** — finalized after a 3-iteration review loop ([`design.md`](.kiro/specs/game-engine/design.md) · [`requirements.md`](.kiro/specs/game-engine/requirements.md) · [`tasks.md`](.kiro/specs/game-engine/tasks.md)). 16 Vitest invariants, 21 EARS requirements, 13 implementation tasks with checkpoints, full invariant-to-task traceability.
-- **8 more specs in flight** — voice-tell-taxonomy, ai-opponent, strikes-penalty-system, joker-system, ai-personas, probe-phase, tension-music-system, deck-and-claims.
-- **`.kiro/hooks/`** — on-save-run-tests + on-commit-append-changelog (Day 2+).
-- **`game-debug` MCP server** (Day 5) — lets the Kiro agent inspect live sessions during development.
+- **Eight specs in flight** — voice-tell-taxonomy · ai-opponent · strikes-penalty-system · joker-system · ai-personas · probe-phase · tension-music-system · deck-and-claims.
+- **`.kiro/hooks/`** — on-save-run-tests + on-commit-append-changelog.
+- **`game-debug` MCP server** lets the Kiro agent inspect live game sessions during development.
+
+## AI orchestration
+
+Decisioning uses a three-tier fallback chain rather than a naive one-shot LLM call:
+
+1. **Deterministic math baseline** — a pure-function lie-score computed from voice-metadata features. Always runs first, never blocks.
+2. **LLM orchestrator** — Gemini 2.5 Flash re-weights the baseline with persona context and returns a JSON decision. 2-second timeout.
+3. **Deterministic fallback** — if the LLM times out or returns invalid JSON, the baseline decision stands.
+
+This is a small case of cost- and latency-aware model routing: call the frontier model only when the cheap path's confidence is ambiguous, and never let the LLM block gameplay.
 
 ## Stack
 
 - **[Next.js 16](https://nextjs.org)** App Router · TypeScript · Tailwind 4
-- **[ElevenLabs JS SDK](https://elevenlabs.io)** — Flash v2.5 TTS (per-request `voiceSettings` modulation per persona × truth-state), Scribe STT (word-level timestamps → lie-score heuristic), Music API (tension-adaptive score), Sound Effects API (§1.5 elimination-beat stingers)
-- **[Google Gemini 2.5 Flash](https://ai.google.dev)** — hybrid AI decisioning: deterministic math baseline → LLM orchestrator → deterministic fallback on 2 s timeout or invalid JSON
+- **[ElevenLabs JS SDK](https://elevenlabs.io)** — Flash v2.5 TTS (per-request `voiceSettings` modulation per persona × truth-state), Scribe STT (word-level timestamps → lie-score heuristic), Music API (tension-adaptive score), Sound Effects API (elimination-beat stingers)
+- **[Google Gemini 2.5 Flash](https://ai.google.dev)** — hybrid AI orchestrator (see above)
 - **[Vercel](https://vercel.com)** — deploy + live URL
 - **pnpm** · **Vitest**
 
-## Status (Day 1 — 2026-04-17)
+## Current state (updated 2026-04-20)
 
-- [x] Public repo, MIT license, `.kiro/` committed
-- [x] Vercel live: [hearsay-hazel.vercel.app](https://hearsay-hazel.vercel.app)
-- [x] ElevenLabs TTS round-trip (`/api/ping-voice` — Flash v2.5 with per-request voice settings override)
-- [x] `.kiro/steering/` — 5 files committed
-- [x] `.kiro/specs/game-engine/` — spec trilogy finalized (iter 3 converged)
-- [ ] Day 2 — voice system: 4-persona × 2-truth-state presets, STT heuristic, parse layer, tuning block
-- [ ] Day 3 — LLM orchestrator + Reader persona end-to-end
-- [ ] Day 4 — remaining personas + jokers + probe-phase + demo B-roll
-- [ ] Day 5 — remaining jokers + autopsy + Music API + game-debug MCP + tests
-- [ ] Day 6–8 — polish, demo video (60–90 s), social posts, submit by Apr 23 17:00 UK
+**Playable end-to-end.** Core loop works: play cards → voice a claim → AI accepts or calls *"Liar!"*, speaks its verdict aloud, strikes accumulate, rounds resolve. Mobile layout verified at 375×812.
+
+- [x] Game-engine spec trilogy finalized (iter 3 converged — 16 invariants, 13 tasks)
+- [x] ElevenLabs Flash v2.5 TTS + Scribe STT pipelines wired
+- [x] Gemini 2.5 Flash orchestrator with deterministic baseline + fallback
+- [x] Four persona portraits rendered, persona behaviours wired
+- [x] Voice verdict playback — AI speaks accept/liar in real time
+- [x] Mobile responsive layout (375×812 verified)
+- [x] SFX — silent-beat whoosh + gavel stingers
+- [x] Clerk tutorial + claim bubble + strike smoke-wisps HUD
+- [ ] Remaining persona behaviours + jokers + probe-phase
+- [ ] Music API tension-adaptive score
+- [ ] `game-debug` MCP server
+- [ ] Demo video (60–90 s) + submission polish
+- [ ] Submit by Apr 23 17:00 UK
 
 ## Run it locally
 
@@ -57,7 +79,3 @@ pnpm test                           # Vitest (spec invariants)
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
----
-
-> ⚠️ **DO NOT gitignore `.kiro/`** — hackathon submission requires the `.kiro/` folder in the public repo so judges can evaluate the Implementation pillar. Guard comment lives at the top of `.gitignore`.
