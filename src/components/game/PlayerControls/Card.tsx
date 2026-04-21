@@ -31,6 +31,12 @@ export const HAND_CARD_TRANSFORMS = [
 export function Card({ rank, faceDown = false, selected = false, onClick }: CardProps) {
   const isFaceDown = faceDown || !rank;
 
+  // Traditional playing-card color mapping — Queens and Aces in red, Kings
+  // and Jacks in black. Hearsay has no suits, so the split is by rank for
+  // visual variety that reads as "real playing card."
+  const isRed = rank === 'Queen' || rank === 'Ace';
+  const rankColor = isRed ? '#c41e3a' : '#1a1a1a';
+
   return (
     <div
       className={selected ? 'card selected' : 'card'}
@@ -40,16 +46,16 @@ export function Card({ rank, faceDown = false, selected = false, onClick }: Card
         height: '150px',
         background: isFaceDown
           ? undefined
-          : 'var(--bone)',
+          : '#fcfcfc',
         backgroundImage: isFaceDown
           ? 'repeating-linear-gradient(45deg, var(--navy) 0px, var(--navy) 3px, #0f1420 3px, #0f1420 6px)'
           : undefined,
-        backgroundColor: isFaceDown ? 'var(--navy)' : undefined,
+        backgroundColor: isFaceDown ? 'var(--navy)' : '#fcfcfc',
         border: selected
           ? '3px solid var(--amber-hi)'
           : isFaceDown
             ? '3px solid var(--amber-dim)'
-            : '3px solid var(--navy)',
+            : '3px solid #1a1a1a',
         borderRadius: '6px',
         boxShadow: selected
           ? '0 10px 24px rgba(0,0,0,0.85), 0 0 16px rgba(255,199,96,0.55)'
@@ -57,7 +63,7 @@ export function Card({ rank, faceDown = false, selected = false, onClick }: Card
         display: 'flex',
         flexDirection: 'column',
         padding: '10px',
-        color: 'var(--navy)',
+        color: rankColor,
         position: 'relative',
         transition: 'transform 0.2s ease',
         cursor: onClick ? 'pointer' : undefined,
