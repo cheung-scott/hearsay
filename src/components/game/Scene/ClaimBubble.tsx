@@ -30,9 +30,9 @@ export function ClaimBubble({ displayedText, isDone, visible }: ClaimBubbleProps
         className="speech-trail"
         style={{
           position: 'absolute',
-          top: '22%',
-          left: 'calc(50% + 40px)',
-          width: '120px',
+          top: '28%',
+          left: 'calc(50% + 60px)',
+          width: '100px',
           height: '20px',
           pointerEvents: 'none',
           zIndex: 11,
@@ -101,27 +101,28 @@ export function ClaimBubble({ displayedText, isDone, visible }: ClaimBubbleProps
       </div>
 
       {/* Main bubble — pinned 20px past the right edge of the 240px portrait
-          (which is centered at 50%), so it always sits right next to the
-          opponent's head regardless of viewport width. */}
+          (centered at 50%), around mouth/chest height so it reads as speech
+          emerging from the opponent, not floating above his head. */}
       <div
         className="claim-bubble"
         style={{
           position: 'absolute',
-          top: '19%',
+          top: '27%',
           left: 'calc(50% + 140px)',
           zIndex: 12,
           background: 'var(--navy)',
-          border: '3px solid var(--amber)',
+          border: '3px solid var(--amber-hi, #ffc760)',
           padding: '14px 22px',
           fontFamily: '"Press Start 2P", monospace',
           fontSize: '15px',
           letterSpacing: '2px',
-          color: 'var(--amber)',
+          color: 'var(--amber-hi, #ffc760)',
           boxShadow: '4px 4px 0 0 var(--shadow), 0 0 36px rgba(253,162,0,0.5)',
           whiteSpace: 'nowrap',
           minHeight: '48px',
           display: 'flex',
           alignItems: 'center',
+          textShadow: '0 1px 0 rgba(0,0,0,0.8)',
         }}
       >
         {displayedText.split('').map((ch, i) => (
@@ -141,7 +142,7 @@ export function ClaimBubble({ displayedText, isDone, visible }: ClaimBubbleProps
               display: 'inline-block',
               width: '10px',
               height: '18px',
-              background: 'var(--amber)',
+              background: 'var(--amber-hi, #ffc760)',
               marginLeft: '4px',
               verticalAlign: 'middle',
               animation: 'blink-cursor 0.9s infinite',
