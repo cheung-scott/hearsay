@@ -1,5 +1,7 @@
 'use client';
 
+import { useIsMobile } from '../../../hooks/useIsMobile';
+
 interface ClaimBubbleProps {
   /**
    * Characters already revealed by the parent's `useTypewriter` call.
@@ -18,14 +20,15 @@ interface ClaimBubbleProps {
 
 /** Returns null when not visible — parent controls phase-gated rendering. */
 export function ClaimBubble({ displayedText, isDone, visible }: ClaimBubbleProps) {
+  const isMobile = useIsMobile();
   if (!visible) return null;
 
   return (
     <>
-      {/* Speech-trail dots — anchored between the opponent's head and the
-          bubble so the dots "lead" from the character toward the speech.
-          Uses calc() off the 50% center so it tracks the portrait regardless
-          of viewport width (portrait is 240px wide, centered). */}
+      {/* Speech-trail dots — hidden on mobile (bubble sits below the character
+          instead of beside, so a left-to-right dot trail no longer makes sense).
+          On desktop, dots lead from the character toward the speech bubble. */}
+      {!isMobile && (
       <div
         className="speech-trail"
         style={{
@@ -99,29 +102,35 @@ export function ClaimBubble({ displayedText, isDone, visible }: ClaimBubbleProps
           }}
         />
       </div>
+      )}
 
-      {/* Main bubble — pinned 20px past the right edge of the 240px portrait
-          (centered at 50%), around mouth/chest height so it reads as speech
-          emerging from the opponent, not floating above his head. */}
+      {/* Main bubble — DESKTOP: pinned 20px past the right edge of the 240px
+          portrait at mouth height so it reads as speech emerging from him.
+          MOBILE: centred below the smaller portrait, max 86vw wide, wraps
+          text so long claims don't overflow a narrow viewport. */}
       <div
         className="claim-bubble"
         style={{
           position: 'absolute',
-          top: '27%',
-          left: 'calc(50% + 140px)',
+          top: isMobile ? '44%' : '27%',
+          left: isMobile ? '50%' : 'calc(50% + 140px)',
+          transform: isMobile ? 'translateX(-50%)' : undefined,
+          maxWidth: isMobile ? '86vw' : undefined,
           zIndex: 12,
           background: 'var(--navy)',
           border: '3px solid var(--amber-hi, #ffc760)',
-          padding: '14px 22px',
+          padding: isMobile ? '10px 14px' : '14px 22px',
           fontFamily: '"Press Start 2P", monospace',
-          fontSize: '15px',
-          letterSpacing: '2px',
+          fontSize: isMobile ? '10px' : '15px',
+          letterSpacing: isMobile ? '1px' : '2px',
+          lineHeight: 1.4,
           color: 'var(--amber-hi, #ffc760)',
           boxShadow: '4px 4px 0 0 var(--shadow), 0 0 36px rgba(253,162,0,0.5)',
-          whiteSpace: 'nowrap',
-          minHeight: '48px',
+          whiteSpace: isMobile ? 'normal' : 'nowrap',
+          minHeight: '40px',
           display: 'flex',
           alignItems: 'center',
+          textAlign: isMobile ? 'center' : 'left',
           textShadow: '0 1px 0 rgba(0,0,0,0.8)',
         }}
       >

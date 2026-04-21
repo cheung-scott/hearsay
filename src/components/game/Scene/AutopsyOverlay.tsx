@@ -126,7 +126,7 @@ export function AutopsyOverlay({ autopsy, onDismiss }: AutopsyOverlayProps) {
   const cardStyle: React.CSSProperties = {
     // Re-enable pointer events only on the card itself
     pointerEvents: 'auto',
-    width: 360,
+    width: 'min(360px, 92vw)',
     minHeight: 200,
     background: 'linear-gradient(160deg, #1a1006 0%, #0d0a04 100%)',
     border: '2px solid var(--amber-hi, #ffc760)',

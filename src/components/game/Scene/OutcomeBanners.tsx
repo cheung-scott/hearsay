@@ -36,6 +36,7 @@ export function YouPlayedBanner({ text, visible }: YouPlayedBannerProps) {
         bottom: '12%',
         left: '50%',
         transform: 'translateX(-50%)',
+        maxWidth: '92vw',
         zIndex: 28,
         background: 'rgba(13,31,23,0.88)',
         border: '2px solid var(--amber, #fda200)',
@@ -48,6 +49,9 @@ export function YouPlayedBanner({ text, visible }: YouPlayedBannerProps) {
         pointerEvents: 'none',
         textTransform: 'uppercase',
         userSelect: 'none',
+        whiteSpace: 'normal',
+        textAlign: 'center',
+        lineHeight: 1.5,
       }}
     >
       <span style={{ color: 'var(--amber-hi, #ffc760)', marginRight: '8px' }}>
@@ -107,12 +111,13 @@ export function ChallengeOutcomeBanner({ outcome }: ChallengeOutcomeBannerProps)
           top: '42%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
+          maxWidth: '92vw',
           zIndex: 40,
           background: 'rgba(10,16,8,0.92)',
           border: `3px solid ${copy.accent}`,
           color: copy.accent,
           fontFamily: '"Press Start 2P", monospace',
-          padding: '20px 32px',
+          padding: '20px 28px',
           boxShadow: '6px 6px 0 0 var(--shadow, rgba(0,0,0,0.6)), 0 0 24px rgba(0,0,0,0.4)',
           textAlign: 'center',
           pointerEvents: 'none',

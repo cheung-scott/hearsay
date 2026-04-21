@@ -1,5 +1,7 @@
 'use client';
 
+import { useIsMobile } from '../../../hooks/useIsMobile';
+
 interface StrikeCounterProps {
   /** Number of strikes lit (0–3). */
   strikes: number;
@@ -9,18 +11,24 @@ interface StrikeCounterProps {
  * Three Balatro-style chunky blocks. Lit blocks (index < strikes) show a candle
  * flame via `flicker` animation and an "X" glyph. Matches `.strikes` / `.strike`
  * / `.strike.lit` in variant-d-across-table.html.
+ *
+ * Mobile: shrinks block size + hides the "STRIKES" label so 3 blocks + target
+ * tag both fit across a 375px viewport.
  */
 export function StrikeCounter({ strikes }: StrikeCounterProps) {
+  const isMobile = useIsMobile();
   // Progressive intensification: at strikes >= 2 the smoke rises faster and
   // slightly larger to match the §1.5 strike-2 CSS dim already in GameSession.
   const smokeAccelerated = strikes >= 2;
+  const blockW = isMobile ? 22 : 36;
+  const blockH = isMobile ? 28 : 44;
   return (
     <div
       data-testid="strikes-row"
       className="strikes"
       style={{
         display: 'flex',
-        gap: '10px',
+        gap: isMobile ? '6px' : '10px',
         alignItems: 'center',
       }}
     >
@@ -32,18 +40,20 @@ export function StrikeCounter({ strikes }: StrikeCounterProps) {
           100% { transform: translate(-50%, -18px) scale(1.6); opacity: 0; }
         }
       `}</style>
-      <span
-        className="strikes-label"
-        style={{
-          fontFamily: '"Press Start 2P", monospace',
-          fontSize: '9px',
-          color: 'var(--bone-dim)',
-          letterSpacing: '3px',
-          marginRight: '6px',
-        }}
-      >
-        STRIKES
-      </span>
+      {!isMobile && (
+        <span
+          className="strikes-label"
+          style={{
+            fontFamily: '"Press Start 2P", monospace',
+            fontSize: '9px',
+            color: 'var(--bone-dim)',
+            letterSpacing: '3px',
+            marginRight: '6px',
+          }}
+        >
+          STRIKES
+        </span>
+      )}
       {[0, 1, 2].map(i => {
         const lit = i < strikes;
         return (
@@ -52,8 +62,8 @@ export function StrikeCounter({ strikes }: StrikeCounterProps) {
             className={lit ? 'strike lit' : 'strike'}
             style={{
               position: 'relative',
-              width: '36px',
-              height: '44px',
+              width: `${blockW}px`,
+              height: `${blockH}px`,
               background: lit
                 ? 'linear-gradient(180deg, var(--coral) 0%, var(--blood) 100%)'
                 : '#1a1f1a',
@@ -65,7 +75,7 @@ export function StrikeCounter({ strikes }: StrikeCounterProps) {
               alignItems: 'center',
               justifyContent: 'center',
               fontFamily: '"Press Start 2P", monospace',
-              fontSize: '16px',
+              fontSize: isMobile ? '10px' : '16px',
               color: lit ? 'var(--bone)' : 'transparent',
               textShadow: lit ? '0 2px 0 rgba(0,0,0,0.5)' : undefined,
             }}

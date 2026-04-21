@@ -1,6 +1,7 @@
 'use client';
 
 import type { Rank } from '../../../lib/game/types';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 
 interface TargetTagProps {
   rank: Rank;
@@ -12,19 +13,20 @@ interface TargetTagProps {
  * `CALL · {rank}` — spec lock takes precedence over the preview label.
  */
 export function TargetTag({ rank }: TargetTagProps) {
+  const isMobile = useIsMobile();
   return (
     <div
       data-testid="target-rank-tag"
       className="target-tag"
       style={{
         fontFamily: '"Press Start 2P", monospace',
-        fontSize: '10px',
-        padding: '10px 16px',
-        border: '3px solid var(--amber)',
+        fontSize: isMobile ? '8px' : '10px',
+        padding: isMobile ? '6px 10px' : '10px 16px',
+        border: isMobile ? '2px solid var(--amber)' : '3px solid var(--amber)',
         background: 'rgba(26,33,48,0.92)',
         color: 'var(--amber)',
-        letterSpacing: '3px',
-        boxShadow: '4px 4px 0 0 var(--shadow)',
+        letterSpacing: isMobile ? '2px' : '3px',
+        boxShadow: isMobile ? '2px 2px 0 0 var(--shadow)' : '4px 4px 0 0 var(--shadow)',
       }}
     >
       CALL ·{' '}

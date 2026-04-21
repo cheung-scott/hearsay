@@ -10,6 +10,8 @@ interface CardProps {
   /** Amber border-glow selection state. */
   selected?: boolean;
   onClick?: () => void;
+  /** Render size — 'desktop' (104×150) or 'mobile' (70×100). Default desktop. */
+  size?: 'desktop' | 'mobile';
 }
 
 /** nth-child fan transforms applied via index prop in PlayerHand. Exported so
@@ -28,8 +30,9 @@ export const HAND_CARD_TRANSFORMS = [
  * Face-down: navy + diagonal hatching, no rank. Selected: amber border glow.
  * Hover lifts `translateY(-18px)` via CSS transition 0.2s ease.
  */
-export function Card({ rank, faceDown = false, selected = false, onClick }: CardProps) {
+export function Card({ rank, faceDown = false, selected = false, onClick, size = 'desktop' }: CardProps) {
   const isFaceDown = faceDown || !rank;
+  const isMobile = size === 'mobile';
 
   // Traditional playing-card color mapping — Queens and Aces in red, Kings
   // and Jacks in black. Hearsay has no suits, so the split is by rank for
@@ -42,8 +45,8 @@ export function Card({ rank, faceDown = false, selected = false, onClick }: Card
       className={selected ? 'card selected' : 'card'}
       onClick={onClick}
       style={{
-        width: '104px',
-        height: '150px',
+        width: isMobile ? '66px' : '104px',
+        height: isMobile ? '96px' : '150px',
         background: isFaceDown
           ? undefined
           : '#fcfcfc',
@@ -62,7 +65,7 @@ export function Card({ rank, faceDown = false, selected = false, onClick }: Card
           : '0 10px 24px rgba(0,0,0,0.85)',
         display: 'flex',
         flexDirection: 'column',
-        padding: '10px',
+        padding: isMobile ? '6px' : '10px',
         color: rankColor,
         position: 'relative',
         transition: 'transform 0.2s ease',
@@ -83,7 +86,7 @@ export function Card({ rank, faceDown = false, selected = false, onClick }: Card
             className="card-rank-tl"
             style={{
               fontFamily: '"Press Start 2P", monospace',
-              fontSize: '18px',
+              fontSize: isMobile ? '12px' : '18px',
               lineHeight: 1,
             }}
           >
@@ -97,7 +100,7 @@ export function Card({ rank, faceDown = false, selected = false, onClick }: Card
               alignItems: 'center',
               justifyContent: 'center',
               fontFamily: '"Press Start 2P", monospace',
-              fontSize: '40px',
+              fontSize: isMobile ? '26px' : '40px',
             }}
           >
             {rank[0]}
@@ -106,7 +109,7 @@ export function Card({ rank, faceDown = false, selected = false, onClick }: Card
             className="card-rank-br"
             style={{
               fontFamily: '"Press Start 2P", monospace',
-              fontSize: '18px',
+              fontSize: isMobile ? '12px' : '18px',
               lineHeight: 1,
               textAlign: 'right',
               transform: 'rotate(180deg)',

@@ -13,6 +13,7 @@ import {
   GAUNTLET_LENGTH,
 } from '../../../lib/game/progress';
 import type { GauntletProgress } from '../../../lib/game/progress';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 
 interface TopBarProps {
   session: ClientSession;
@@ -35,6 +36,7 @@ export function TopBar({ session, progress }: TopBarProps) {
   const roundsWon = session.self.roundsWon;
   const opponentRoundsWon = session.opponent.roundsWon;
   const roundsLost = opponentRoundsWon;
+  const isMobile = useIsMobile();
 
   // Dedupe active joker effects by type.
   const activeEffects = round?.activeJokerEffects ?? [];
@@ -45,27 +47,29 @@ export function TopBar({ session, progress }: TopBarProps) {
       className="top-bar"
       style={{
         position: 'absolute',
-        top: '16px',
-        left: '16px',
-        right: '16px',
+        top: isMobile ? '8px' : '16px',
+        left: isMobile ? '8px' : '16px',
+        right: isMobile ? '8px' : '16px',
         zIndex: 25,
         display: 'flex',
         flexDirection: 'column',
-        gap: '8px',
+        gap: isMobile ? '4px' : '8px',
       }}
     >
-      {/* Main HUD row */}
+      {/* Main HUD row — on mobile the middle column (RoundPill) hides to keep
+          both sides visible without wrapping; rejoins on ≥640px. */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'auto 1fr auto',
-          gap: '20px',
+          gridTemplateColumns: isMobile ? 'auto auto' : 'auto 1fr auto',
+          justifyContent: isMobile ? 'space-between' : undefined,
+          gap: isMobile ? '8px' : '20px',
           alignItems: 'center',
         }}
       >
         <TargetTag rank={targetRank} />
-        <RoundPill roundNumber={roundNumber} />
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+        {!isMobile && <RoundPill roundNumber={roundNumber} />}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
           <StrikeCounter strikes={strikes} />
           <RoundsWonGavels
             roundsWon={roundsWon}

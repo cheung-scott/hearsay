@@ -87,7 +87,7 @@ export function ProbeReveal({ probe }: ProbeRevealProps) {
         top: '96px',
         left: '50%',
         transform: 'translateX(-50%)',
-        width: '340px',
+        width: 'min(340px, 92vw)',
         zIndex: 20,
         background: 'var(--navy, #1a2130)',
         border: '2px solid var(--amber, #fda200)',

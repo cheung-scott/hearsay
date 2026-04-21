@@ -408,7 +408,8 @@ export function ClerkTutorial({ session, onComplete, tutorial }: ClerkTutorialPr
       {/* SVG arrow overlay (only when we have coords) */}
       {arrowCoords && <TutorialArrow {...arrowCoords} />}
 
-      {/* Speech bubble — positioned per step anchor */}
+      {/* Speech bubble — positioned per step anchor. Mobile: cap at 92vw so the
+          bubble never overflows the viewport regardless of the locked 320px max. */}
       <div
         ref={bubbleRef}
         data-testid="tutorial-bubble"
@@ -417,13 +418,13 @@ export function ClerkTutorial({ session, onComplete, tutorial }: ClerkTutorialPr
           top: `${bubblePos.top}px`,
           left: `${bubblePos.left}px`,
           transform: bubblePos.transform ?? 'translateX(-50%)',
-          maxWidth: `${BUBBLE_MAX_WIDTH}px`,
+          maxWidth: `min(${BUBBLE_MAX_WIDTH}px, 92vw)`,
           background: 'var(--bone, #f0e8d0)',
           color: 'var(--wall, #1a1209)',
           fontFamily: '"Press Start 2P", monospace',
           fontSize: '9px',
           lineHeight: '1.7',
-          padding: '16px',
+          padding: '14px',
           border: '2px solid var(--amber-hi, #f5c842)',
           boxShadow: '4px 4px 0 0 var(--shadow, rgba(0,0,0,0.5))',
           letterSpacing: '0.5px',

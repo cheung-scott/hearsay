@@ -30,6 +30,11 @@ export interface PersonaPortraitProps {
    * PERSONA_ACCENT_COLORS. Ignored once a real PNG is loaded.
    */
   personaAccent?: string;
+  /**
+   * Render size — 'desktop' (240×360) or 'mobile' (160×240). Defaults to
+   * desktop so SSR / non-responsive callers keep the prior behaviour.
+   */
+  size?: 'desktop' | 'mobile';
 }
 
 /** Maps Persona/Clerk → filename stem. Stable lowercase convention. */
@@ -38,7 +43,7 @@ function fileStemFor(persona: Persona | 'clerk'): string {
   return persona.toLowerCase();
 }
 
-export function PersonaPortrait({ persona, personaAccent }: PersonaPortraitProps) {
+export function PersonaPortrait({ persona, personaAccent, size = 'desktop' }: PersonaPortraitProps) {
   const [failed, setFailed] = useState(false);
   const stem = fileStemFor(persona);
   const src = `/images/personas/${stem}.png`;
@@ -47,6 +52,8 @@ export function PersonaPortrait({ persona, personaAccent }: PersonaPortraitProps
   if (failed) {
     return <Silhouette personaAccent={personaAccent} />;
   }
+
+  const isMobile = size === 'mobile';
 
   return (
     <div
@@ -57,8 +64,8 @@ export function PersonaPortrait({ persona, personaAccent }: PersonaPortraitProps
         left: '50%',
         top: 0,
         transform: 'translateX(-50%)',
-        width: '240px',     // was 160px — 1.5× scale so the character reads at demo distance
-        height: '360px',    // was 240px — 1.5× scale
+        width: isMobile ? '160px' : '240px',
+        height: isMobile ? '240px' : '360px',
         animation: 'breathe 4.5s ease-in-out infinite',
         filter: 'drop-shadow(0 18px 32px rgba(0,0,0,0.9))',
       }}
