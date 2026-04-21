@@ -49,24 +49,6 @@ This is a small case of cost- and latency-aware model routing: call the frontier
 - **[Vercel](https://vercel.com)** — deploy + live URL
 - **pnpm** · **Vitest**
 
-## Current state (updated 2026-04-20)
-
-**Playable end-to-end.** Core loop works: play cards → voice a claim → AI accepts or calls *"Liar!"*, speaks its verdict aloud, strikes accumulate, rounds resolve. Mobile layout verified at 375×812.
-
-- [x] Game-engine spec trilogy finalized (iter 3 converged — 16 invariants, 13 tasks)
-- [x] ElevenLabs Flash v2.5 TTS + Scribe STT pipelines wired
-- [x] Gemini 2.5 Flash orchestrator with deterministic baseline + fallback
-- [x] Four persona portraits rendered, persona behaviours wired
-- [x] Voice verdict playback — AI speaks accept/liar in real time
-- [x] Mobile responsive layout (375×812 verified)
-- [x] SFX — silent-beat whoosh + gavel stingers
-- [x] Clerk tutorial + claim bubble + strike smoke-wisps HUD
-- [ ] Remaining persona behaviours + jokers + probe-phase
-- [ ] Music API tension-adaptive score
-- [ ] `game-debug` MCP server
-- [ ] Demo video (60–90 s) + submission polish
-- [ ] Submit by Apr 23 17:00 UK
-
 ## Run it locally
 
 ```bash
