@@ -175,22 +175,30 @@ export function GameSession({ initialSession }: GameSessionProps) {
       const playerGained = nowPlayer > prev.player;
       const aiGained = nowAi > prev.ai;
 
+      // Fix (2026-04-22): outcome disambiguation now uses lastClaimByRef
+      // (who made the claim that got resolved) rather than
+      // lastRespondActionRef (which stays stale when the player doesn't
+      // respond — e.g. when the AI auto-chains a challenge on the server
+      // after a PlayerClaim). Rule: the struck party is the one who made
+      // the losing play — if the last claim was theirs and they lost, they
+      // were caught lying; if the last claim was the opponent's and they
+      // lost, they wrongly challenged the opponent's honest claim.
       if (playerGained && !aiGained) {
         // Player took a strike.
-        if (lastRespondActionRef.current === 'challenge') {
-          // Player called LIAR but was wrong.
-          showOutcomeForMs('false-accusation');
-        } else {
-          // AI called LIAR on the player and caught them.
+        if (lastClaimByRef.current === 'player') {
+          // Player lied; AI caught them.
           showOutcomeForMs('player-caught');
+        } else {
+          // Player challenged AI's honest claim and was wrong.
+          showOutcomeForMs('false-accusation');
         }
       } else if (aiGained && !playerGained) {
         // AI took a strike.
         if (lastClaimByRef.current === 'ai') {
-          // Player caught the AI's lie.
+          // AI lied; player caught them.
           showOutcomeForMs('caught-lie');
         } else {
-          // AI challenged player's truth.
+          // AI challenged player's honest claim and was wrong.
           showOutcomeForMs('ai-wrong-call');
         }
       }
@@ -341,19 +349,31 @@ export function GameSession({ initialSession }: GameSessionProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioPlayer.isPlaying, musicEnabled]);
 
+  // -------------------------------------------------------------------------
+  // Tutorial — hoisted above audio effects so claim-audio can gate on tutorial.
+  // While the overlay is visible, we refuse to play the AI's claim audio OR
+  // fire the next AiAct so the Defendant waits for the player to read/dismiss.
+  // -------------------------------------------------------------------------
+  const tutorial = useTutorial(state.session);
+
   // When a new TTS audio URL arrives, play it and register a combined onEnded
   // callback (markAudioEnded for FSM phase advance + restoreFromOutput for music).
+  // Gated on !tutorial.active so the claim voiceline doesn't overlap the
+  // Clerk's tutorial popup. `lastClaimAudioUrlPlayedRef` prevents re-play when
+  // tutorial.active toggles while lastClaimAudioUrl is unchanged.
+  const lastClaimAudioUrlPlayedRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (state.lastClaimAudioUrl) {
-      audioPlayer.onEnded(() => {
-        markAudioEnded();
-        if (musicEnabled) music.restoreFromOutput();
-      });
-      audioPlayer.play(state.lastClaimAudioUrl);
-    }
+    if (!state.lastClaimAudioUrl || tutorial.active) return;
+    if (lastClaimAudioUrlPlayedRef.current === state.lastClaimAudioUrl) return;
+    lastClaimAudioUrlPlayedRef.current = state.lastClaimAudioUrl;
+    audioPlayer.onEnded(() => {
+      markAudioEnded();
+      if (musicEnabled) music.restoreFromOutput();
+    });
+    audioPlayer.play(state.lastClaimAudioUrl);
     // audioPlayer and markAudioEnded are stable refs — intentionally omitted.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.lastClaimAudioUrl]);
+  }, [state.lastClaimAudioUrl, tutorial.active]);
 
   // When the AI's spoken accept/liar verdict arrives from /api/turn PlayerClaim
   // (Gemini → ElevenLabs pipe), play it on the dedicated responsePlayer so it
@@ -382,30 +402,39 @@ export function GameSession({ initialSession }: GameSessionProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.lastAiResponseAudioUrl]);
 
-  // -------------------------------------------------------------------------
-  // Tutorial — hoisted here so the auto-AI effect can gate on `tutorial.active`.
-  // While the overlay is visible, we refuse to fire `AiAct` so the Defendant
-  // waits for the player to read / dismiss each step.
-  // -------------------------------------------------------------------------
-  const tutorial = useTutorial(state.session);
-
   // Auto-trigger AI's turn when it's their move. Without this, rounds where
   // activePlayer starts as 'ai' hang in 'awaiting-ai' forever because the
   // server chains AI judgment inside PlayerClaim but has no AI-first pathway.
   //
-  // Gated on THREE conditions so the next AI claim never overlaps previously
-  // playing audio:
-  //   1. responseAudioPending — the AI's accept/liar verdict voiceline from
-  //      the prior PlayerClaim hasn't finished yet.
-  //   2. audioPlayer.isPlaying — the previous AI CLAIM audio is still playing.
-  //   3. responsePlayer.isPlaying — residual verdict audio from any path.
+  // Gated on:
+  //   - tutorial.active — Clerk tutorial overlay is showing.
+  //   - responseAudioPending / audioPlayer.isPlaying / responsePlayer.isPlaying
+  //     — any audio is currently playing.
+  //   - aiActCooldown — a 500ms breather AFTER audio ends, so the AI's next
+  //     claim doesn't slam straight into the trailing edge of the prior
+  //     verdict / claim. Gives natural rhythm + guards against mis-timed
+  //     `isPlaying` state transitions.
+  const [aiActCooldown, setAiActCooldown] = useState(false);
+  useEffect(() => {
+    if (audioPlayer.isPlaying || responsePlayer.isPlaying || responseAudioPending) {
+      setAiActCooldown(true);
+      return;
+    }
+    if (!aiActCooldown) return;
+    const t = setTimeout(() => setAiActCooldown(false), 500);
+    return () => clearTimeout(t);
+    // aiActCooldown self-reference OK — gated on the return above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioPlayer.isPlaying, responsePlayer.isPlaying, responseAudioPending]);
+
   useEffect(() => {
     if (
       state.phase === 'awaiting-ai' &&
       !tutorial.active &&
       !responseAudioPending &&
       !audioPlayer.isPlaying &&
-      !responsePlayer.isPlaying
+      !responsePlayer.isPlaying &&
+      !aiActCooldown
     ) {
       dispatch({ type: 'AiAct' }).catch(() => { /* error surfaces via state.error */ });
     }
@@ -416,6 +445,7 @@ export function GameSession({ initialSession }: GameSessionProps) {
     responseAudioPending,
     audioPlayer.isPlaying,
     responsePlayer.isPlaying,
+    aiActCooldown,
   ]);
 
   // When holdToSpeak audioBlob transitions from null to non-null, AND we're
@@ -677,6 +707,18 @@ export function GameSession({ initialSession }: GameSessionProps) {
   if (state.phase === 'session-over') {
     const winner = state.session.sessionWinner;
     const playerWon = winner === 'player';
+    // Diagnostic log to catch playtest reports of "CASE DISMISSED after losing".
+    // Logs the raw session-end state so we can verify sessionWinner matches
+    // strikes/roundsWon on the client before the render branch is taken.
+    // eslint-disable-next-line no-console
+    console.log('[SESSION-OVER]', {
+      sessionWinner: winner,
+      playerStrikes: state.session.self.strikes,
+      aiStrikes: state.session.opponent.strikes,
+      playerRoundsWon: state.session.self.roundsWon,
+      aiRoundsWon: state.session.opponent.roundsWon,
+      persona: state.session.opponent.personaIfAi,
+    });
 
     // Gauntlet-complete override: all 4 opponents beaten → COURT ADJOURNED screen.
     if (isGauntletComplete(progress)) {
