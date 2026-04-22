@@ -348,16 +348,24 @@ export function GameSession({ initialSession }: GameSessionProps) {
   // doesn't overwrite the main claim-TTS audioPlayer if one happens to be
   // mid-playback. Ref guard ensures we don't replay the same URL on re-renders
   // (data: URLs are stable per response, so this is reliable).
+  //
+  // Also marks `responseAudioPending` true until onEnded fires, which gates the
+  // auto-AiAct effect below so the next AI claim doesn't overlap the verdict.
+  const [responseAudioPending, setResponseAudioPending] = useState(false);
   useEffect(() => {
     const url = state.lastAiResponseAudioUrl;
     if (!url) return;
     if (lastResponseAudioUrlRef.current === url) return;
     lastResponseAudioUrlRef.current = url;
+    setResponseAudioPending(true);
+    responsePlayer.onEnded(() => setResponseAudioPending(false));
     try {
       responsePlayer.play(url);
     } catch {
       // Audio playback failure is non-fatal; the outcome banner + session
-      // state already convey the verdict. Silent swallow.
+      // state already convey the verdict. Clear the pending flag so the next
+      // AI claim can fire.
+      setResponseAudioPending(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.lastAiResponseAudioUrl]);
@@ -372,12 +380,14 @@ export function GameSession({ initialSession }: GameSessionProps) {
   // Auto-trigger AI's turn when it's their move. Without this, rounds where
   // activePlayer starts as 'ai' hang in 'awaiting-ai' forever because the
   // server chains AI judgment inside PlayerClaim but has no AI-first pathway.
+  // Gate on `responseAudioPending` so the AI's next claim doesn't overlap the
+  // preceding verdict voiceline.
   useEffect(() => {
-    if (state.phase === 'awaiting-ai' && !tutorial.active) {
+    if (state.phase === 'awaiting-ai' && !tutorial.active && !responseAudioPending) {
       dispatch({ type: 'AiAct' }).catch(() => { /* error surfaces via state.error */ });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.phase, tutorial.active]);
+  }, [state.phase, tutorial.active, responseAudioPending]);
 
   // When holdToSpeak audioBlob transitions from null to non-null, AND we're
   // in recording phase with cards selected, dispatch PlayerClaim.

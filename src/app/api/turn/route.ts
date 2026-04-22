@@ -62,6 +62,24 @@ function autoChainRoundEnd(session: Session): Session {
     newDrawPile: remaining,
     now: Date.now(),
   });
+
+  // If the offer is to the AI, auto-pick server-side and advance to the next
+  // round. toClientView gates `currentOffer` to the `offeredToWinner` viewer,
+  // so an AI-owned offer is invisible to the player — if we left it sitting,
+  // the client would render nothing and the game would freeze. The AI picks
+  // a random joker from the 3 offered.
+  if (next.currentOffer?.offeredToWinner === 'ai') {
+    const pool = next.currentOffer.offered;
+    const aiPick = pool[Math.floor(Math.random() * pool.length)];
+    const nextRoundDeal = dealFresh();
+    next = reduce(next, {
+      type: 'JokerPicked',
+      joker: aiPick,
+      nextRoundDeal,
+      now: Date.now(),
+    });
+  }
+
   return next;
 }
 
