@@ -240,8 +240,12 @@ describe('GameSession gauntlet — save-on-win', () => {
 // ---------------------------------------------------------------------------
 
 describe('GameSession gauntlet — preferredPersona routing after re-mount', () => {
-  it('passes preferredPersona=Reader to CreateSession after Novice has been defeated', async () => {
-    // Seed localStorage with Novice defeated.
+  // Hackathon build (2026-04-22): GameSession now clears gauntlet progress +
+  // tutorial flag on mount so every hard-refresh lands on the tutorial against
+  // the Defendant (Novice). Persisted-across-refresh behaviour returns
+  // post-event; this test asserts the current hackathon-mode reset.
+  it('ignores seeded Novice-defeated progress on mount and targets Novice (hackathon reset)', async () => {
+    // Seed localStorage with Novice defeated — GameSession should wipe this on mount.
     localStorage.setItem(KEY, JSON.stringify({ defeated: ['Novice'] }));
 
     const createSessionCalls: Array<{ preferredPersona?: string }> = [];
@@ -273,6 +277,9 @@ describe('GameSession gauntlet — preferredPersona routing after re-mount', () 
       await new Promise(r => setTimeout(r, 10));
     });
 
+    // After mount, localStorage progress key should be cleared.
+    expect(localStorage.getItem(KEY)).toBeNull();
+
     // Click BEGIN TRIAL to fire CreateSession with the current preferredPersona.
     await act(async () => {
       const btn = container.querySelector('button');
@@ -281,10 +288,11 @@ describe('GameSession gauntlet — preferredPersona routing after re-mount', () 
       await new Promise(r => setTimeout(r, 30));
     });
 
-    // The CreateSession call should have carried preferredPersona: 'Reader'.
+    // The CreateSession call should target Novice (first in gauntlet), since
+    // mount reset wiped the seeded Novice-defeated progress.
     expect(createSessionCalls.length).toBeGreaterThan(0);
-    const call = createSessionCalls.find(c => c.preferredPersona === 'Reader');
+    const call = createSessionCalls.find(c => c.preferredPersona === 'Novice');
     expect(call).toBeDefined();
-    expect(call?.preferredPersona).toBe('Reader');
+    expect(call?.preferredPersona).toBe('Novice');
   });
 });

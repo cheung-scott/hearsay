@@ -12,7 +12,6 @@ import { hasAllTracks } from '@/lib/music/tracks';
 import { PERSONA_DISPLAY_NAMES } from '@/lib/persona/displayNames';
 import type { ClientSession, MusicTrack, Persona } from '@/lib/game/types';
 import {
-  loadProgress,
   saveProgress,
   clearProgress,
   nextPersona,
@@ -99,7 +98,20 @@ export function GameSession({ initialSession }: GameSessionProps) {
   // -------------------------------------------------------------------------
   // Gauntlet progression (Option B — localStorage)
   // -------------------------------------------------------------------------
-  const [progress, setProgress] = useState<GauntletProgress>(() => loadProgress());
+  // Hackathon build (2026-04-22): always reset the gauntlet AND the tutorial
+  // flag on mount so a hard-refresh always lands on the tutorial against the
+  // Defendant. Full gauntlet persistence returns post-event.
+  const [progress, setProgress] = useState<GauntletProgress>(() => {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        clearProgress();
+        localStorage.removeItem('hearsay-tutorial-seen');
+      } catch {
+        // localStorage unavailable — silently proceed with in-memory defaults.
+      }
+    }
+    return { defeated: [] };
+  });
   // Ref guard: tracks session id for which we've already saved a gauntlet win,
   // to ensure the save-on-win effect fires exactly once per session_over.
   const gauntletWinFiredRef = useRef<string | null>(null);
