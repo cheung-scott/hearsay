@@ -56,6 +56,17 @@ function autoChainRoundEnd(session: Session): Session {
   return next;
 }
 
+function isSpokenClaimValidForTurn(
+  voiceMeta: VoiceMeta,
+  expectedCount: 1 | 2,
+  expectedRank: Session['rounds'][number]['targetRank'],
+): boolean {
+  return (
+    voiceMeta.parsed?.count === expectedCount &&
+    voiceMeta.parsed.rank === expectedRank
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Request / response shapes
 // ---------------------------------------------------------------------------
@@ -228,11 +239,25 @@ export async function POST(req: Request): Promise<Response> {
       // Fire ClaimMade — FSM derives truthState server-side.
       session = reduce(session, { type: 'ClaimMade', claim, now: Date.now() });
 
+      const forceChallengeForInvalidSpeech = !isSpokenClaimValidForTurn(
+        voiceMeta,
+        actualCardIds.length as 1 | 2,
+        currentRound.targetRank,
+      );
+
       // The claim is now appended to claimHistory. Build DecisionContext and
       // chain AI judgment inline (invariant 9 — response includes aiDecision).
       const updatedRound = session.rounds[session.currentRoundIdx];
-      const decisionCtx = buildDecisionContext(session, updatedRound);
-      const aiDecision = await aiDecideOnClaim(decisionCtx);
+      const aiDecision = forceChallengeForInvalidSpeech
+        ? {
+            action: 'challenge' as const,
+            innerThought: 'The spoken claim did not match the required count and rank.',
+            voiceline: 'Liar. The court heard no valid claim.',
+            source: 'invalid-speech' as const,
+            latencyMs: 0,
+            mathProb: 1,
+          }
+        : await aiDecideOnClaim(buildDecisionContext(session, updatedRound));
 
       // Fire the AI's chosen response on the FSM.
       if (aiDecision.action === 'challenge') {
@@ -240,7 +265,8 @@ export async function POST(req: Request): Promise<Response> {
 
         // Resolve the challenge: server knows the ground truth.
         const lastClaim = updatedRound.claimHistory[updatedRound.claimHistory.length - 1];
-        const challengeWasCorrect = lastClaim?.truthState === 'lying';
+        const challengeWasCorrect =
+          forceChallengeForInvalidSpeech || lastClaim?.truthState === 'lying';
         session = reduce(session, {
           type: 'RevealComplete',
           challengeWasCorrect,

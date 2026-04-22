@@ -274,63 +274,11 @@ export function DemoRecorder() {
 
   const session = useMemo(() => buildSession(shot, runtime), [shot, runtime]);
 
-  // ---- Session-over GUILTY screen (silent — no gavel/stinger, editor adds it) ----
+  // ---- Session-over GUILTY / EXECUTED typewriter fade (DEMO-SCRIPT Act 4) ----
+  // Sequence: pure black 1s → GUILTY. fades in → 1s hold → EXECUTED. fades in →
+  // 2s hold. Matches script 0:51-0:55 exactly.
   if (effectivePhase === 'session-over') {
-    return (
-      <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'var(--wall)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '20px',
-          fontFamily: '"Press Start 2P", monospace',
-          color: 'var(--bone)',
-        }}
-      >
-        <OverlayEffects />
-        <div
-          style={{
-            padding: '24px 44px',
-            border: '3px solid var(--coral)',
-            background: 'rgba(10,16,8,0.75)',
-            boxShadow: '6px 6px 0 0 var(--shadow), 0 0 32px rgba(0,0,0,0.55)',
-            textAlign: 'center',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '8px',
-              letterSpacing: '3px',
-              color: 'var(--bone-dim)',
-              marginBottom: '12px',
-              textTransform: 'uppercase',
-            }}
-          >
-            VERDICT
-          </div>
-          <h1 style={{ fontSize: '26px', margin: 0, letterSpacing: '4px', color: 'var(--coral)' }}>
-            GUILTY
-          </h1>
-          <p
-            style={{
-              fontSize: '9px',
-              letterSpacing: '2px',
-              color: 'var(--bone-dim)',
-              marginTop: '14px',
-              marginBottom: 0,
-              textTransform: 'uppercase',
-            }}
-          >
-            THE JURY HAS SPOKEN.
-          </p>
-        </div>
-        {overlayVisible && <ControlOverlay shotIdx={shotIdx} onLoad={loadShot} />}
-      </div>
-    );
+    return <VerdictSequence overlayVisible={overlayVisible} shotIdx={shotIdx} onLoad={loadShot} />;
   }
 
   // ---- Main recording surface ----
@@ -352,6 +300,71 @@ export function DemoRecorder() {
         onLiar={() => {}}
       />
       {overlayVisible && <ControlOverlay shotIdx={shotIdx} onLoad={loadShot} shot={shot} />}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Verdict sequence — matches DEMO-SCRIPT Act 4 (0:51-0:55).
+//
+//   0s    pure black, silent
+//   1.0s  `GUILTY.` typewriter fade-in (amber, Press Start 2P)
+//   2.0s  `EXECUTED.` typewriter fade-in (amber, same style)
+//   4.0s  full hold — both words stay on screen until shot reset
+//
+// No audio (editor layers gavel/stinger in post). CSS animations only so the
+// typewriter is deterministic across retakes.
+// ---------------------------------------------------------------------------
+
+function VerdictSequence({
+  overlayVisible,
+  shotIdx,
+  onLoad,
+}: {
+  overlayVisible: boolean;
+  shotIdx: number;
+  onLoad: (i: number) => void;
+}) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: '#000',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '32px',
+        fontFamily: '"Press Start 2P", monospace',
+        color: '#f4a500', // amber, per DEMO-SCRIPT Act 1/4
+      }}
+    >
+      <style>{`
+        @keyframes verdictFadeIn {
+          from { opacity: 0; transform: translateY(4px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .verdict-guilty {
+          font-size: 56px;
+          letter-spacing: 10px;
+          opacity: 0;
+          animation: verdictFadeIn 0.6s ease-out forwards;
+          animation-delay: 1.0s;
+          margin: 0;
+        }
+        .verdict-executed {
+          font-size: 56px;
+          letter-spacing: 10px;
+          opacity: 0;
+          animation: verdictFadeIn 7.0s ease-out forwards;
+          animation-delay: 2.0s;
+          margin: 0;
+        }
+      `}</style>
+      <h1 className="verdict-guilty">GUILTY.</h1>
+      <h1 className="verdict-executed">EXECUTED.</h1>
+      {overlayVisible && <ControlOverlay shotIdx={shotIdx} onLoad={onLoad} />}
     </div>
   );
 }

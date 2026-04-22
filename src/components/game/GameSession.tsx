@@ -46,6 +46,8 @@ import {
 const SILENT_BEAT_DUCK_MS = 400;
 /** Dead-air duration before cards flip on every challenge reveal. */
 const SILENT_BEAT_DURATION_MS = 2000;
+/** Breather after an AI accept/liar verdict before the next AI claim can fire. */
+const NEXT_AI_CLAIM_BREATHER_MS = 1400;
 /** Delay between stinger end and per-persona final-words clip. */
 const FINAL_WORDS_DELAY_MS = 1000;
 
@@ -433,26 +435,52 @@ export function GameSession({ initialSession }: GameSessionProps) {
   // mid-playback. Ref guard ensures we don't replay the same URL on re-renders
   // (data: URLs are stable per response, so this is reliable).
   //
-  // Also marks `responseAudioPending` true until onEnded fires, which gates the
-  // auto-AiAct effect below so the next AI claim doesn't overlap the verdict.
+  // Also keeps `responseAudioPending` true until onEnded fires and the
+  // post-verdict breather elapses, which gates the auto-AiAct effect below.
   const [responseAudioPending, setResponseAudioPending] = useState(false);
+  const responseFlowReadyUrlRef = useRef<string | undefined>(undefined);
+  const responseFlowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const releaseResponseFlowAfterBreather = useCallback((url: string) => {
+    if (responseFlowTimerRef.current) {
+      clearTimeout(responseFlowTimerRef.current);
+    }
+    responseFlowTimerRef.current = setTimeout(() => {
+      responseFlowTimerRef.current = null;
+      if (lastResponseAudioUrlRef.current !== url) return;
+      responseFlowReadyUrlRef.current = url;
+      setResponseAudioPending(false);
+    }, NEXT_AI_CLAIM_BREATHER_MS);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (responseFlowTimerRef.current) clearTimeout(responseFlowTimerRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     const url = state.lastAiResponseAudioUrl;
     if (!url) return;
     if (lastResponseAudioUrlRef.current === url) return;
     lastResponseAudioUrlRef.current = url;
+    responseFlowReadyUrlRef.current = undefined;
+    if (responseFlowTimerRef.current) {
+      clearTimeout(responseFlowTimerRef.current);
+      responseFlowTimerRef.current = null;
+    }
     setResponseAudioPending(true);
-    responsePlayer.onEnded(() => setResponseAudioPending(false));
+    responsePlayer.onEnded(() => releaseResponseFlowAfterBreather(url));
     try {
       responsePlayer.play(url);
     } catch {
       // Audio playback failure is non-fatal; the outcome banner + session
-      // state already convey the verdict. Clear the pending flag so the next
-      // AI claim can fire.
-      setResponseAudioPending(false);
+      // state already convey the verdict. Keep the same breather so pacing
+      // remains consistent.
+      releaseResponseFlowAfterBreather(url);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.lastAiResponseAudioUrl]);
+  }, [state.lastAiResponseAudioUrl, releaseResponseFlowAfterBreather]);
 
   // Auto-trigger AI's turn when it's their move. Without this, rounds where
   // activePlayer starts as 'ai' hang in 'awaiting-ai' forever because the
@@ -468,7 +496,7 @@ export function GameSession({ initialSession }: GameSessionProps) {
   //     `isPlaying` state transitions.
   const [aiActCooldown, setAiActCooldown] = useState(false);
   useEffect(() => {
-    if (audioPlayer.isPlaying || responsePlayer.isPlaying || responseAudioPending) {
+    if (audioPlayer.isPlaying) {
       setAiActCooldown(true);
       return;
     }
@@ -477,13 +505,18 @@ export function GameSession({ initialSession }: GameSessionProps) {
     return () => clearTimeout(t);
     // aiActCooldown self-reference OK — gated on the return above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [audioPlayer.isPlaying, responsePlayer.isPlaying, responseAudioPending]);
+  }, [audioPlayer.isPlaying]);
 
   useEffect(() => {
+    const responseUrl = state.lastAiResponseAudioUrl;
+    const responseFlowReady =
+      !responseUrl || responseFlowReadyUrlRef.current === responseUrl;
+
     if (
       state.phase === 'awaiting-ai' &&
       !tutorial.active &&
       !responseAudioPending &&
+      responseFlowReady &&
       !audioPlayer.isPlaying &&
       !responsePlayer.isPlaying &&
       !aiActCooldown
@@ -493,6 +526,7 @@ export function GameSession({ initialSession }: GameSessionProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     state.phase,
+    state.lastAiResponseAudioUrl,
     tutorial.active,
     responseAudioPending,
     audioPlayer.isPlaying,

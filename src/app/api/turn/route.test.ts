@@ -80,6 +80,7 @@ process.env.GEMINI_API_KEY = 'test-key';
 import { POST } from './route';
 import type { Session } from '@/lib/game/types';
 import { VOICE_PRESETS } from '@/lib/voice/presets';
+import { computeVoiceMetaFromAudio } from '@/lib/voice/stt';
 
 // ---------------------------------------------------------------------------
 // Retrieve spy references from globalThis (set by vi.mock factories).
@@ -321,6 +322,57 @@ describe('Invariant 9 — chain AI judgment inline (PlayerClaim)', () => {
     const aiDecision = body.aiDecision as { action: string; innerThought: string };
     expect(aiDecision.action).toBe('accept');
     expect(aiDecision.innerThought).toBe('Seems fine to me.');
+  });
+
+  it.each([
+    ['unparseable speech', 'hello court'],
+    ['wrong rank', 'one king'],
+    ['wrong count', 'two queens'],
+  ])('auto-challenges %s instead of consulting AI judgment', async (_label, transcript) => {
+    const session = makeSession({ activePlayer: 'player', roundStatus: 'claim_phase' });
+    storeGet().mockResolvedValue(session);
+    vi.mocked(computeVoiceMetaFromAudio).mockResolvedValueOnce({
+      transcript,
+      latencyMs: 1200,
+      fillerCount: 0,
+      pauseCount: 0,
+      speechRateWpm: 180,
+      lieScore: 0.2,
+      audioDurationSecs: 3,
+    });
+    aiDecideOnClaimSpy().mockResolvedValue({
+      action: 'accept',
+      innerThought: 'Should not be called.',
+      voiceline: 'Proceed.',
+      source: 'llm',
+      latencyMs: 42,
+      mathProb: 0.1,
+    });
+
+    const req = post({
+      type: 'PlayerClaim',
+      sessionId: 'test-id',
+      cards: [{ id: 'Q-0' }],
+      audioBase64: 'dGVzdA==',
+      claimText: 'One Queen.',
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(aiDecideOnClaimSpy()).not.toHaveBeenCalled();
+    const body = (await res.json()) as {
+      aiDecision: { action: string; innerThought: string };
+      aiResponse: { voiceline: string };
+      session: { self: { strikes: number }; opponent: { strikes: number } };
+    };
+
+    expect(body.aiDecision.action).toBe('challenge');
+    expect(body.aiDecision.innerThought).toContain('spoken claim');
+    expect(body.aiResponse.voiceline).toContain('no valid claim');
+    expect(body.session.self.strikes).toBe(1);
+    expect(body.session.opponent.strikes).toBe(0);
+    expect(storeSet()).toHaveBeenCalledOnce();
   });
 });
 
