@@ -13,13 +13,57 @@ import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 import { reduce } from '@/lib/game/fsm';
 import { toClientView } from '@/lib/game/toClientView';
 import { InvalidTransitionError } from '@/lib/game/types';
-import type { Claim, VoiceMeta } from '@/lib/game/types';
+import type { Claim, Session, VoiceMeta, JokerType } from '@/lib/game/types';
 import { parseClaim } from '@/lib/game/claims';
+import { dealFresh } from '@/lib/game/deck';
+import { pickOffer } from '@/lib/jokers/lifecycle';
 import { computeVoiceMetaFromAudio } from '@/lib/voice/stt';
 import { VOICE_PRESETS, PERSONA_VOICE_IDS } from '@/lib/voice/presets';
 import { aiDecideOnClaim, aiDecideOwnPlay } from '@/lib/ai/brain';
 import { buildDecisionContext, buildOwnPlayContext } from '@/lib/session/buildContexts';
 import * as store from '@/lib/session/store';
+
+/**
+ * After any event that could end a round, check whether the session is now
+ * sitting in `round_active` with `round.status === 'round_over'`. If so,
+ * auto-chain `RoundSettled` and then `JokerOffered` (or `JokerOfferEmpty` if
+ * the draw pile is exhausted) so the client sees a valid `joker_offer` state
+ * instead of a stuck round. Idempotent — returns session unchanged if no
+ * round-end transition is pending.
+ */
+function autoChainRoundEnd(session: Session): Session {
+  if (session.status !== 'round_active') return session;
+  const currentRound = session.rounds[session.currentRoundIdx];
+  if (!currentRound || currentRound.status !== 'round_over') return session;
+
+  // Step 1: RoundSettled — may transition to session_over if strikes/rounds cap hit.
+  let next = reduce(session, { type: 'RoundSettled', now: Date.now() });
+  if (next.status !== 'joker_offer') return next;
+
+  // Step 2: Offer jokers (or skip if pile is empty).
+  const drawPile = next.jokerDrawPile ?? [];
+  if (drawPile.length === 0) {
+    const nextRoundDeal = dealFresh();
+    next = reduce(next, { type: 'JokerOfferEmpty', nextRoundDeal, now: Date.now() });
+    return next;
+  }
+
+  const { offered, remaining } = pickOffer(drawPile, Math.random);
+  if (offered.length === 0) {
+    // pickOffer returned empty despite non-empty pile — defensive fallback.
+    const nextRoundDeal = dealFresh();
+    next = reduce(next, { type: 'JokerOfferEmpty', nextRoundDeal, now: Date.now() });
+    return next;
+  }
+
+  next = reduce(next, {
+    type: 'JokerOffered',
+    offered,
+    newDrawPile: remaining,
+    now: Date.now(),
+  });
+  return next;
+}
 
 // ---------------------------------------------------------------------------
 // Request / response shapes
@@ -42,6 +86,11 @@ type TurnRequest =
   | {
       type: 'AiAct';
       sessionId: string;
+    }
+  | {
+      type: 'PickJoker';
+      sessionId: string;
+      joker: JokerType;
     };
 
 // ---------------------------------------------------------------------------
@@ -210,6 +259,11 @@ export async function POST(req: Request): Promise<Response> {
         session = reduce(session, { type: 'ClaimAccepted', now: Date.now() });
       }
 
+      // If either path ended a round, auto-chain RoundSettled + joker offer
+      // so the client doesn't stall on a `round_over` state the FSM can't
+      // advance without orchestration.
+      session = autoChainRoundEnd(session);
+
       // Synthesize TTS for the AI's spoken judgment (voiceline). Uses the same
       // ElevenLabs Flash v2.5 pipeline as AiAct's claim TTS. Voice settings
       // come from the persona's "lying" preset for a challenge (AI is
@@ -284,6 +338,9 @@ export async function POST(req: Request): Promise<Response> {
           now: Date.now(),
         });
       }
+
+      // Auto-chain round-end → joker offer if the round just ended.
+      session = autoChainRoundEnd(session);
 
       await store.set(sessionId, session);
       return Response.json({ session: toClientView(session, 'player') });
@@ -372,6 +429,50 @@ export async function POST(req: Request): Promise<Response> {
           persona,
         },
       });
+    }
+
+    // -----------------------------------------------------------------------
+    // PickJoker
+    // -----------------------------------------------------------------------
+    if (body.type === 'PickJoker') {
+      const { joker } = body;
+
+      if (session.status !== 'joker_offer') {
+        return Response.json(
+          {
+            error: {
+              code: 'INVALID_PICK_JOKER',
+              message: `PickJoker only valid when session.status === 'joker_offer' (was '${session.status}')`,
+            },
+          },
+          { status: 400 },
+        );
+      }
+
+      if (!session.currentOffer?.offered.includes(joker)) {
+        return Response.json(
+          {
+            error: {
+              code: 'JOKER_NOT_OFFERED',
+              message: `Joker '${joker}' was not in the current offer`,
+            },
+          },
+          { status: 400 },
+        );
+      }
+
+      // Deal the next round (both hands + deck + targetRank + activePlayer).
+      const nextRoundDeal = dealFresh();
+
+      session = reduce(session, {
+        type: 'JokerPicked',
+        joker,
+        nextRoundDeal,
+        now: Date.now(),
+      });
+
+      await store.set(sessionId, session);
+      return Response.json({ session: toClientView(session, 'player') });
     }
 
     // Unknown event type.

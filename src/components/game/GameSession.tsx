@@ -702,7 +702,7 @@ export function GameSession({ initialSession }: GameSessionProps) {
     const nextUp = nextPersona(progress);
     const subtitle = playerWon
       ? (nextUp
-          ? `The ${PERSONA_DISPLAY_NAMES[nextUp]} rises next.`
+          ? `${PERSONA_DISPLAY_NAMES[nextUp]} rises next.`
           : 'The court adjourns.')
       : 'The jury has spoken.';
     const ctaLabel = playerWon
