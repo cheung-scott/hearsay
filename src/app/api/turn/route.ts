@@ -16,7 +16,6 @@ import { InvalidTransitionError } from '@/lib/game/types';
 import type { Claim, Session, VoiceMeta, JokerType } from '@/lib/game/types';
 import { parseClaim } from '@/lib/game/claims';
 import { dealFresh } from '@/lib/game/deck';
-import { pickOffer } from '@/lib/jokers/lifecycle';
 import { computeVoiceMetaFromAudio } from '@/lib/voice/stt';
 import { VOICE_PRESETS, PERSONA_VOICE_IDS } from '@/lib/voice/presets';
 import { aiDecideOnClaim, aiDecideOwnPlay } from '@/lib/ai/brain';
@@ -26,10 +25,17 @@ import * as store from '@/lib/session/store';
 /**
  * After any event that could end a round, check whether the session is now
  * sitting in `round_active` with `round.status === 'round_over'`. If so,
- * auto-chain `RoundSettled` and then `JokerOffered` (or `JokerOfferEmpty` if
- * the draw pile is exhausted) so the client sees a valid `joker_offer` state
- * instead of a stuck round. Idempotent — returns session unchanged if no
+ * auto-chain `RoundSettled` and force-skip the joker offer so rounds advance
+ * straight to the next deal. Idempotent — returns session unchanged if no
  * round-end transition is pending.
+ *
+ * JOKERS DISABLED (2026-04-22, playtest decision): the joker system ships
+ * partially — FSM + UI exist, but the round-end → offer → pick → next-round
+ * flow was freezing on AI-winning rounds and adding friction to playtest
+ * iteration without being in the demo video script. Restoring jokers is a
+ * post-hackathon task; for now we settle the round, then force-drop the
+ * draw pile and fire `JokerOfferEmpty` which advances to the next round
+ * without offering anything. FSM reducers are untouched.
  */
 function autoChainRoundEnd(session: Session): Session {
   if (session.status !== 'round_active') return session;
@@ -40,46 +46,13 @@ function autoChainRoundEnd(session: Session): Session {
   let next = reduce(session, { type: 'RoundSettled', now: Date.now() });
   if (next.status !== 'joker_offer') return next;
 
-  // Step 2: Offer jokers (or skip if pile is empty).
-  const drawPile = next.jokerDrawPile ?? [];
-  if (drawPile.length === 0) {
-    const nextRoundDeal = dealFresh();
-    next = reduce(next, { type: 'JokerOfferEmpty', nextRoundDeal, now: Date.now() });
-    return next;
-  }
-
-  const { offered, remaining } = pickOffer(drawPile, Math.random);
-  if (offered.length === 0) {
-    // pickOffer returned empty despite non-empty pile — defensive fallback.
-    const nextRoundDeal = dealFresh();
-    next = reduce(next, { type: 'JokerOfferEmpty', nextRoundDeal, now: Date.now() });
-    return next;
-  }
-
-  next = reduce(next, {
-    type: 'JokerOffered',
-    offered,
-    newDrawPile: remaining,
-    now: Date.now(),
-  });
-
-  // If the offer is to the AI, auto-pick server-side and advance to the next
-  // round. toClientView gates `currentOffer` to the `offeredToWinner` viewer,
-  // so an AI-owned offer is invisible to the player — if we left it sitting,
-  // the client would render nothing and the game would freeze. The AI picks
-  // a random joker from the 3 offered.
-  if (next.currentOffer?.offeredToWinner === 'ai') {
-    const pool = next.currentOffer.offered;
-    const aiPick = pool[Math.floor(Math.random() * pool.length)];
-    const nextRoundDeal = dealFresh();
-    next = reduce(next, {
-      type: 'JokerPicked',
-      joker: aiPick,
-      nextRoundDeal,
-      now: Date.now(),
-    });
-  }
-
+  // Step 2: skip jokers — clear the draw pile to satisfy JokerOfferEmpty's
+  // guard, then advance directly to the next round.
+  const nextRoundDeal = dealFresh();
+  next = reduce(
+    { ...next, jokerDrawPile: [] },
+    { type: 'JokerOfferEmpty', nextRoundDeal, now: Date.now() },
+  );
   return next;
 }
 
