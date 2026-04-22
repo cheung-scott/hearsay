@@ -380,14 +380,31 @@ export function GameSession({ initialSession }: GameSessionProps) {
   // Auto-trigger AI's turn when it's their move. Without this, rounds where
   // activePlayer starts as 'ai' hang in 'awaiting-ai' forever because the
   // server chains AI judgment inside PlayerClaim but has no AI-first pathway.
-  // Gate on `responseAudioPending` so the AI's next claim doesn't overlap the
-  // preceding verdict voiceline.
+  //
+  // Gated on THREE conditions so the next AI claim never overlaps previously
+  // playing audio:
+  //   1. responseAudioPending — the AI's accept/liar verdict voiceline from
+  //      the prior PlayerClaim hasn't finished yet.
+  //   2. audioPlayer.isPlaying — the previous AI CLAIM audio is still playing.
+  //   3. responsePlayer.isPlaying — residual verdict audio from any path.
   useEffect(() => {
-    if (state.phase === 'awaiting-ai' && !tutorial.active && !responseAudioPending) {
+    if (
+      state.phase === 'awaiting-ai' &&
+      !tutorial.active &&
+      !responseAudioPending &&
+      !audioPlayer.isPlaying &&
+      !responsePlayer.isPlaying
+    ) {
       dispatch({ type: 'AiAct' }).catch(() => { /* error surfaces via state.error */ });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.phase, tutorial.active, responseAudioPending]);
+  }, [
+    state.phase,
+    tutorial.active,
+    responseAudioPending,
+    audioPlayer.isPlaying,
+    responsePlayer.isPlaying,
+  ]);
 
   // When holdToSpeak audioBlob transitions from null to non-null, AND we're
   // in recording phase with cards selected, dispatch PlayerClaim.
@@ -612,8 +629,17 @@ export function GameSession({ initialSession }: GameSessionProps) {
         <button
           onClick={async () => {
             // Prime AudioContext inside the user gesture (autoplay policy).
-            await music.prime().catch(() => { /* music will be silently disabled */ });
-            await dispatch({ type: 'CreateSession', preferredPersona });
+            try {
+              await music.prime();
+            } catch {
+              // music will be silently disabled
+            }
+            try {
+              await dispatch({ type: 'CreateSession', preferredPersona });
+            } catch (err) {
+              // eslint-disable-next-line no-console
+              console.error('[CTA] CreateSession dispatch threw:', err);
+            }
           }}
           style={{
             fontFamily: '"Press Start 2P", monospace',
@@ -782,8 +808,17 @@ export function GameSession({ initialSession }: GameSessionProps) {
         <button
           onClick={async () => {
             // Prime AudioContext inside the user gesture (autoplay policy).
-            await music.prime().catch(() => { /* music will be silently disabled */ });
-            await dispatch({ type: 'CreateSession', preferredPersona });
+            try {
+              await music.prime();
+            } catch {
+              // music will be silently disabled
+            }
+            try {
+              await dispatch({ type: 'CreateSession', preferredPersona });
+            } catch (err) {
+              // eslint-disable-next-line no-console
+              console.error('[CTA] CreateSession dispatch threw:', err);
+            }
           }}
           style={{
             fontFamily: '"Press Start 2P", monospace',
