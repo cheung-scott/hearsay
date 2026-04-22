@@ -77,10 +77,10 @@ const CLERK_VOICE_ID = 'Al9pMcZxV70KAzzehiTE';  // hearsay-clerk
 const TUTORIAL_LINES: string[] = [
   "Court is in session. Before your trial, let me brief you on the rules.",
   "The rank called each round is here.",
-  "Pick one or two cards, then press and hold this button and call 'one queen' or 'two queens' — or whatever rank the court is demanding. The rank is locked each round, but the cards you actually play can be anything. Tell the truth, or bluff. The defendant will listen to your voice and decide whether to believe you. Win by emptying your hand, or by catching him in three lies.",
-  "If you're caught bluffing, you take a strike. Three strikes and you lose the round. Win best-of-three to advance to the next opponent.",
+  "Tap one or two cards from your hand. A HOLD TO SPEAK button will appear — press and hold it, then call \"one queen\" or \"two queens\" (or whatever rank the court is demanding). The rank is locked each round, but the cards you actually play can be anything. Tell the truth, or bluff. The defendant will listen to your voice and decide whether to believe you.",
+  "Win by emptying your hand, or by catching him in three lies. If YOU get caught bluffing, you take a strike — three strikes and you lose the session.",
   "The defendant just made his claim. Listen for the tells. Do you believe him?",
-  "Well played. Winning a round grants you a joker which holds a power — use it against your opponent to gain an advantage. Most expire after one turn.",
+  "Well played. Keep winning rounds to advance through the court.",
   "Court is now in recess. Good luck.",
 ];
 

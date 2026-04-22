@@ -62,7 +62,7 @@ const STEP_TARGET_SELECTOR: Record<number, string | null> = {
   3: "[data-testid='hold-to-speak']",
   4: "[data-testid='strikes-row'], .strikes",
   5: null, // centred — claim bubble already on screen
-  6: "[data-testid='joker-tray']",
+  6: null,
   7: null, // centred
 };
 
@@ -83,7 +83,7 @@ const STEP_ANCHOR: Record<number, BubbleAnchor> = {
   3: { kind: 'above-target' },   // HoldToSpeak button sits at ~bottom 30%
   4: { kind: 'below-target' },   // StrikeCounter sits at top-right of HUD
   5: { kind: 'center' },
-  6: { kind: 'above-target' },   // JokerTray sits at bottom-left
+  6: { kind: 'center' },
   7: { kind: 'center' },
 };
 
