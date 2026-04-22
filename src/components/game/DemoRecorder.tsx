@@ -357,8 +357,8 @@ function VerdictSequence({
           font-size: 56px;
           letter-spacing: 10px;
           opacity: 0;
-          animation: verdictFadeIn 7.0s ease-out forwards;
-          animation-delay: 2.0s;
+          animation: verdictFadeIn 3.0s ease-out forwards;
+          animation-delay: 3.0s;
           margin: 0;
         }
       `}</style>

@@ -51,16 +51,16 @@ function templateHonest(
       `That's ${count} ${rankStr}.`,
     ],
     Misdirector: [
-      `*nervous laugh* ...${count} ${rankStr}.`,
+      `A delicate ${count} ${rankStr}.`,
       `Could be ${count} ${rankStr}... or not.`,
       `I'm... ${count} ${rankStr}, definitely.`,
-      `*clears throat* ${count} ${rankStr}.`,
+      `For the record, ${count} ${rankStr}.`,
     ],
     Silent: [
       `${count} ${rankStr}.`,
-      `${rankStr}, ${count}.`,
-      `${count}.`,
-      `There.`,
+      `I play ${count} ${rankStr}.`,
+      `${count} ${rankStr}, placed.`,
+      `${count} ${rankStr}, done.`,
     ],
   };
 
@@ -95,15 +95,15 @@ function templateLie(
     ],
     Misdirector: [
       `Oh, ${count} ${rankStr}, obviously.`,
-      `*confidently* ${count} ${rankStr}.`,
+      `Obviously, ${count} ${rankStr}.`,
       `Clear as day — ${count} ${rankStr}.`,
       `I've got ${count} ${rankStr}, easy.`,
     ],
     Silent: [
       `${count} ${rankStr}.`,
-      `${rankStr}.`,
-      `${count}.`,
-      `Done.`,
+      `I claim ${count} ${rankStr}.`,
+      `${count} ${rankStr}, no more.`,
+      `${count} ${rankStr}, done.`,
     ],
   };
 

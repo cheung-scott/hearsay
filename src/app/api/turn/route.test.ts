@@ -324,11 +324,46 @@ describe('Invariant 9 — chain AI judgment inline (PlayerClaim)', () => {
     expect(aiDecision.innerThought).toBe('Seems fine to me.');
   });
 
+  it('AI challenging a valid honest player claim gives the strike to the AI', async () => {
+    const session = makeSession({ activePlayer: 'player', roundStatus: 'claim_phase' });
+    storeGet().mockResolvedValue(session);
+
+    aiDecideOnClaimSpy().mockResolvedValue({
+      action: 'challenge',
+      innerThought: 'Mistaken suspicion.',
+      voiceline: 'Liar.',
+      source: 'llm',
+      latencyMs: 42,
+      mathProb: 0.3,
+    });
+
+    const req = post({
+      type: 'PlayerClaim',
+      sessionId: 'test-id',
+      cards: [{ id: 'Q-0' }],
+      audioBase64: 'dGVzdA==',
+      claimText: 'One Queen.',
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(aiDecideOnClaimSpy()).toHaveBeenCalledOnce();
+    const body = (await res.json()) as {
+      aiDecision: { action: string };
+      session: { self: { strikes: number }; opponent: { strikes: number } };
+    };
+
+    expect(body.aiDecision.action).toBe('challenge');
+    expect(body.session.self.strikes).toBe(0);
+    expect(body.session.opponent.strikes).toBe(1);
+  });
+
   it.each([
     ['unparseable speech', 'hello court'],
     ['wrong rank', 'one king'],
     ['wrong count', 'two queens'],
-  ])('auto-challenges %s instead of consulting AI judgment', async (_label, transcript) => {
+  ])('auto-challenges %s but honest cards still punish the AI challenger', async (_label, transcript) => {
     const session = makeSession({ activePlayer: 'player', roundStatus: 'claim_phase' });
     storeGet().mockResolvedValue(session);
     vi.mocked(computeVoiceMetaFromAudio).mockResolvedValueOnce({
@@ -370,9 +405,52 @@ describe('Invariant 9 — chain AI judgment inline (PlayerClaim)', () => {
     expect(body.aiDecision.action).toBe('challenge');
     expect(body.aiDecision.innerThought).toContain('spoken claim');
     expect(body.aiResponse.voiceline).toContain('no valid claim');
+    expect(body.session.self.strikes).toBe(0);
+    expect(body.session.opponent.strikes).toBe(1);
+    expect(storeSet()).toHaveBeenCalledOnce();
+  });
+
+  it('auto-challenge from invalid speech still strikes player when the cards are actually a lie', async () => {
+    const session = makeSession({ activePlayer: 'player', roundStatus: 'claim_phase' });
+    storeGet().mockResolvedValue(session);
+    vi.mocked(computeVoiceMetaFromAudio).mockResolvedValueOnce({
+      transcript: 'hello court',
+      latencyMs: 1200,
+      fillerCount: 0,
+      pauseCount: 0,
+      speechRateWpm: 180,
+      lieScore: 0.2,
+      audioDurationSecs: 3,
+    });
+    aiDecideOnClaimSpy().mockResolvedValue({
+      action: 'accept',
+      innerThought: 'Should not be called.',
+      voiceline: 'Proceed.',
+      source: 'llm',
+      latencyMs: 42,
+      mathProb: 0.1,
+    });
+
+    const req = post({
+      type: 'PlayerClaim',
+      sessionId: 'test-id',
+      cards: [{ id: 'K-0' }],
+      audioBase64: 'dGVzdA==',
+      claimText: 'One Queen.',
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(aiDecideOnClaimSpy()).not.toHaveBeenCalled();
+    const body = (await res.json()) as {
+      aiDecision: { action: string };
+      session: { self: { strikes: number }; opponent: { strikes: number } };
+    };
+
+    expect(body.aiDecision.action).toBe('challenge');
     expect(body.session.self.strikes).toBe(1);
     expect(body.session.opponent.strikes).toBe(0);
-    expect(storeSet()).toHaveBeenCalledOnce();
   });
 });
 
@@ -423,6 +501,73 @@ describe('Invariant 10 — TTS preset selected from persona + truthState (AiAct)
       style: expected.style,
       speed: expected.speed,
     });
+  });
+
+  it('AiAct prefixes count and rank when a terse Judge line omits them', async () => {
+    const session = makeSession({
+      activePlayer: 'ai',
+      roundStatus: 'claim_phase',
+      persona: 'Silent',
+    });
+    storeGet().mockResolvedValue(session);
+
+    const aiHandCard = session.ai.hand[0];
+    aiDecideOwnPlaySpy().mockResolvedValue({
+      cardsToPlay: [aiHandCard],
+      claim: { count: 1, rank: 'Queen' },
+      truthState: 'honest',
+      claimText: 'Proceed.',
+      innerThought: 'Terse.',
+      source: 'llm',
+      latencyMs: 25,
+    });
+
+    const req = post({ type: 'AiAct', sessionId: 'test-id' });
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { aiClaim: { claimText: string } };
+    expect(body.aiClaim.claimText).toBe('One Queen. Proceed.');
+
+    const [_voiceId, convertArgs] = ttsConvertSpy().mock.calls[0] as [
+      string,
+      { text: string },
+    ];
+    expect(convertArgs.text).toBe('One Queen. Proceed.');
+  });
+
+  it('AiAct strips starred emotion directions from Misdirector claim text', async () => {
+    const session = makeSession({
+      activePlayer: 'ai',
+      roundStatus: 'claim_phase',
+      persona: 'Misdirector',
+    });
+    storeGet().mockResolvedValue(session);
+
+    aiDecideOwnPlaySpy().mockResolvedValue({
+      cardsToPlay: [session.ai.hand[0], session.ai.hand[1]],
+      claim: { count: 2, rank: 'Queen' },
+      truthState: 'honest',
+      claimText: '*confidently* Two Queens.',
+      innerThought: 'Theatrical.',
+      source: 'llm',
+      latencyMs: 25,
+    });
+
+    const req = post({ type: 'AiAct', sessionId: 'test-id' });
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { aiClaim: { claimText: string } };
+    expect(body.aiClaim.claimText).toBe('Two Queens.');
+    expect(body.aiClaim.claimText).not.toContain('*');
+    expect(body.aiClaim.claimText.toLowerCase()).not.toContain('confidently');
+
+    const [_voiceId, convertArgs] = ttsConvertSpy().mock.calls[0] as [
+      string,
+      { text: string },
+    ];
+    expect(convertArgs.text).toBe('Two Queens.');
   });
 });
 

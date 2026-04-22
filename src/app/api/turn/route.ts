@@ -67,6 +67,33 @@ function isSpokenClaimValidForTurn(
   );
 }
 
+function formatClaimPhrase(count: 1 | 2, rank: Session['rounds'][number]['targetRank']): string {
+  const countWord = count === 1 ? 'One' : 'Two';
+  const rankWord = count === 2 ? `${rank}s` : rank;
+  return `${countWord} ${rankWord}`;
+}
+
+function sanitizeAiClaimText(
+  text: string,
+  count: 1 | 2,
+  rank: Session['rounds'][number]['targetRank'],
+): string {
+  const phrase = formatClaimPhrase(count, rank);
+  const rankPattern = count === 2 ? `${rank}s?` : `${rank}s?`;
+  const countPattern = count === 1 ? '(?:one|1)' : '(?:two|2)';
+  const phraseRegex = new RegExp(`\\b${countPattern}\\s+${rankPattern}\\b`, 'i');
+  const cleaned = text
+    .replace(/\*[^*]*\*/g, '')
+    .replace(/\[[^\]]*\]/g, '')
+    .replace(/\([^)]*\)/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s,.;:!?—-]+/, '')
+    .trim();
+
+  if (phraseRegex.test(cleaned)) return cleaned;
+  return cleaned ? `${phrase}. ${cleaned}` : `${phrase}.`;
+}
+
 // ---------------------------------------------------------------------------
 // Request / response shapes
 // ---------------------------------------------------------------------------
@@ -265,8 +292,7 @@ export async function POST(req: Request): Promise<Response> {
 
         // Resolve the challenge: server knows the ground truth.
         const lastClaim = updatedRound.claimHistory[updatedRound.claimHistory.length - 1];
-        const challengeWasCorrect =
-          forceChallengeForInvalidSpeech || lastClaim?.truthState === 'lying';
+        const challengeWasCorrect = lastClaim?.truthState === 'lying';
         session = reduce(session, {
           type: 'RevealComplete',
           challengeWasCorrect,
@@ -392,6 +418,11 @@ export async function POST(req: Request): Promise<Response> {
       // Build context + get AI's own-play decision.
       const ownPlayCtx = buildOwnPlayContext(session, currentRound);
       const aiPlay = await aiDecideOwnPlay(ownPlayCtx);
+      const aiClaimText = sanitizeAiClaimText(
+        aiPlay.claimText,
+        aiPlay.claim.count,
+        currentRound.targetRank,
+      );
 
       // Synthesize TTS for the AI's claim text.
       let ttsAudioUrl = '';
@@ -401,7 +432,7 @@ export async function POST(req: Request): Promise<Response> {
         const voiceSettings = VOICE_PRESETS[persona][aiPlay.truthState];
 
         const audioStream = await client.textToSpeech.convert(voiceId, {
-          text: aiPlay.claimText,
+          text: aiClaimText,
           modelId: 'eleven_flash_v2_5',
           outputFormat: 'mp3_44100_128',
           voiceSettings: {
@@ -428,7 +459,7 @@ export async function POST(req: Request): Promise<Response> {
         claimedRank: currentRound.targetRank,
         actualCardIds: aiPlay.cardsToPlay.map(c => c.id),
         truthState: aiPlay.truthState,
-        claimText: aiPlay.claimText,
+        claimText: aiClaimText,
         llmReasoning: aiPlay.llmReasoning,
         timestamp: Date.now(),
       };
@@ -441,7 +472,7 @@ export async function POST(req: Request): Promise<Response> {
       return Response.json({
         session: toClientView(session, 'player'),
         aiClaim: {
-          claimText: aiPlay.claimText,
+          claimText: aiClaimText,
           ttsAudioUrl,
           persona,
         },

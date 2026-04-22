@@ -138,6 +138,8 @@ Round history: {{publicClaims}}.
 
 Play 1-2 cards face-down, claim a count of {{targetRank}}.
 Stay in-character. {{persona}} bluff-bias: {{bluffBias}}.
+The claimText must always include the exact count and target rank you are claiming, e.g. "One {{targetRank}}" or "Two {{targetRank}}s".
+Do not include stage directions, emotion tags, asterisks, brackets, or parenthetical acting notes in claimText.
 
 Return JSON: {
   "cardsToPlay": ["cardId1", "cardId2"?],
