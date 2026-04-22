@@ -73,6 +73,19 @@ describe('TopBar — empty activeJokerEffects', () => {
   });
 });
 
+describe('TopBar - opponent strikes', () => {
+  it('renders an opponent strike counter', () => {
+    const session = makeSession([]);
+    session.opponent.strikes = 2;
+
+    const { container } = render(<TopBar session={session} />);
+
+    const opponentStrikes = container.querySelector('[data-testid="opponent-strikes-row"]');
+    expect(opponentStrikes).not.toBeNull();
+    expect(opponentStrikes?.querySelectorAll('.strike.lit')).toHaveLength(2);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Test 2: One cold_read effect → chip with "COLD READ" text
 // ---------------------------------------------------------------------------

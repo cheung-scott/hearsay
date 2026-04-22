@@ -80,10 +80,10 @@ export type ChallengeOutcome =
 
 const OUTCOME_COPY: Record<ChallengeOutcome, { label: string; sub: string; accent: string }> = {
   'caught-lie':       { label: 'LIAR CAUGHT',   sub: 'Strike to the defendant',  accent: 'var(--amber-hi, #ffc760)' },
-  'false-accusation': { label: 'HE TOLD TRUTH', sub: 'Strike to you',            accent: 'var(--coral, #fd5f55)' },
+  'false-accusation': { label: 'FALSE ACCUSATION', sub: 'Strike to you',         accent: 'var(--coral, #fd5f55)' },
   'accepted':         { label: 'ACCEPTED',      sub: 'Claim stands',             accent: 'var(--bone, #e8dcc8)' },
   'player-caught':    { label: 'YOU GOT CAUGHT',sub: 'Strike to you',            accent: 'var(--coral, #fd5f55)' },
-  'ai-wrong-call':    { label: 'HE WAS WRONG',  sub: 'Strike to the defendant', accent: 'var(--amber-hi, #ffc760)' },
+  'ai-wrong-call':    { label: 'YOU TOLD TRUTH',sub: 'Strike to the defendant', accent: 'var(--amber-hi, #ffc760)' },
 };
 
 export interface ChallengeOutcomeBannerProps {

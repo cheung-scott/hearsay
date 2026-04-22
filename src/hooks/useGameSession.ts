@@ -7,6 +7,7 @@ import type { ClientSession, Card } from '../lib/game/types';
 
 export type GameEvent =
   | { type: 'CreateSession'; preferredPersona?: string }
+  | { type: 'ResetSession' }
   | { type: 'PlayerClaim'; cards: Card[]; audio: Blob; claimText: string }
   | { type: 'PlayerRespond'; action: 'accept' | 'challenge' }
   | { type: 'AiAct' }
@@ -198,6 +199,21 @@ export function useGameSession(initialSession?: ClientSession): {
 
   const dispatch = useCallback(
     async (event: GameEvent) => {
+      if (event.type === 'ResetSession') {
+        ++inFlightSeqRef.current;
+        sessionIdRef.current = null;
+        phaseRef.current = 'idle';
+        setSession(null);
+        setPhase('idle');
+        setLastClaimAudioUrl(undefined);
+        setLastClaimText(undefined);
+        setLastAiResponseAudioUrl(undefined);
+        setLastAiResponseText(undefined);
+        setError(undefined);
+        setSelectedCardIds(new Set());
+        return;
+      }
+
       // Stamp this dispatch; drop the response if a newer dispatch arrives first.
       const seq = ++inFlightSeqRef.current;
 

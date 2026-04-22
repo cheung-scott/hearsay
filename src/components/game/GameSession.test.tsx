@@ -4,7 +4,7 @@
 // an initial ClientSession in round_active / claim_phase.
 
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import type { ClientSession, ClientRound } from '../../lib/game/types';
 
 // ---------------------------------------------------------------------------
@@ -150,6 +150,49 @@ describe('GameSession — invariant 12 smoke test', () => {
     // Cards render rank letters; check that rank text appears somewhere.
     const rankText = container.textContent ?? '';
     expect(rankText).toMatch(/Q|K|A|J/);
+  });
+});
+
+describe('GameSession - challenge outcome banner', () => {
+  it('shows caught-player copy when the player claim caused the player strike', async () => {
+    const { GameSession } = await import('./GameSession');
+
+    const initialSession = makeClientSession({
+      status: 'round_active',
+      self: {
+        hand: [
+          { id: 'King-0', rank: 'King' },
+          { id: 'Ace-0', rank: 'Ace' },
+        ],
+        takenCards: [],
+        roundsWon: 0,
+        strikes: 1,
+        jokers: [],
+      },
+      rounds: [
+        makeClientRound({
+          status: 'claim_phase',
+          activePlayer: 'ai',
+          claimHistory: [
+            {
+              by: 'player',
+              count: 1,
+              claimedRank: 'Queen',
+              timestamp: 1,
+              claimText: '1 Queen',
+            },
+          ],
+        }),
+      ],
+    });
+
+    const { getByTestId } = render(<GameSession initialSession={initialSession} />);
+
+    await waitFor(() => {
+      const banner = getByTestId('challenge-outcome-banner');
+      expect(banner.getAttribute('data-outcome')).toBe('player-caught');
+      expect(banner.textContent).toContain('YOU GOT CAUGHT');
+    });
   });
 });
 

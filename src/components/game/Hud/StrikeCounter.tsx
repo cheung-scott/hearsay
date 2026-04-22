@@ -5,6 +5,8 @@ import { useIsMobile } from '../../../hooks/useIsMobile';
 interface StrikeCounterProps {
   /** Number of strikes lit (0–3). */
   strikes: number;
+  label?: string;
+  testId?: string;
 }
 
 /**
@@ -15,7 +17,11 @@ interface StrikeCounterProps {
  * Mobile: shrinks block size + hides the "STRIKES" label so 3 blocks + target
  * tag both fit across a 375px viewport.
  */
-export function StrikeCounter({ strikes }: StrikeCounterProps) {
+export function StrikeCounter({
+  strikes,
+  label = 'STRIKES',
+  testId = 'strikes-row',
+}: StrikeCounterProps) {
   const isMobile = useIsMobile();
   // Progressive intensification: at strikes >= 2 the smoke rises faster and
   // slightly larger to match the §1.5 strike-2 CSS dim already in GameSession.
@@ -24,7 +30,7 @@ export function StrikeCounter({ strikes }: StrikeCounterProps) {
   const blockH = isMobile ? 28 : 44;
   return (
     <div
-      data-testid="strikes-row"
+      data-testid={testId}
       className="strikes"
       style={{
         display: 'flex',
@@ -40,18 +46,18 @@ export function StrikeCounter({ strikes }: StrikeCounterProps) {
           100% { transform: translate(-50%, -18px) scale(1.6); opacity: 0; }
         }
       `}</style>
-      {!isMobile && (
+      {label && (!isMobile || label !== 'STRIKES') && (
         <span
           className="strikes-label"
           style={{
             fontFamily: '"Press Start 2P", monospace',
-            fontSize: '9px',
+            fontSize: isMobile ? '6px' : '9px',
             color: 'var(--bone-dim)',
-            letterSpacing: '3px',
-            marginRight: '6px',
+            letterSpacing: isMobile ? '1px' : '3px',
+            marginRight: isMobile ? '2px' : '6px',
           }}
         >
-          STRIKES
+          {label}
         </span>
       )}
       {[0, 1, 2].map(i => {

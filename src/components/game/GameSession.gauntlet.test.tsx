@@ -239,6 +239,206 @@ describe('GameSession gauntlet — save-on-win', () => {
 // Test 2: re-mount after Novice defeated → preferredPersona sent as 'Reader'
 // ---------------------------------------------------------------------------
 
+describe('GameSession verdict CTAs', () => {
+  it('NEXT CASE creates a session for the next undefeated persona', async () => {
+    const createSessionCalls: Array<{ preferredPersona?: string }> = [];
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.toString();
+        if (url.includes('/api/music/pregen')) {
+          return new Response(JSON.stringify({ tracks: [] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }) as Response;
+        }
+        if (url.includes('/api/session')) {
+          const body = JSON.parse((init?.body as string) ?? '{}') as {
+            preferredPersona?: string;
+          };
+          createSessionCalls.push({ preferredPersona: body.preferredPersona });
+          return new Response(
+            JSON.stringify({
+              session: makeClientSession({
+                id: `session-${body.preferredPersona ?? 'fallback'}`,
+                opponent: {
+                  handSize: 5,
+                  takenCards: [],
+                  roundsWon: 0,
+                  strikes: 0,
+                  jokers: [],
+                  personaIfAi: body.preferredPersona as ClientSession['opponent']['personaIfAi'],
+                },
+              }),
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          ) as Response;
+        }
+        return new Response(JSON.stringify({ session: makeClientSession() }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }) as Response;
+      }),
+    );
+
+    const { GameSession } = await import('./GameSession');
+    const sessionOver = makeClientSession({
+      id: 'session-novice-win-next-case',
+      status: 'session_over',
+      sessionWinner: 'player',
+      opponent: {
+        handSize: 0,
+        takenCards: [],
+        roundsWon: 2,
+        strikes: 2,
+        jokers: [],
+        personaIfAi: 'Novice',
+      },
+    });
+
+    let result!: ReturnType<typeof render>;
+    await act(async () => {
+      result = render(<GameSession initialSession={sessionOver} />);
+    });
+
+    expect(result.getByText(/Prosecutor rises next/i)).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(result.getByText('NEXT CASE'));
+      await new Promise(r => setTimeout(r, 20));
+    });
+
+    expect(createSessionCalls).toContainEqual({ preferredPersona: 'Reader' });
+  });
+
+  it('RETRIAL returns to the start screen without creating a session', async () => {
+    const createSessionCalls: Array<{ preferredPersona?: string }> = [];
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input.toString();
+        if (url.includes('/api/music/pregen')) {
+          return new Response(JSON.stringify({ tracks: [] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }) as Response;
+        }
+        if (url.includes('/api/session')) {
+          const body = JSON.parse((init?.body as string) ?? '{}') as {
+            preferredPersona?: string;
+          };
+          createSessionCalls.push({ preferredPersona: body.preferredPersona });
+        }
+        return new Response(JSON.stringify({ session: makeClientSession() }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }) as Response;
+      }),
+    );
+
+    const { GameSession } = await import('./GameSession');
+    const sessionOver = makeClientSession({
+      id: 'session-ai-win-retrial',
+      status: 'session_over',
+      sessionWinner: 'ai',
+      self: {
+        hand: [],
+        takenCards: [],
+        roundsWon: 0,
+        strikes: 2,
+        jokers: [],
+      },
+      opponent: {
+        handSize: 0,
+        takenCards: [],
+        roundsWon: 2,
+        strikes: 0,
+        jokers: [],
+        personaIfAi: 'Novice',
+      },
+    });
+
+    let result!: ReturnType<typeof render>;
+    await act(async () => {
+      result = render(<GameSession initialSession={sessionOver} />);
+    });
+
+    localStorage.setItem(KEY, JSON.stringify({ defeated: ['Novice'] }));
+    localStorage.setItem('hearsay-tutorial-seen', '1');
+
+    await act(async () => {
+      fireEvent.click(result.getByText('RETRIAL'));
+      await new Promise(r => setTimeout(r, 20));
+    });
+
+    expect(result.getByText('BEGIN TRIAL')).toBeTruthy();
+    expect(createSessionCalls).toHaveLength(0);
+    expect(localStorage.getItem(KEY)).toBeNull();
+    expect(localStorage.getItem('hearsay-tutorial-seen')).toBeNull();
+
+    await act(async () => {
+      fireEvent.click(result.getByText('BEGIN TRIAL'));
+      await new Promise(r => setTimeout(r, 30));
+    });
+
+    expect(createSessionCalls).toContainEqual({ preferredPersona: 'Novice' });
+  });
+
+  it('shows RETRIAL when terminal strikes prove a loss even if sessionWinner is stale', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : input.toString();
+        if (url.includes('/api/music/pregen')) {
+          return new Response(JSON.stringify({ tracks: [] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }) as Response;
+        }
+        return new Response(JSON.stringify({ session: makeClientSession() }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }) as Response;
+      }),
+    );
+
+    const { GameSession } = await import('./GameSession');
+    const staleWinnerSession = makeClientSession({
+      id: 'session-stale-player-winner',
+      status: 'session_over',
+      sessionWinner: 'player',
+      self: {
+        hand: [],
+        takenCards: [],
+        roundsWon: 0,
+        strikes: 3,
+        jokers: [],
+      },
+      opponent: {
+        handSize: 2,
+        takenCards: [],
+        roundsWon: 1,
+        strikes: 0,
+        jokers: [],
+        personaIfAi: 'Novice',
+      },
+    });
+
+    let result!: ReturnType<typeof render>;
+    await act(async () => {
+      result = render(<GameSession initialSession={staleWinnerSession} />);
+      await new Promise(r => setTimeout(r, 20));
+    });
+
+    expect(result.getByText('GUILTY')).toBeTruthy();
+    expect(result.getByText('RETRIAL')).toBeTruthy();
+    expect(result.queryByText('NEXT CASE')).toBeNull();
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+});
+
 describe('GameSession gauntlet — preferredPersona routing after re-mount', () => {
   // Hackathon build (2026-04-22): GameSession now clears gauntlet progress +
   // tutorial flag on mount so every hard-refresh lands on the tutorial against

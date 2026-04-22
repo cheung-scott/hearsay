@@ -360,3 +360,84 @@ describe('invariant 12 (via brain): alreadyClaimed includes current claim', () =
     expect(result.mathProb).toBe(0.95);
   });
 });
+
+describe('aiDecideOnClaim - player bluff forgiveness', () => {
+  it('softens Defendant challenge calls unless there is a severe voice tell', async () => {
+    callLLMJudgmentSpy.mockResolvedValueOnce({
+      action: 'challenge',
+      innerThought: 'The math looks suspicious.',
+      voiceline: 'You are lying.',
+    });
+
+    const currentClaim: DecisionContext['claim'] = {
+      by: 'player',
+      count: 2,
+      claimedRank: 'Queen',
+      timestamp: 100,
+      voiceMeta: {
+        latencyMs: 0,
+        fillerCount: 0,
+        pauseCount: 0,
+        speechRateWpm: 120,
+        lieScore: 0.5,
+        parsed: { count: 2, rank: 'Queen' },
+      },
+    };
+    const priorClaim: PublicClaim = {
+      by: 'ai',
+      count: 2,
+      claimedRank: 'Queen',
+      timestamp: 10,
+    };
+
+    const result = await aiDecideOnClaim(makeDecisionCtx({
+      persona: 'Novice',
+      myHand: [
+        makeCard('King', 'K-0'),
+        makeCard('King', 'K-1'),
+        makeCard('Ace', 'A-0'),
+        makeCard('Jack', 'J-0'),
+        makeCard('Jack', 'J-1'),
+      ],
+      claim: currentClaim,
+      roundHistory: [priorClaim, currentClaim],
+    }));
+
+    expect(result.mathProb).toBe(0.95);
+    expect(result.source).toBe('llm');
+    expect(result.action).toBe('accept');
+    expect(result.innerThought).toContain('Not enough to risk calling liar.');
+  });
+
+  it('still lets the Defendant challenge when the player voice tell is severe', async () => {
+    callLLMJudgmentSpy.mockResolvedValueOnce({
+      action: 'challenge',
+      innerThought: 'That sounded very shaky.',
+      voiceline: 'You are lying.',
+    });
+
+    const claim: DecisionContext['claim'] = {
+      by: 'player',
+      count: 1,
+      claimedRank: 'Queen',
+      timestamp: 100,
+      voiceMeta: {
+        latencyMs: 0,
+        fillerCount: 3,
+        pauseCount: 2,
+        speechRateWpm: 80,
+        lieScore: 0.95,
+        parsed: { count: 1, rank: 'Queen' },
+      },
+    };
+
+    const result = await aiDecideOnClaim(makeDecisionCtx({
+      persona: 'Novice',
+      claim,
+      roundHistory: [claim],
+    }));
+
+    expect(result.action).toBe('challenge');
+    expect(result.voiceline).toBe('You are lying.');
+  });
+});

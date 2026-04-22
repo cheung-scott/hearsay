@@ -197,6 +197,19 @@ describe('useGameSession — dispatch issues fetch', () => {
     expect(calledUrl).toBe('/api/session');
   });
 
+  it('dispatch ResetSession returns to idle without fetching', async () => {
+    const initial = makeClientSession({ status: 'session_over', sessionWinner: 'ai' });
+    const { result } = renderHook(() => useGameSession(initial));
+
+    await act(async () => {
+      await result.current.dispatch({ type: 'ResetSession' });
+    });
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(result.current.state.session).toBeNull();
+    expect(result.current.state.phase).toBe('idle');
+  });
+
   // H-I2: assert that PlayerClaim dispatch threads sessionId into the body
   // (catches the CreateSession drift CRITICAL: a missing sessionId 400s silently)
   it('dispatch PlayerClaim includes sessionId in POST body (H-I2)', async () => {

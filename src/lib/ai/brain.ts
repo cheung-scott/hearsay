@@ -90,6 +90,18 @@ function pickFallbackVoiceline(persona: Persona, action: 'accept' | 'challenge')
 
 const TIMEOUT_MS = 2000;
 
+const PLAYER_CLAIM_CHALLENGE_FLOORS: Record<
+  Persona,
+  { mathProb: number; voiceLie: number }
+> = {
+  // Playtest tuning: the Defendant should be beatable. They only call a
+  // player's bluff on a severe voice tell; math suspicion alone is not enough.
+  Novice:      { mathProb: 0.96, voiceLie: 0.92 },
+  Reader:      { mathProb: 0.95, voiceLie: 0.82 },
+  Misdirector: { mathProb: 0.90, voiceLie: 0.76 },
+  Silent:      { mathProb: 0.85, voiceLie: 0.70 },
+};
+
 // ---------------------------------------------------------------------------
 // Private helper — map caught errors to AiSource telemetry tags
 // ---------------------------------------------------------------------------
@@ -98,6 +110,27 @@ function errorToSource(err: unknown): AiSource {
   if (err instanceof LLMTimeoutError)     return 'fallback-timeout';
   if (err instanceof LLMInvalidJSONError) return 'fallback-invalid-json';
   return 'fallback-network-error';
+}
+
+function softenPlayerChallenge(
+  ctx: DecisionContext,
+  decision: AiDecision,
+): AiDecision {
+  if (decision.action !== 'challenge') return decision;
+
+  const voiceLie = ctx.claim.voiceMeta?.lieScore ?? 0.5;
+  const floor = PLAYER_CLAIM_CHALLENGE_FLOORS[ctx.persona];
+  const hasStrongEvidence =
+    decision.mathProb >= floor.mathProb || voiceLie >= floor.voiceLie;
+
+  if (hasStrongEvidence) return decision;
+
+  return {
+    ...decision,
+    action: 'accept',
+    innerThought: `${decision.innerThought} Not enough to risk calling liar.`,
+    voiceline: pickFallbackVoiceline(ctx.persona, 'accept'),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -113,7 +146,7 @@ export async function aiDecideOnClaim(ctx: DecisionContext): Promise<AiDecision>
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const llm = await callLLMJudgment(ctx, mathProb, controller.signal);
-    return {
+    return softenPlayerChallenge(ctx, {
       action:       llm.action,
       innerThought: llm.innerThought,
       llmReasoning: llm.innerThought,
@@ -121,10 +154,10 @@ export async function aiDecideOnClaim(ctx: DecisionContext): Promise<AiDecision>
       source:       'llm',
       latencyMs:    performance.now() - t0,
       mathProb,
-    };
+    });
   } catch (err) {
     const fb = aiDecideOnClaimFallback(ctx);
-    return {
+    return softenPlayerChallenge(ctx, {
       action:       fb.action,
       innerThought: fb.innerThought,
       // llmReasoning intentionally omitted on fallback paths (undefined)
@@ -132,7 +165,7 @@ export async function aiDecideOnClaim(ctx: DecisionContext): Promise<AiDecision>
       source:       errorToSource(err),
       latencyMs:    performance.now() - t0,
       mathProb, // outer — same value as fb.mathProb (pure function, same ctx)
-    };
+    });
   } finally {
     clearTimeout(timer);
   }

@@ -33,6 +33,7 @@ export function TopBar({ session, progress }: TopBarProps) {
   const roundNumber = (round?.roundNumber ?? 1) as 1 | 2 | 3;
   const targetRank = round?.targetRank ?? 'Queen';
   const strikes = session.self.strikes;
+  const opponentStrikes = session.opponent.strikes;
   const roundsWon = session.self.roundsWon;
   const opponentRoundsWon = session.opponent.roundsWon;
   const roundsLost = opponentRoundsWon;
@@ -70,7 +71,12 @@ export function TopBar({ session, progress }: TopBarProps) {
         <TargetTag rank={targetRank} />
         {!isMobile && <RoundPill roundNumber={roundNumber} />}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-          <StrikeCounter strikes={strikes} />
+          <StrikeCounter strikes={strikes} label="YOU" />
+          <StrikeCounter
+            strikes={opponentStrikes}
+            label="THEM"
+            testId="opponent-strikes-row"
+          />
           <RoundsWonGavels
             roundsWon={roundsWon}
             roundsLost={roundsLost}

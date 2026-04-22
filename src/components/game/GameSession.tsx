@@ -57,6 +57,43 @@ const FINAL_WORDS_URLS: Record<Persona, string> = {
   Silent:      '/sfx/final-words/silent.mp3',
 };
 
+function deriveVerdictWinner(session: ClientSession): 'player' | 'ai' | undefined {
+  if (session.self.strikes >= 3) return 'ai';
+  if (session.opponent.strikes >= 3) return 'player';
+  if (session.sessionWinner) return session.sessionWinner;
+  if (session.self.roundsWon >= 2) return 'player';
+  if (session.opponent.roundsWon >= 2) return 'ai';
+  return undefined;
+}
+
+function progressIncludingCurrentWin(
+  progress: GauntletProgress,
+  session: ClientSession,
+): GauntletProgress {
+  const persona = session.opponent.personaIfAi;
+  if (
+    deriveVerdictWinner(session) !== 'player' ||
+    !persona ||
+    !GAUNTLET_ORDER.includes(persona) ||
+    progress.defeated.includes(persona)
+  ) {
+    return progress;
+  }
+
+  return { defeated: [...progress.defeated, persona] };
+}
+
+function latestClaimBy(session: ClientSession): 'player' | 'ai' | null {
+  const startIdx = Math.min(session.currentRoundIdx, session.rounds.length - 1);
+  for (let i = startIdx; i >= 0; i--) {
+    const history = session.rounds[i]?.claimHistory;
+    if (history && history.length > 0) {
+      return history[history.length - 1].by;
+    }
+  }
+  return null;
+}
+
 export interface GameSessionProps {
   /** Optional hydration — if provided, populates initial state (for testing). */
   initialSession?: ClientSession;
@@ -119,6 +156,19 @@ export function GameSession({ initialSession }: GameSessionProps) {
   // Derive the preferred persona for the next CreateSession call.
   const preferredPersona = nextPersona(progress) ?? undefined;
 
+  const resetToStartScreen = useCallback(async () => {
+    clearProgress();
+    const reset: GauntletProgress = { defeated: [] };
+    setProgress(reset);
+    gauntletWinFiredRef.current = null;
+    try {
+      localStorage.removeItem('hearsay-tutorial-seen');
+    } catch {
+      // localStorage unavailable — reset in memory only.
+    }
+    await dispatch({ type: 'ResetSession' });
+  }, [dispatch]);
+
   // Typewriter: 110 ms per char per DESIGN-DECISIONS.md §8.
   const { displayedText, isDone } = useTypewriter(state.lastClaimText ?? '', 110);
 
@@ -174,6 +224,8 @@ export function GameSession({ initialSession }: GameSessionProps) {
     if (nowPlayer !== prev.player || nowAi !== prev.ai) {
       const playerGained = nowPlayer > prev.player;
       const aiGained = nowAi > prev.ai;
+      const claimBy = latestClaimBy(s) ?? lastClaimByRef.current;
+      if (claimBy) lastClaimByRef.current = claimBy;
 
       // Fix (2026-04-22): outcome disambiguation now uses lastClaimByRef
       // (who made the claim that got resolved) rather than
@@ -185,7 +237,7 @@ export function GameSession({ initialSession }: GameSessionProps) {
       // lost, they wrongly challenged the opponent's honest claim.
       if (playerGained && !aiGained) {
         // Player took a strike.
-        if (lastClaimByRef.current === 'player') {
+        if (claimBy === 'player') {
           // Player lied; AI caught them.
           showOutcomeForMs('player-caught');
         } else {
@@ -194,7 +246,7 @@ export function GameSession({ initialSession }: GameSessionProps) {
         }
       } else if (aiGained && !playerGained) {
         // AI took a strike.
-        if (lastClaimByRef.current === 'ai') {
+        if (claimBy === 'ai') {
           // AI lied; player caught them.
           showOutcomeForMs('caught-lie');
         } else {
@@ -533,7 +585,7 @@ export function GameSession({ initialSession }: GameSessionProps) {
 
     // Step 2: if AI was eliminated (player won), schedule per-persona final-words
     // ~1s after the stinger ends. We use onEnded for reliable chaining.
-    if (session.sessionWinner === 'player') {
+    if (deriveVerdictWinner(session) === 'player') {
       const persona = session.opponent.personaIfAi;
       if (persona) {
         const finalWordsUrl = FINAL_WORDS_URLS[persona];
@@ -555,7 +607,7 @@ export function GameSession({ initialSession }: GameSessionProps) {
     const session = state.session;
     if (!session) return;
     if (state.phase !== 'session-over') return;
-    if (session.sessionWinner !== 'player') return;
+    if (deriveVerdictWinner(session) !== 'player') return;
     // Ref guard: only fire once per session id.
     if (gauntletWinFiredRef.current === session.id) return;
 
@@ -575,7 +627,15 @@ export function GameSession({ initialSession }: GameSessionProps) {
     });
     // gauntletWinFiredRef, saveProgress, GAUNTLET_ORDER are stable refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.phase, state.session?.id, state.session?.sessionWinner]);
+  }, [
+    state.phase,
+    state.session?.id,
+    state.session?.sessionWinner,
+    state.session?.self.strikes,
+    state.session?.opponent.strikes,
+    state.session?.self.roundsWon,
+    state.session?.opponent.roundsWon,
+  ]);
 
   // -------------------------------------------------------------------------
   // §1.5 Elimination-Beat: silent-beat before reveal
@@ -705,14 +765,16 @@ export function GameSession({ initialSession }: GameSessionProps) {
   // Render: session-over → gauntlet-complete final win screen OR NEW TRIAL CTA
   // -------------------------------------------------------------------------
   if (state.phase === 'session-over') {
-    const winner = state.session.sessionWinner;
+    const winner = deriveVerdictWinner(state.session);
     const playerWon = winner === 'player';
+    const verdictProgress = progressIncludingCurrentWin(progress, state.session);
     // Diagnostic log to catch playtest reports of "CASE DISMISSED after losing".
     // Logs the raw session-end state so we can verify sessionWinner matches
     // strikes/roundsWon on the client before the render branch is taken.
     // eslint-disable-next-line no-console
     console.log('[SESSION-OVER]', {
-      sessionWinner: winner,
+      sessionWinner: state.session.sessionWinner,
+      verdictWinner: winner,
       playerStrikes: state.session.self.strikes,
       aiStrikes: state.session.opponent.strikes,
       playerRoundsWon: state.session.self.roundsWon,
@@ -721,7 +783,7 @@ export function GameSession({ initialSession }: GameSessionProps) {
     });
 
     // Gauntlet-complete override: all 4 opponents beaten → COURT ADJOURNED screen.
-    if (isGauntletComplete(progress)) {
+    if (isGauntletComplete(verdictProgress)) {
       return (
         <div
           style={{
@@ -789,7 +851,7 @@ export function GameSession({ initialSession }: GameSessionProps) {
 
     // Subtitle copy differs by outcome + by gauntlet position (verdict stays
     // the same, but mid-gauntlet phrasing previews the next opponent).
-    const nextUp = nextPersona(progress);
+    const nextUp = playerWon ? nextPersona(verdictProgress) : nextPersona(progress);
     const subtitle = playerWon
       ? (nextUp
           ? `${PERSONA_DISPLAY_NAMES[nextUp]} rises next.`
@@ -860,15 +922,29 @@ export function GameSession({ initialSession }: GameSessionProps) {
           </p>
         </div>
         <button
+          type="button"
           onClick={async () => {
-            // Prime AudioContext inside the user gesture (autoplay policy).
-            try {
-              await music.prime();
-            } catch {
-              // music will be silently disabled
+            if (!playerWon) {
+              await resetToStartScreen();
+              return;
             }
+
+            if (!nextUp) {
+              await resetToStartScreen();
+              return;
+            }
+
+            if (verdictProgress !== progress) {
+              saveProgress(verdictProgress);
+              setProgress(verdictProgress);
+            }
+
+            // Best-effort AudioContext priming should never block case advance.
+            void music.prime().catch(() => {
+              // music will be silently disabled
+            });
             try {
-              await dispatch({ type: 'CreateSession', preferredPersona });
+              await dispatch({ type: 'CreateSession', preferredPersona: nextUp });
             } catch (err) {
               // eslint-disable-next-line no-console
               console.error('[CTA] CreateSession dispatch threw:', err);
