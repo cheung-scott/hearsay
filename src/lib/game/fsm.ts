@@ -344,10 +344,28 @@ function resolveStrikeAndPile(
     ? session[loserKey].strikes
     : session[loserKey].strikes + 1;
 
+  // Caught-bluff rule (2026-04-22 playtest-fix): if the claimant was caught
+  // lying, the cards from their lying claim return to their HAND rather than
+  // going to takenCards. Strike still applies. Kills the "bluff to shed cards"
+  // exploit (you can't win by running out of cards via bluffs if the bluffed
+  // cards bounce back). Prior pile cards (opponent's honest plays earlier in
+  // the round) still flow to the caught bluffer's takenCards as before.
+  const caughtBluff = challengeWasCorrect && loserKey === lastClaim.by;
+  const lastClaimCardIds = new Set(lastClaim.actualCardIds);
+  const returnedCards = caughtBluff
+    ? currentRound.pile.filter((c) => lastClaimCardIds.has(c.id))
+    : [];
+  const pileToTakenCards = caughtBluff
+    ? currentRound.pile.filter((c) => !lastClaimCardIds.has(c.id))
+    : currentRound.pile;
+
   const loserAfterPile = {
     ...session[loserKey],
     strikes: loserStrikesAfter,
-    takenCards: [...session[loserKey].takenCards, ...currentRound.pile],
+    hand: caughtBluff
+      ? [...session[loserKey].hand, ...returnedCards]
+      : session[loserKey].hand,
+    takenCards: [...session[loserKey].takenCards, ...pileToTakenCards],
     jokerSlots: loserKey === 'player' ? playerSlotsAfterSW : aiSlotsAfterSW,
   };
 

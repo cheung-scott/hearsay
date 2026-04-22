@@ -26,8 +26,11 @@ export type VoiceTellPreset =
 // `// TUNED: YYYY-MM-DD <note>` on any tuned entry.
 export const VOICE_PRESETS: Record<Persona, Record<TruthState, VoiceSettings>> = {
   Novice: {
-    honest: { stability: 0.85, similarity_boost: 0.85, style: 0.20, speed: 1.00 },
-    lying:  { stability: 0.20, similarity_boost: 0.75, style: 0.60, speed: 0.92 }, // obvious
+    // TUNED: 2026-04-22 — binarized tutorial tells for playtest clarity.
+    // Values exceed the ±0.1 / ±0.04 tuning band on purpose to make the
+    // honest/lying contrast max-legible for the first-opponent teaching round.
+    honest: { stability: 0.95, similarity_boost: 0.85, style: 0.10, speed: 1.04 }, // max-clean
+    lying:  { stability: 0.10, similarity_boost: 0.75, style: 0.70, speed: 0.88 }, // max-nervous
   },
   Reader: {
     honest: { stability: 0.80, similarity_boost: 0.85, style: 0.25, speed: 1.00 },
@@ -38,8 +41,13 @@ export const VOICE_PRESETS: Record<Persona, Record<TruthState, VoiceSettings>> =
     // honest = acoustically NERVOUS (low stability / high style)
     // lying  = acoustically CALM    (high stability / low style)
     // Any "normalizer" that sorts by acoustic property silently breaks this persona.
-    honest: { stability: 0.40, similarity_boost: 0.80, style: 0.55, speed: 0.95 },
-    lying:  { stability: 0.80, similarity_boost: 0.85, style: 0.25, speed: 1.00 },
+    //
+    // TUNED: 2026-04-22 — mirrors Novice binarization but inverted, so the
+    // contrast is the same magnitude (max-obvious) while keeping the trap
+    // direction (honest SOUNDS nervous, lying SOUNDS calm). Values exceed the
+    // standard ±0.1 / ±0.04 tuning band for the same reason as Novice.
+    honest: { stability: 0.10, similarity_boost: 0.75, style: 0.70, speed: 0.88 }, // nervous (inverted)
+    lying:  { stability: 0.95, similarity_boost: 0.85, style: 0.10, speed: 1.04 }, // calm (inverted)
   },
   Silent: {
     honest: { stability: 0.75, similarity_boost: 0.85, style: 0.30, speed: 1.00 },

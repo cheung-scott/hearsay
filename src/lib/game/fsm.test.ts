@@ -778,8 +778,10 @@ describe('reduce — RevealComplete (5.3)', () => {
     expect(() => reduce(session, { type: 'RevealComplete', challengeWasCorrect: false, now: 4000 })).toThrow(InvalidTransitionError);
   });
 
-  it('else-branch: challengeWasCorrect=true, hand non-empty → claimant struck, pile cleared, swap active, claim_phase', () => {
-    // Player (active) played a lying claim; AI challenged correctly; player hand still has cards
+  it('else-branch: challengeWasCorrect=true, hand non-empty → claimant struck, bluffed cards return to hand (2026-04-22 rule), swap active, claim_phase', () => {
+    // Player (active) played a lying claim; AI challenged correctly; player hand still has cards.
+    // Caught-bluff rule: the bluffed cards bounce back to the claimant's hand rather than to takenCards,
+    // so bluffing cannot be used to shed cards. Strike still applies.
     const all = make20Cards();
     const pile = [all[0]]; // Queen-0 played by player
     const claim = makeClaimFor('player', ['Queen-0'], false); // lying
@@ -799,7 +801,10 @@ describe('reduce — RevealComplete (5.3)', () => {
     expect(round.pile).toEqual([]);
     expect(out.player.strikes).toBe(1);   // claimant punished
     expect(out.ai.strikes).toBe(0);
-    expect(out.player.takenCards).toHaveLength(1);
+    // Bluffed card returned to claimant's HAND (new rule), not takenCards.
+    expect(out.player.hand).toHaveLength(5); // 4 remaining + 1 returned
+    expect(out.player.hand.some((c) => c.id === 'Queen-0')).toBe(true);
+    expect(out.player.takenCards).toHaveLength(0);
     expect(out.ai.takenCards).toHaveLength(0);
   });
 
@@ -828,14 +833,16 @@ describe('reduce — RevealComplete (5.3)', () => {
     expect(out.player.takenCards).toHaveLength(0);
   });
 
-  // Invariant 6: Caught-on-final-card-lie → opponent wins round
-  it('Invariant 6: caught-on-final-card-lie → round_over, opponent wins, active strikes+1, pile → active.takenCards', () => {
+  // Invariant 6 (REVISED 2026-04-22): caught-on-final-card-lie no longer ends the round by
+  // emptying the liar's hand, because the bluffed cards now return to the liar's HAND under
+  // the caught-bluff rule. Round continues, active swaps, strike still applies.
+  it('Invariant 6 (revised): caught-on-final-card-lie → round continues (cards return to hand), claimant struck, active swaps', () => {
     const all = make20Cards();
-    const pile = [all[0]]; // Queen-0 was the final (only) card played by player
+    const pile = [all[0]]; // Queen-0 was the "final" lying card played by player
     const claim = makeClaimFor('player', ['Queen-0'], false); // lying claim
     const session = makeSessionInResolvingPhase({
       activePlayer: 'player',
-      playerHand: [],          // hand NOW empty (played last card)
+      playerHand: [],          // hand was empty before caught-bluff — but rule returns the bluffed card
       aiHand: all.slice(5, 10),
       deck: all.slice(10, 20),
       pile,
@@ -844,11 +851,13 @@ describe('reduce — RevealComplete (5.3)', () => {
 
     const out = reduce(session, { type: 'RevealComplete', challengeWasCorrect: true, now: 4000 });
     const round = out.rounds[out.currentRoundIdx];
-    expect(round.status).toBe('round_over');
-    expect(round.winner).toBe('ai');       // opponent wins
+    // Round continues: claimant's hand no longer empty (bluffed card returned).
+    expect(round.status).toBe('claim_phase');
+    expect(round.activePlayer).toBe('ai'); // swapped
     expect(round.pile).toEqual([]);
     expect(out.player.strikes).toBe(1);   // active (liar) struck
-    expect(out.player.takenCards).toEqual([all[0]]); // pile → active.takenCards
+    expect(out.player.hand).toEqual([all[0]]); // Queen-0 bounced back
+    expect(out.player.takenCards).toHaveLength(0);
     expect(out.ai.takenCards).toHaveLength(0);
   });
 
@@ -2510,8 +2519,11 @@ describe('Integration: joker lifecycle walkthrough (I2, I8, I10)', () => {
       const outRound = out.rounds[out.currentRoundIdx];
       expect(outRound.jokerTriggeredThisRound).toContain('second_wind');
 
-      // Pile transferred to loser (player, the claimant)
-      expect(out.player.takenCards).toHaveLength(1);
+      // Caught-bluff rule (2026-04-22): bluffed cards return to claimant's HAND,
+      // not takenCards. Orthogonal to Second Wind — SW only cancels the strike,
+      // it doesn't alter the card-return behaviour.
+      expect(out.player.takenCards).toHaveLength(0);
+      expect(out.player.hand.some((c) => c.id === 'Queen-0')).toBe(true);
     });
 
     it('contrast: player has second_wind but WINS challenge (no strike incoming) → stays held (Req 14.4)', () => {
