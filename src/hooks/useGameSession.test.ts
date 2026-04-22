@@ -236,6 +236,49 @@ describe('useGameSession — dispatch issues fetch', () => {
     expect(body.type).toBe('PlayerClaim');
     expect(Array.isArray(body.cards)).toBe(true);
   });
+
+  it('dispatch PlayerClaim stores server speech parse visualization data', async () => {
+    const responseSession = makeClientSession({
+      status: 'round_active',
+      rounds: [makeClientRound({ status: 'claim_phase', activePlayer: 'ai' })],
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          session: responseSession,
+          playerSpeech: {
+            transcript: 'uh one queen',
+            parsed: { count: 1, rank: 'Queen' },
+            expected: { count: 1, rank: 'Queen' },
+            valid: true,
+          },
+        }),
+      }),
+    );
+
+    const initial = makeClientSession({ id: 'claim-session-id' });
+    const { result } = renderHook(() => useGameSession(initial));
+    const fakeCard = initial.self.hand[0];
+    const fakeBlob = new Blob(['audio-data'], { type: 'audio/webm' });
+
+    await act(async () => {
+      await result.current.dispatch({
+        type: 'PlayerClaim',
+        cards: [fakeCard],
+        audio: fakeBlob,
+        claimText: '1 Queen',
+      });
+    });
+
+    expect(result.current.state.lastPlayerSpeechParse).toEqual({
+      transcript: 'uh one queen',
+      parsed: { count: 1, rank: 'Queen' },
+      expected: { count: 1, rank: 'Queen' },
+      valid: true,
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

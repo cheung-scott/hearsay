@@ -14,6 +14,7 @@
  */
 
 import React from 'react';
+import type { PlayerSpeechParse } from '@/hooks/useGameSession';
 
 // ---------------------------------------------------------------------------
 // YouPlayedBanner — STT readback shown after player makes a claim.
@@ -58,6 +59,69 @@ export function YouPlayedBanner({ text, visible }: YouPlayedBannerProps) {
         YOU CALLED ·
       </span>
       <span style={{ color: 'var(--bone, #e8dcc8)' }}>{text}</span>
+    </div>
+  );
+}
+
+export interface SpeechParseBannerProps {
+  parse?: PlayerSpeechParse;
+  visible: boolean;
+}
+
+function formatParsedClaim(parsed: PlayerSpeechParse['parsed']): string {
+  if (!parsed) return 'NOT RECOGNIZED';
+  const rank = parsed.count === 2 ? `${parsed.rank}s` : parsed.rank;
+  return `${parsed.count} ${rank}`;
+}
+
+function formatExpectedClaim(expected: PlayerSpeechParse['expected']): string {
+  const rank = expected.count === 2 ? `${expected.rank}s` : expected.rank;
+  return `${expected.count} ${rank}`;
+}
+
+export function SpeechParseBanner({ parse, visible }: SpeechParseBannerProps) {
+  if (!visible || !parse) return null;
+  const transcript = parse.transcript.trim() || '(no speech recognized)';
+  const accent = parse.valid ? 'var(--amber-hi, #ffc760)' : 'var(--coral, #fd5f55)';
+
+  return (
+    <div
+      data-testid="speech-parse-banner"
+      data-valid={parse.valid ? 'true' : 'false'}
+      style={{
+        position: 'fixed',
+        bottom: '19%',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: 'min(520px, 92vw)',
+        zIndex: 29,
+        background: 'rgba(10,16,8,0.92)',
+        border: `2px solid ${accent}`,
+        color: 'var(--bone, #e8dcc8)',
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: '8px',
+        letterSpacing: '1px',
+        lineHeight: 1.6,
+        padding: '10px 12px',
+        boxShadow: '4px 4px 0 0 var(--shadow, rgba(0,0,0,0.5))',
+        pointerEvents: 'none',
+        textTransform: 'uppercase',
+        userSelect: 'none',
+      }}
+    >
+      <div style={{ color: accent, marginBottom: '5px' }}>
+        SPEECH PARSE {parse.valid ? 'OK' : 'FAILED'}
+      </div>
+      <div>
+        <span style={{ color: 'var(--bone-dim, #a09070)' }}>HEARD: </span>
+        <span>{transcript}</span>
+      </div>
+      <div>
+        <span style={{ color: 'var(--bone-dim, #a09070)' }}>PARSED: </span>
+        <span>{formatParsedClaim(parse.parsed)}</span>
+        <span style={{ color: 'var(--bone-dim, #a09070)' }}> / EXPECTED: </span>
+        <span>{formatExpectedClaim(parse.expected)}</span>
+      </div>
     </div>
   );
 }

@@ -34,6 +34,7 @@ import { ClerkTutorial } from './Scene/ClerkTutorial';
 import { useTutorial } from '@/hooks/useTutorial';
 import {
   YouPlayedBanner,
+  SpeechParseBanner,
   ChallengeOutcomeBanner,
   type ChallengeOutcome,
 } from './Scene/OutcomeBanners';
@@ -1115,6 +1116,10 @@ export function GameSession({ initialSession }: GameSessionProps) {
 
       {/* STT readback + outcome banner — playtest fixes. */}
       <YouPlayedBanner text={lastPlayerClaimText} visible={youPlayedVisible} />
+      <SpeechParseBanner
+        parse={state.lastPlayerSpeechParse}
+        visible={youPlayedVisible}
+      />
       <ChallengeOutcomeBanner outcome={outcome} />
 
       {/* ClerkTutorial — 7-step annotated walkthrough, first session only.

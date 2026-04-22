@@ -319,9 +319,16 @@ describe('Invariant 9 — chain AI judgment inline (PlayerClaim)', () => {
     expect(aiDecideOnClaimSpy()).toHaveBeenCalledOnce();
 
     expect(body).toHaveProperty('aiDecision');
+    expect(body).toHaveProperty('playerSpeech');
     const aiDecision = body.aiDecision as { action: string; innerThought: string };
     expect(aiDecision.action).toBe('accept');
     expect(aiDecision.innerThought).toBe('Seems fine to me.');
+    expect(body.playerSpeech).toMatchObject({
+      transcript: 'One Queen.',
+      parsed: { count: 1, rank: 'Queen' },
+      expected: { count: 1, rank: 'Queen' },
+      valid: true,
+    });
   });
 
   it('AI challenging a valid honest player claim gives the strike to the AI', async () => {

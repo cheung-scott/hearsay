@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { ClientSession, Card } from '../lib/game/types';
+import type { ClientSession, Card, Rank } from '../lib/game/types';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -26,6 +26,13 @@ export type GamePhase =
   | 'round-over'
   | 'session-over';
 
+export interface PlayerSpeechParse {
+  transcript: string;
+  parsed: { count: 1 | 2; rank: Rank } | null;
+  expected: { count: 1 | 2; rank: Rank };
+  valid: boolean;
+}
+
 export interface GameSessionState {
   session: ClientSession | null;
   phase: GamePhase;
@@ -39,6 +46,8 @@ export interface GameSessionState {
   lastAiResponseAudioUrl?: string;
   /** Text version of the above — rendered alongside the audio for clarity. */
   lastAiResponseText?: string;
+  /** Last player STT transcript + parsed claim phrase returned by the server. */
+  lastPlayerSpeechParse?: PlayerSpeechParse;
   error?: string;
 }
 
@@ -142,6 +151,9 @@ export function useGameSession(initialSession?: ClientSession): {
   const [lastAiResponseText, setLastAiResponseText] = useState<
     string | undefined
   >(undefined);
+  const [lastPlayerSpeechParse, setLastPlayerSpeechParse] = useState<
+    PlayerSpeechParse | undefined
+  >(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
 
   // Card selection — local Set<CardId>.
@@ -209,6 +221,7 @@ export function useGameSession(initialSession?: ClientSession): {
         setLastClaimText(undefined);
         setLastAiResponseAudioUrl(undefined);
         setLastAiResponseText(undefined);
+        setLastPlayerSpeechParse(undefined);
         setError(undefined);
         setSelectedCardIds(new Set());
         return;
@@ -267,6 +280,7 @@ export function useGameSession(initialSession?: ClientSession): {
           session: ClientSession;
           aiClaim?: { claimText: string; ttsAudioUrl: string };
           aiResponse?: { voiceline: string; audioUrl: string; persona: string };
+          playerSpeech?: PlayerSpeechParse;
         };
 
         // Second stale-response guard after JSON parse (async boundary).
@@ -291,6 +305,11 @@ export function useGameSession(initialSession?: ClientSession): {
           setLastAiResponseAudioUrl(aiResponse.audioUrl);
           setLastAiResponseText(aiResponse.voiceline);
         }
+        if (data.playerSpeech) {
+          setLastPlayerSpeechParse(data.playerSpeech);
+        } else if (event.type === 'CreateSession') {
+          setLastPlayerSpeechParse(undefined);
+        }
         setError(undefined);
 
         const derived = derivePhase(newSession, newAudioUrl);
@@ -314,6 +333,7 @@ export function useGameSession(initialSession?: ClientSession): {
     lastClaimText,
     lastAiResponseAudioUrl,
     lastAiResponseText,
+    lastPlayerSpeechParse,
     error,
   };
 

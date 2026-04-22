@@ -214,6 +214,7 @@ export async function POST(req: Request): Promise<Response> {
 
       // Run STT on the audio blob.
       let voiceMeta: VoiceMeta;
+      let speechTranscript = '';
       try {
         const client = makeElevenLabsClient();
         const audioBuffer = base64ToBuffer(audioBase64);
@@ -222,6 +223,7 @@ export async function POST(req: Request): Promise<Response> {
         new Uint8Array(plainArrayBuffer).set(audioBuffer);
         const audioBlob = new Blob([plainArrayBuffer], { type: 'audio/webm' });
         const metaFromAudio = await computeVoiceMetaFromAudio(audioBlob, client);
+        speechTranscript = metaFromAudio.transcript;
         voiceMeta = {
           latencyMs: metaFromAudio.latencyMs,
           fillerCount: metaFromAudio.fillerCount,
@@ -229,7 +231,7 @@ export async function POST(req: Request): Promise<Response> {
           speechRateWpm: metaFromAudio.speechRateWpm,
           lieScore: metaFromAudio.lieScore,
           // Parse the spoken claim from the transcript.
-          parsed: parseClaim(metaFromAudio.transcript),
+          parsed: parseClaim(speechTranscript),
         };
       } catch {
         // STT failure is non-fatal — use fallback VoiceMeta.
@@ -356,6 +358,15 @@ export async function POST(req: Request): Promise<Response> {
           voiceline: aiDecision.voiceline,
           audioUrl: aiResponseAudioUrl,
           persona: respondingPersona,
+        },
+        playerSpeech: {
+          transcript: speechTranscript,
+          parsed: voiceMeta.parsed,
+          expected: {
+            count: actualCardIds.length as 1 | 2,
+            rank: currentRound.targetRank,
+          },
+          valid: !forceChallengeForInvalidSpeech,
         },
       });
     }
