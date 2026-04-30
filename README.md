@@ -1,8 +1,10 @@
 # Hearsay
 
+> **3rd of 74** · [ElevenLabs × AWS Kiro hackathon](https://hacks.elevenlabs.io/hackathons/4) (April 2026) · $2,330 prize ($2,000 cash + 1 month ElevenLabs Scale)
+>
 > A voice-bluffing card game where the AI's voice betrays its lies — and yours might too.
 
-**[Play the live demo](https://hearsay-hazel.vercel.app)** · Built for [ElevenHacks](https://elevenhacks.xyz) Hack #5 (AWS Kiro partner week, Apr 16–23 2026).
+**[Play the live demo](https://hearsay-hazel.vercel.app)** · Built solo in 8 days for [ElevenHacks Hack #5: Kiro](https://hacks.elevenlabs.io/hackathons/4) (AWS Kiro partner week, Apr 16–23 2026) · [Submission page](https://hacks.elevenlabs.io/submissions/d97fc6ba-31ea-4312-b5c5-3247af652f24)
 
 ---
 
